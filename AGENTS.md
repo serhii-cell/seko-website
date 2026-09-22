@@ -60,6 +60,13 @@ Task-specific procedures live in `.claude/skills/`, one folder each, with a
 - `lumos-upgrade-version` — move a site onto the latest framework without losing its
   customizations. Three-way merges against the commit it was scaffolded from,
   and pixel-diffs every page before and after.
+- `gsap-core`, `gsap-timeline`, `gsap-scrolltrigger`, `gsap-plugins`,
+  `gsap-utils`, `gsap-performance`, `gsap-frameworks` — GreenSock's official
+  GSAP skills, copied unchanged from
+  [greensock/gsap-skills](https://github.com/greensock/gsap-skills) at commit
+  `aed9cfd` and kept out of Prettier so they stay identical. To update, copy
+  the folders again from a newer commit and change it here. Where they differ
+  from MOTION.md, MOTION.md wins.
 
 In Claude Code these load on their own, or with `/lumos-import-figma`. Any other
 assistant can read the `SKILL.md` directly and follow it — the steps are plain
