@@ -1,10 +1,9 @@
 /** Site name. Appended to every page title and used as `og:site_name`. */
-export const SITE_NAME = "Lumos Framework";
+export const SITE_NAME = "Seko";
 /** Fallback meta description for pages that don't set their own. */
-export const SITE_DESCRIPTION =
-  "Lumos is a cutting-edge framework for building Astro sites. It's designed with efficiency, scaleability, and accessibility at its core.";
+export const SITE_DESCRIPTION = "The official website of Seko.";
 /** Canonical origin. Resolves canonical URLs, social images, and the sitemap. */
-export const SITE_URL = "https://preview.lumosframework.com";
+export const SITE_URL = "https://seko-website-seven.vercel.app";
 /** BCP 47 locale tag used to format dates and numbers. */
 export const SITE_LOCALE = "en-US";
 /**
