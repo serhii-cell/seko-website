@@ -1,0 +1,62 @@
+<script>
+  import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  const blocks = [
+    ".section > .container > .layout > * > *",
+    ".section > .container > .grid > *",
+    ".section > .container > :not(.layout, .grid)",
+  ].join(", ");
+
+  onPage(() => {
+    const main = document.querySelector<HTMLElement>("main[data-reveal]");
+    const designing =
+      document.documentElement.classList.contains("stacki-designer");
+    if (!main || designing) return;
+
+    const mm = gsap.matchMedia();
+
+    mm.add("(prefers-reduced-motion: no-preference)", (context) => {
+      const targets = gsap.utils
+        .toArray<HTMLElement>(blocks, main)
+        .filter(
+          (block) =>
+            block.getClientRects().length > 0 &&
+            getComputedStyle(block).visibility !== "hidden" &&
+            !ScrollTrigger.isInViewport(block),
+        );
+      const opacity = new Map<Element, string>(
+        targets.map((block) => [block, getComputedStyle(block).opacity]),
+      );
+
+      const settle = "opacity,visibility,transform";
+
+      const reveal = context.add("reveal", (batch: Element[]) => {
+        const passed = batch.filter(
+          (block) => block.getBoundingClientRect().bottom <= 0,
+        );
+        const entering = batch.filter((block) => !passed.includes(block));
+
+        if (passed.length > 0) gsap.set(passed, { clearProps: settle });
+        if (entering.length > 0) {
+          gsap.to(entering, {
+            autoAlpha: (_: number, block: Element) =>
+              Number(opacity.get(block)),
+            y: 0,
+            stagger: 0.08,
+            clearProps: settle,
+          });
+        }
+      });
+
+      gsap.set(targets, { autoAlpha: 0, y: "2rem" });
+      ScrollTrigger.batch(targets, {
+        start: "top 90%",
+        once: true,
+        onEnter: (batch) => reveal(batch),
+      });
+    });
+
+    return () => mm.revert();
+  });
+</script>

@@ -4,6 +4,8 @@ import BaseHead from "@/components/Utility/BaseHead.astro";
 import SkipLink from "@/components/Global/SkipLink.astro";
 import Nav from "@/components/Global/Nav.astro";
 import Footer from "@/components/Global/Footer.astro";
+import SmoothScroll from "@/components/Global/SmoothScroll.astro";
+import ScrollReveal from "@/components/Global/ScrollReveal.astro";
 import type { SeoProps } from "@/types.ts";
 
 type Props = SeoProps & {
@@ -15,9 +17,19 @@ type Props = SeoProps & {
    * `paddingTop="navoverlap"` to clear the bar.
    */
   overlap?: boolean;
+  /**
+   * Fade each block of content up into place the first time it scrolls into
+   * view. Blocks already on screen when the page loads stay as they are.
+   */
+  reveal?: boolean;
 };
 
-const { theme = "inherit", overlap = false, ...seo } = Astro.props;
+const {
+  theme = "inherit",
+  overlap = false,
+  reveal = false,
+  ...seo
+} = Astro.props;
 ---
 
 <!doctype html>
@@ -29,9 +41,11 @@ const { theme = "inherit", overlap = false, ...seo } = Astro.props;
   <body>
     <SkipLink />
     <Nav overlap={overlap} />
-    <main id="main" tabindex="-1">
+    <main id="main" tabindex="-1" data-reveal={reveal ? "" : undefined}>
       <slot />
     </main>
     <Footer />
+    <SmoothScroll />
+    {reveal && <ScrollReveal />}
   </body>
 </html>
