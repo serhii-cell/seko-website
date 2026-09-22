@@ -1,0 +1,114 @@
+---
+import Section from "@/components/Wrapper/Section.astro";
+import ContentWrapper from "@/components/Wrapper/ContentWrapper.astro";
+import Heading from "@/components/Typography/Heading.astro";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+import ButtonWrapper from "@/components/Wrapper/ButtonWrapper.astro";
+import Button from "@/components/Button.astro";
+import AsciiStage from "@/components/Media/AsciiStage.astro";
+
+interface Props {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** The page's main heading. Nothing is output without it. */
+  heading?: string;
+  /** The paragraph beside the heading. */
+  text?: string;
+  /** The button's label. The button is left out without it. */
+  buttonText?: string;
+  /** Where the button goes. */
+  buttonHref?: string;
+}
+
+const {
+  render = true,
+  heading,
+  text,
+  buttonText,
+  buttonHref = "#",
+} = Astro.props;
+---
+
+{
+  render && heading && (
+    <Section
+      class="hero-main_wrap"
+      paddingTop="even"
+      paddingBottom="even"
+      containerClass="hero-main_container"
+    >
+      <div class="hero-main_stage">
+        <AsciiStage />
+      </div>
+      <ContentWrapper
+        variant="columns"
+        class="hero-main_intro"
+        column1Class="align-self-start"
+      >
+        <Heading tag="h1" variant="h1" class="hero-main_title" data-intro>
+          {heading}
+        </Heading>
+        <Fragment slot="column2">
+          <Paragraph
+            variant="large"
+            class="hero-main_text color-faded"
+            data-intro
+            render={!!text}
+          >
+            {text}
+          </Paragraph>
+          <ButtonWrapper data-intro render={!!buttonText}>
+            <Button element="link" href={buttonHref} class="hero-main_button">
+              {buttonText}
+            </Button>
+          </ButtonWrapper>
+        </Fragment>
+      </ContentWrapper>
+    </Section>
+  )
+}
+
+<style is:global>
+  @layer components {
+    .hero-main_wrap {
+      height: calc(100svh - var(--nav-height));
+      min-height: 30rem;
+    }
+
+    .hero-main_container {
+      flex: 1 1 auto;
+      min-height: 0;
+      align-items: stretch;
+    }
+
+    .hero-main_stage {
+      flex: 1 1 auto;
+      min-height: 7.5rem;
+    }
+
+    .hero-main_intro {
+      flex: none;
+      row-gap: var(--space-4);
+      @media (width >= 64rem) {
+        &.columns {
+          grid-template-columns: minmax(0, 11fr) minmax(0, 8fr);
+        }
+      }
+    }
+
+    .hero-main_button {
+      min-height: calc(var(--space-6) + var(--space-4));
+    }
+
+    /* Short screens: the type gives way so the hero still fits one screen. */
+    @media (width >= 48rem) and (height <= 51.25rem) {
+      .hero-main_title {
+        font-size: min(var(--h1), 6.2svh);
+      }
+
+      .hero-main_text {
+        font-size: max(1rem, min(var(--text-large), 2.5svh));
+      }
+    }
+  }
+</style>
