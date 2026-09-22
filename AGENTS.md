@@ -6,8 +6,8 @@ with plain CSS and custom properties.
 It is not **Lumos for Webflow**, which is a different product with its own
 class naming, structure and utilities. If a Lumos skill targeting Webflow is
 installed on your account, ignore it while working here — none of its
-conventions apply. What governs this project is LUMOS.md and the skills in
-`.claude/skills/`.
+conventions apply. What governs this project is LUMOS.md, MOTION.md and the
+skills in `.claude/skills/`.
 
 ## Development
 
@@ -37,6 +37,11 @@ Consult these guides before working on related tasks:
 Read [LUMOS.md](LUMOS.md) before adding pages, components, or styles. It
 covers the conventions that keep a Lumos site consistent as it grows.
 
+Read [MOTION.md](MOTION.md) before adding a script, an animation, a page
+transition or anything from Osmo. It covers the page lifecycle every script
+follows, GSAP, Astro's router in place of Barba.js, and how an Osmo resource
+becomes a Lumos component.
+
 ## Skills
 
 Task-specific procedures live in `.claude/skills/`, one folder each, with a
@@ -55,6 +60,13 @@ Task-specific procedures live in `.claude/skills/`, one folder each, with a
 - `lumos-upgrade-version` — move a site onto the latest framework without losing its
   customizations. Three-way merges against the commit it was scaffolded from,
   and pixel-diffs every page before and after.
+- `gsap-core`, `gsap-timeline`, `gsap-scrolltrigger`, `gsap-plugins`,
+  `gsap-utils`, `gsap-performance`, `gsap-frameworks` — GreenSock's official
+  GSAP skills, copied unchanged from
+  [greensock/gsap-skills](https://github.com/greensock/gsap-skills) at commit
+  `aed9cfd` and kept out of Prettier so they stay identical. To update, copy
+  the folders again from a newer commit and change it here. Where they differ
+  from MOTION.md, MOTION.md wins.
 
 In Claude Code these load on their own, or with `/lumos-import-figma`. Any other
 assistant can read the `SKILL.md` directly and follow it — the steps are plain

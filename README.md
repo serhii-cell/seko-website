@@ -20,8 +20,9 @@ npm run dev
 | `npm run check`   | Type-checks every `.astro` file   |
 | `npm run format`  | Formats the project with Prettier |
 
-Read [LUMOS.md](LUMOS.md) before adding pages, components or styles. The
-component reference and guides are at
+Read [LUMOS.md](LUMOS.md) before adding pages, components or styles, and
+[MOTION.md](MOTION.md) before adding scripts, animation, page transitions or
+Osmo resources. The component reference and guides are at
 [lumosframework.com](https://lumosframework.com).
 
 ## Branches
