@@ -1,40 +1,14 @@
-<p align="center">
-  <img src=".github/assets/banner.png" alt="Lumos For Astro" width="720">
-</p>
+# Seko website
 
-<p align="center">
-  <a href="https://www.npmjs.com/package/create-lumos"><img alt="npm version" src="https://img.shields.io/npm/v/create-lumos?labelColor=1E1E1E&color=C6FB50"></a>
-  <a href="LICENSE"><img alt="license" src="https://img.shields.io/npm/l/create-lumos?labelColor=1E1E1E&color=C6FB50"></a>
-  <a href="https://github.com/lumosframework/lumos-for-astro/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/lumosframework/lumos-for-astro/actions/workflows/ci.yml/badge.svg"></a>
-</p>
+The Seko website, built with [Astro](https://astro.build) on
+[Lumos for Astro](https://lumosframework.com) 0.0.3.
 
-A component and styling framework for building Astro sites, designed around
-efficiency, scalability and accessibility.
+## Run it locally
 
-Documentation lives at **[lumosframework.com](https://lumosframework.com)**.
-
-> **Beta.** Every `0.x` release is allowed to break things, and the component
-> props and their placements are the parts still moving — the tokens, layers and
-> CSS are not. `v1.0.0` is where the API gets committed to; breaking it after
-> that would take a `v2.0.0`.
->
-> Starting a site before then does not strand it. `create-lumos` stamps the
-> commit your site came from, and `/lumos-upgrade-version` three-way merges each
-> release into your own changes and pixel-diffs every page, so an upgrade is a
-> reviewed diff rather than a rewrite. The badge above carries the current
-> release.
-
-## Getting started
+Node 22.12 or newer is required.
 
 ```sh
-npm create lumos@latest my-site
-```
-
-That scaffolds a new site from this repository and installs its dependencies
-with whichever package manager you ran it with. Then:
-
-```sh
-cd my-site
+npm install
 npm run dev
 ```
 
@@ -46,21 +20,65 @@ npm run dev
 | `npm run check`   | Type-checks every `.astro` file   |
 | `npm run format`  | Formats the project with Prettier |
 
-Node 22.12 or newer is required.
-
-## Documentation
-
-Component reference, styling guides and examples are at
+Read [LUMOS.md](LUMOS.md) before adding pages, components or styles. The
+component reference and guides are at
 [lumosframework.com](https://lumosframework.com).
 
-## Contributing
+## Branches
 
-Read
-[CONTRIBUTING.md](https://github.com/lumosframework/lumos-for-astro/blob/main/CONTRIBUTING.md)
-first — a pull request needs the
-[CLA](https://github.com/lumosframework/lumos-for-astro/blob/main/CLA.md)
-signed before it can be merged.
+| Branch      | Holds                                                   |
+| ----------- | ------------------------------------------------------- |
+| `main`      | The live site. It only changes by merging `develop` in. |
+| `develop`   | Finished work waiting for the next release.             |
+| `feature/*` | One piece of work each, branched off `develop`.         |
+
+Start new work from an up-to-date `develop`:
+
+```sh
+git switch develop
+git pull
+git switch -c feature/home-hero
+```
+
+Commit as you go, then push the branch and open a pull request into `develop`:
+
+```sh
+git push -u origin feature/home-hero
+gh pr create --base develop
+```
+
+To release, open a pull request from `develop` into `main`:
+
+```sh
+gh pr create --base main --head develop --title "Release"
+```
+
+## GitHub account
+
+The repository belongs to [serhii-cell](https://github.com/serhii-cell), and
+commits are authored as `Serhii Shepel <serhii@seko.design>`.
+
+On a machine signed in to several GitHub accounts, pin the clone to
+serhii-cell in its local git config. Switching the active `gh` account for
+other projects then doesn't change who commits or pushes here:
+
+```sh
+git config user.name "Serhii Shepel"
+git config user.email "serhii@seko.design"
+git config credential.https://github.com.helper ""
+git config --add credential.https://github.com.helper '!f() { test "$1" = get || return 0; t=$(gh auth token --hostname github.com --user serhii-cell) || return 0; echo username=serhii-cell; echo "password=$t"; }; f'
+```
+
+`gh` commands such as `gh pr create` still use whichever account is active, so
+run `gh auth switch --user serhii-cell` first if another one is.
+
+## Upgrading Lumos
+
+Run `/lumos-upgrade-version` in Claude Code, or follow
+[its steps](.claude/skills/lumos-upgrade-version/SKILL.md) by hand. It needs a
+clean working tree, so do it on its own branch off `develop`.
 
 ## License
 
-[MIT](LICENSE)
+[LICENSE](LICENSE) is Lumos for Astro's MIT license, which covers the framework
+code this site is built from.
