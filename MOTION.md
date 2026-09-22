@@ -11,6 +11,9 @@ and CSS; this covers what changes once JavaScript is involved.
   two routers fight over the same clicks. See [Why not Barba](#why-not-barba).
 - **Animation:** GSAP from npm, plugins included — ScrollTrigger, SplitText,
   Flip — all imported from that one package. No CDN copies.
+- **GSAP skills:** GreenSock's official skills in `.claude/skills/gsap-*`,
+  copied unchanged. They cover GSAP itself; where they differ from this file,
+  this file wins — Lenis rather than ScrollSmoother, for one.
 - **Smooth scroll:** Lenis, only if the design calls for it.
 - CSS stays the first choice for hovers and simple state changes, on the
   `--hover-*` and `--open-*` tokens in `src/styles/base.css`. GSAP is for
@@ -33,17 +36,18 @@ function registry in Osmo's boilerplate:
   outside its own elements: listeners on `window` or `document`, observers,
   intervals.
 
-Both go through one helper, `src/utils/lifecycle.ts`, so components never listen
-for router events themselves. It ties start to `astro:page-load` and clean up
-to `astro:before-swap`, and it works without the router too: the
-`astro-view-transitions-enabled` meta tag says which case applies.
+Both go through `onPage()` from `src/utils/lifecycle.ts`, so components never
+listen for router events themselves: a script hands it a start function, which
+returns its clean up. It starts the first page itself, then follows
+`astro:page-load` and `astro:before-swap`, so the same script works with the
+router on or off.
 
 ## Script checklist
 
 Every box has to be ticked before a script is accepted.
 
 - [ ] Lives in the component that needs it, per LUMOS.md, and registers
-      through the lifecycle helper rather than moving to a global file.
+      through `onPage()` rather than moving to a global file.
 - [ ] Finds its elements from the component's root class. Behavior hooks and
       per-instance settings may be `data-` attributes, as Osmo's are; looks stay
       on Lumos classes and variants.
@@ -134,18 +138,17 @@ grid-to-detail with Flip, needs a custom `event.swap` in `astro:before-swap`
 that keeps the old content on the page, and animates both once the swap is
 done.
 
-## Not set up yet
+## Before the first page transition
 
-None of this is installed: no GSAP, no router, no helper. The first time a
-script or animation is added, do it in this order:
+GSAP, `src/utils/gsap.ts` and `src/utils/lifecycle.ts` are in place, and new
+scripts use them from the start. The router isn't on yet. Before it is, in this
+order:
 
-1. Install GSAP and add `src/utils/gsap.ts`.
-2. Add `src/utils/lifecycle.ts`.
-3. Move the ten Lumos components with scripts onto it: Form, Range, Nav,
-   Footer, Accordion, Dropdown, Marquee, Modal, Slider and Tabs. Each wires
+1. Move the ten Lumos components with scripts onto `onPage()`: Form, Range,
+   Nav, Footer, Accordion, Dropdown, Marquee, Modal, Slider and Tabs. Each wires
    itself up once at load, and Nav, Dropdown, Modal and Accordion attach
    listeners or observers to the whole document that are never removed, so all
    ten break or leak after the first page change.
-4. Add `<ClientRouter />` to `BaseHead.astro`, only once all ten are moved.
+2. Add `<ClientRouter />` to `BaseHead.astro`, only once all ten are moved.
 
 Remove this section once that's done.
