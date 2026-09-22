@@ -14,7 +14,10 @@ and CSS; this covers what changes once JavaScript is involved.
 - **GSAP skills:** GreenSock's official skills in `.claude/skills/gsap-*`,
   copied unchanged. They cover GSAP itself; where they differ from this file,
   this file wins — Lenis rather than ScrollSmoother, for one.
-- **Smooth scroll:** Lenis, only if the design calls for it.
+- **Smooth scroll:** Lenis, on every page through `SmoothScroll`. It pauses
+  while Lumos locks the page for an open modal, lets inner scroll areas scroll
+  natively, and turns itself off for reduced motion. It leaves in-page links to
+  the browser, so the skip link still moves focus.
 - CSS stays the first choice for hovers and simple state changes, on the
   `--hover-*` and `--open-*` tokens in `src/styles/base.css`. GSAP is for
   anything sequenced, scroll-driven or split into parts.
@@ -66,8 +69,27 @@ Every box has to be ticked before a script is accepted.
 - [ ] Keeps content visible if JavaScript never runs. Anything hidden before
       its entrance is hidden under a class a script sets on `<html>`, never by
       default CSS.
-- [ ] Refreshes ScrollTrigger once its layout has settled — images, fonts,
-      split text — never on a timer.
+- [ ] Leaves content alone in Lumos's visual designer, when `<html>` has
+      `stacki-designer`: nothing is hidden or animated there.
+- [ ] Refreshes ScrollTrigger after anything it changes that moves layout —
+      split text, added content — never on a timer. ScrollTrigger refreshes
+      itself on load and resize.
+
+## Site-wide pieces
+
+`BaseLayout` renders these once. They output a script and no markup, so they
+take no `render` prop; the layout decides where they appear.
+
+- **`SmoothScroll`** starts Lenis once per visit and drives it from GSAP's
+  ticker, so ScrollTrigger reads the same scroll position. Its CSS is Lenis's
+  own, class names included.
+- **`ScrollReveal`** runs on pages whose layout has `reveal`. It fades each
+  block up the first time it scrolls into view: every item in a section's
+  top-level `ContentWrapper`, every item of a top-level `Grid`, and any other
+  top-level block whole. Nothing inside Tabs, Sliders or Modals is touched, so a
+  hidden panel can't stay hidden. Blocks on screen at load are left alone,
+  blocks already scrolled past settle without animating, and each fades back to
+  its own opacity, so a card's dimmed media stays dimmed.
 
 ## Page transitions
 
@@ -140,15 +162,16 @@ done.
 
 ## Before the first page transition
 
-GSAP, `src/utils/gsap.ts` and `src/utils/lifecycle.ts` are in place, and new
-scripts use them from the start. The router isn't on yet. Before it is, in this
-order:
+GSAP, Lenis, `onPage()` and the reveal are in place, and new scripts use them
+from the start. The router isn't on yet. Before it is, in this order:
 
 1. Move the ten Lumos components with scripts onto `onPage()`: Form, Range,
    Nav, Footer, Accordion, Dropdown, Marquee, Modal, Slider and Tabs. Each wires
    itself up once at load, and Nav, Dropdown, Modal and Accordion attach
    listeners or observers to the whole document that are never removed, so all
    ten break or leak after the first page change.
-2. Add `<ClientRouter />` to `BaseHead.astro`, only once all ten are moved.
+2. Refresh ScrollTrigger after every swap, since its own refresh on the load
+   event only comes with a full load, and give Lenis `stopInertiaOnNavigate`.
+3. Add `<ClientRouter />` to `BaseHead.astro`, only once the above is done.
 
 Remove this section once that's done.
