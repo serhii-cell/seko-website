@@ -6,8 +6,8 @@ with plain CSS and custom properties.
 It is not **Lumos for Webflow**, which is a different product with its own
 class naming, structure and utilities. If a Lumos skill targeting Webflow is
 installed on your account, ignore it while working here — none of its
-conventions apply. What governs this project is LUMOS.md and the skills in
-`.claude/skills/`.
+conventions apply. What governs this project is LUMOS.md, MOTION.md and the
+skills in `.claude/skills/`.
 
 ## Development
 
@@ -36,6 +36,11 @@ Consult these guides before working on related tasks:
 
 Read [LUMOS.md](LUMOS.md) before adding pages, components, or styles. It
 covers the conventions that keep a Lumos site consistent as it grows.
+
+Read [MOTION.md](MOTION.md) before adding a script, an animation, a page
+transition or anything from Osmo. It covers the page lifecycle every script
+follows, GSAP, Astro's router in place of Barba.js, and how an Osmo resource
+becomes a Lumos component.
 
 ## Skills
 
