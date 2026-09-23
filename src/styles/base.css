@@ -4,14 +4,14 @@
   --light-100: #ffffff;
   --light-200: #ebebeb;
   --light-300: #d9d9d9;
-  --dark-700: #453e42;
-  --dark-800: #2f2b2d;
-  --dark-900: #1f1d1e;
-  --brand-500: #c6fb50;
-  --brand-text: var(--dark-900);
+  --dark-700: #2a2a2a;
+  --dark-800: #1f1f1f;
+  --dark-900: #101010;
+  --brand-500: #79d12d;
+  --brand-text: #000000;
 
   /* Typography primitives */
-  --primary-family: var(--font-inter, system-ui, sans-serif);
+  --primary-family: var(--font-archivo, "Helvetica Neue", Arial, sans-serif);
   --primary-regular: 400;
   --primary-medium: 500;
   --primary-bold: 700;
@@ -19,7 +19,7 @@
   --primary-trim-bottom: 0.38em;
 
   /* Letter spacing */
-  --letter-spacing-tight: -0.03em;
+  --letter-spacing-tight: -0.02em;
   --letter-spacing-normal: 0em;
 
   /* Line height */
@@ -43,7 +43,7 @@
   --open-ease: var(--hover-ease);
 
   /* Radius */
-  --radius-small: 0.5rem;
+  --radius-small: 0.375rem;
   --radius-main: 1rem;
   --radius-round: 100vw;
 
@@ -75,15 +75,15 @@
   --display-text-wrap: balance;
 
   --h1: clamp(var(--h1-min) / 16 * 1rem, ((var(--h1-min) - ((var(--h1-max) - var(--h1-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--h1-max) - var(--h1-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--h1-max) / 16 * 1rem);
-  --h1-min: 48;
-  --h1-max: 80;
-  --h1-line-height: var(--line-height-small);
+  --h1-min: 34;
+  --h1-max: 52;
+  --h1-line-height: 1.2;
   --h1-letter-spacing: var(--letter-spacing-tight);
   --h1-text-transform: none;
   --h1-margin-top: var(--space-7);
   --h1-margin-bottom: var(--space-6);
   --h1-font-family: var(--primary-family);
-  --h1-font-weight: var(--primary-medium);
+  --h1-font-weight: var(--primary-regular);
   --h1-trim-top: var(--primary-trim-top);
   --h1-trim-bottom: var(--primary-trim-bottom);
   --h1-text-wrap: balance;
@@ -159,9 +159,9 @@
   --h6-text-wrap: balance;
 
   --text-large: clamp(var(--text-large-min) / 16 * 1rem, ((var(--text-large-min) - ((var(--text-large-max) - var(--text-large-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--text-large-max) - var(--text-large-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--text-large-max) / 16 * 1rem);
-  --text-large-min: 18;
+  --text-large-min: 16;
   --text-large-max: 20;
-  --text-large-line-height: var(--line-height-large);
+  --text-large-line-height: var(--line-height-huge);
   --text-large-letter-spacing: var(--letter-spacing-normal);
   --text-large-text-transform: none;
   --text-large-margin-top: var(--space-4);
@@ -202,8 +202,8 @@
 
   /* Site layout */
   --site-margin: clamp(var(--site-margin-min) / 16 * 1rem, ((var(--site-margin-min) - ((var(--site-margin-max) - var(--site-margin-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--site-margin-max) - var(--site-margin-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--site-margin-max) / 16 * 1rem);
-  --site-margin-min: 16;
-  --site-margin-max: 48;
+  --site-margin-min: 20;
+  --site-margin-max: 64;
 
   --site-gutter: clamp(var(--site-gutter-min) / 16 * 1rem, ((var(--site-gutter-min) - ((var(--site-gutter-max) - var(--site-gutter-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--site-gutter-max) - var(--site-gutter-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--site-gutter-max) / 16 * 1rem);
   --site-gutter-min: 16;
@@ -309,9 +309,9 @@
   --button-background: var(--brand-500);
   --button-border: var(--button-background);
   --button-text: var(--brand-text);
-  --button-background-hover: var(--text);
+  --button-background-hover: color-mix(in srgb, var(--brand-500), black 12%);
   --button-border-hover: var(--button-background-hover);
-  --button-text-hover: var(--background);
+  --button-text-hover: var(--brand-text);
 
   --button-2-background: transparent;
   --button-2-border: var(--border);

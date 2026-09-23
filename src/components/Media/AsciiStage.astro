@@ -1,0 +1,1377 @@
+---
+import type { HTMLAttributes } from "astro/types";
+
+interface Props extends HTMLAttributes<"div"> {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+}
+
+const { render = true, class: className, ...rest } = Astro.props;
+---
+
+{
+  render && (
+    <div
+      class:list={["ascii-stage_wrap", className]}
+      aria-hidden="true"
+      {...rest}
+    >
+      <canvas class="ascii-stage_background" />
+      <div class="ascii-stage_visual">
+        <canvas class="ascii-stage_cubes" />
+      </div>
+    </div>
+  )
+}
+
+<script>
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  type Rgb = [number, number, number];
+  type Engine = { play(): void; pause(): void; destroy(): void };
+  type Controller = {
+    running(): boolean;
+    onChange(listener: (running: boolean) => void): void;
+    destroy(): void;
+  };
+  type Glyph = {
+    size: number;
+    listeners: Set<(size: number) => void>;
+    set(size: number): void;
+  };
+  type Look = { glyph: string; accent: string; font: string };
+
+  /* One glyph size for both effects, set by the cube: 12px when it shows at
+     its full 720px, scaled down with it, never below 6px. Cells keep the
+     8 × 14 proportion of the 12px grid. */
+  const GLYPH = { max: 12, min: 6, fullAt: 720, cellW: 8 / 12, cellH: 14 / 12 };
+  const GLYPHS = " .:-'^~=+*ctxowq#M%@";
+  /* Still frames for reduced motion: the eight cubes joined into one. */
+  const STILL_TIME = 4400;
+
+  const clamp = (value: number, min: number, max: number) =>
+    Math.min(max, Math.max(min, value));
+  const smoothstep = (edge0: number, edge1: number, x: number) => {
+    const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+    return t * t * (3 - 2 * t);
+  };
+
+  function toRgb(color: string): Rgb {
+    const probe = document.createElement("canvas").getContext("2d");
+    if (!probe) return [255, 255, 255];
+    probe.fillStyle = color;
+    const hex = probe.fillStyle.replace("#", "");
+    return [0, 2, 4].map(
+      (at) => parseInt(hex.slice(at, at + 2), 16) || 0,
+    ) as Rgb;
+  }
+
+  /* Effects run only while the stage is on screen, with a 200px margin, and
+     start animating once the page has loaded and the browser is idle, so the
+     work stays out of the load that performance tools measure. */
+  function createController(stage: HTMLElement): Controller {
+    let visible = true;
+    let started = false;
+    let idle = 0;
+    let timer = 0;
+    const listeners = new Set<(running: boolean) => void>();
+    const notify = () =>
+      listeners.forEach((listener) => listener(started && visible));
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const now = entries.some((entry) => entry.isIntersecting);
+        if (now === visible) return;
+        visible = now;
+        notify();
+      },
+      { rootMargin: "200px 0px" },
+    );
+    observer.observe(stage);
+
+    const begin = () => {
+      timer = window.setTimeout(() => {
+        started = true;
+        notify();
+      }, 250);
+    };
+    const whenLoaded = () => {
+      if ("requestIdleCallback" in window) {
+        idle = requestIdleCallback(begin, { timeout: 1500 });
+      } else {
+        timer = self.setTimeout(begin, 300);
+      }
+    };
+    if (document.readyState === "complete") whenLoaded();
+    else addEventListener("load", whenLoaded, { once: true });
+
+    return {
+      running: () => started && visible,
+      onChange: (listener) => listeners.add(listener),
+      destroy() {
+        observer.disconnect();
+        removeEventListener("load", whenLoaded);
+        if (idle && "cancelIdleCallback" in window) cancelIdleCallback(idle);
+        clearTimeout(timer);
+        listeners.clear();
+      },
+    };
+  }
+
+  /* ---------- Background: glyphs spiralling into a hole behind the cube ---------- */
+  function createBackground(
+    canvas: HTMLCanvasElement,
+    controller: Controller,
+    glyph: Glyph,
+    look: Look,
+    motion: boolean,
+  ): Engine {
+    const context = canvas.getContext("2d");
+    const stage = canvas.parentElement;
+    if (!context || !stage) return { play() {}, pause() {}, destroy() {} };
+
+    const config = {
+      cellW: 8,
+      cellH: 14,
+      fontSize: 12,
+      /* Cap so the spiral never becomes a solid fill. */
+      maxDensity: 0.8,
+      /* How fast the cursor's glow fades: higher is quicker. */
+      glowFade: 1.6,
+      hole: {
+        /* 1 is a circle as tall as the stage. */
+        radius: 1.0,
+        arms: 4,
+        twist: 3.6,
+        spin: 0.55,
+        inflow: 0.22,
+        /* Distance over which glyphs grow from dots to full weight. */
+        falloff: 0.38,
+      },
+      speed: 0.3,
+      fps: 24,
+    };
+
+    function hash(x: number, y: number, z: number) {
+      let h =
+        (Math.imul(x, 374761393) +
+          Math.imul(y, 668265263) +
+          Math.imul(z, 1274126177)) |
+        0;
+      h = Math.imul(h ^ (h >>> 13), 1103515245);
+      h ^= h >>> 16;
+      return (h >>> 0) / 4294967296;
+    }
+    const fade = (t: number) => t * t * (3 - 2 * t);
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+    function valueNoise(x: number, y: number, z: number) {
+      const xi = Math.floor(x);
+      const yi = Math.floor(y);
+      const zi = Math.floor(z);
+      const xf = fade(x - xi);
+      const yf = fade(y - yi);
+      const zf = fade(z - zi);
+      return lerp(
+        lerp(
+          lerp(hash(xi, yi, zi), hash(xi + 1, yi, zi), xf),
+          lerp(hash(xi, yi + 1, zi), hash(xi + 1, yi + 1, zi), xf),
+          yf,
+        ),
+        lerp(
+          lerp(hash(xi, yi, zi + 1), hash(xi + 1, yi, zi + 1), xf),
+          lerp(hash(xi, yi + 1, zi + 1), hash(xi + 1, yi + 1, zi + 1), xf),
+          yf,
+        ),
+        zf,
+      );
+    }
+    const fbm = (x: number, y: number, z: number) =>
+      valueNoise(x, y, z) * 0.57 +
+      valueNoise(x * 2.03, y * 2.03, z * 1.3) * 0.29 +
+      valueNoise(x * 4.1, y * 4.1, z * 1.7) * 0.14;
+
+    /* Density from 0 (empty) to 1. Glyphs swirl round a hole in the middle of
+       the stage in spiral arms and drift inward, thinning to dots as they fall
+       in. Positions are in units of the stage's shorter side. */
+    function field(px: number, py: number, t: number, wU: number, hU: number) {
+      const hole = config.hole;
+      const dx = px - wU / 2;
+      const dy = py - hU / 2;
+      const r = Math.hypot(dx, dy);
+      const r0 = (Math.min(wU, hU) / 2) * hole.radius;
+      if (r <= r0) return 0;
+
+      const lr = Math.log(r / r0 + 1e-6);
+      const u = Math.atan2(dy, dx) + hole.twist * lr + hole.spin * t;
+      const v = lr + hole.inflow * t;
+
+      const wobble =
+        (fbm(Math.cos(u) * 1.2 + 3.1, Math.sin(u) * 1.2, v * 1.3) - 0.5) * 2.2;
+      const arms = Math.pow(0.5 + 0.5 * Math.cos(hole.arms * u + wobble), 2.2);
+      const streak = smoothstep(
+        0.3,
+        0.75,
+        fbm(Math.cos(u) * 5.5, Math.sin(u) * 5.5, v * 1.1 + 7.7),
+      );
+      const radial = Math.pow(smoothstep(0, hole.falloff, r - r0), 1.3);
+      const rim = smoothstep(0, 0.025, r - r0);
+
+      const density =
+        (0.08 + 0.92 * (0.4 * arms + 0.6 * arms * streak + 0.12 * streak)) *
+        radial *
+        rim;
+      return Math.min(config.maxDensity, density * config.maxDensity * 1.15);
+    }
+
+    const bayer = (() => {
+      const base = [
+        [0, 2],
+        [3, 1],
+      ];
+      let matrix = base;
+      for (let n = 2; n < 8; n *= 2) {
+        const next: number[][] = [];
+        for (let y = 0; y < n * 2; y++) {
+          next.push([]);
+          for (let x = 0; x < n * 2; x++) {
+            next[y].push(
+              4 * matrix[y % n][x % n] +
+                base[Math.floor(y / n)][Math.floor(x / n)],
+            );
+          }
+        }
+        matrix = next;
+      }
+      return matrix.map((row) => row.map((value) => (value + 0.5) / 64));
+    })();
+
+    /* Glyphs ordered by the ink each one measures, never by a fixed list. */
+    let ramp: { ch: string; cov: number }[] = [];
+    let atlas = document.createElement("canvas");
+    let glowAtlas = document.createElement("canvas");
+    let dpr = 1;
+
+    function buildRamp() {
+      const w = 32;
+      const h = 56;
+      const probe = document.createElement("canvas");
+      probe.width = w;
+      probe.height = h;
+      const g = probe.getContext("2d", { willReadFrequently: true });
+      if (!g) return;
+      g.font = `${config.fontSize * 4}px ${look.font}`;
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      const measured = [...new Set(GLYPHS)]
+        .map((ch) => {
+          g.clearRect(0, 0, w, h);
+          g.fillStyle = "#fff";
+          g.fillText(ch, w / 2, h / 2);
+          const data = g.getImageData(0, 0, w, h).data;
+          let sum = 0;
+          for (let i = 3; i < data.length; i += 4) sum += data[i];
+          return { ch, cov: sum };
+        })
+        .sort((a, b) => a.cov - b.cov);
+      const max = measured[measured.length - 1].cov || 1;
+      ramp = [];
+      for (const entry of measured) {
+        const cov = entry.cov / max;
+        if (!ramp.length || cov - ramp[ramp.length - 1].cov > 0.025) {
+          ramp.push({ ch: entry.ch, cov });
+        }
+      }
+    }
+
+    function paintAtlas(color: string) {
+      const cw = config.cellW * dpr;
+      const ch = config.cellH * dpr;
+      const sheet = document.createElement("canvas");
+      sheet.width = cw * ramp.length;
+      sheet.height = ch;
+      const g = sheet.getContext("2d");
+      if (g) {
+        g.font = `${config.fontSize * dpr}px ${look.font}`;
+        g.textAlign = "center";
+        g.textBaseline = "middle";
+        g.fillStyle = color;
+        ramp.forEach((entry, i) =>
+          g.fillText(entry.ch, i * cw + cw / 2, ch / 2),
+        );
+      }
+      return sheet;
+    }
+
+    let cols = 0;
+    let rows = 0;
+    let width = 0;
+    let height = 0;
+    let glyphIndex = new Uint8Array(0);
+
+    /* The cursor pushes glyphs along its path like a finger through water; a
+       spring pulls them back, and the ones it touched glow in the accent. */
+    const scatter = {
+      radius: 42,
+      gain: 1.0,
+      spread: 0.5,
+      spring: 36,
+      damping: 5.5,
+      maxDisp: 180,
+      wake: 0.6,
+    };
+    let sdx = new Float32Array(0);
+    let sdy = new Float32Array(0);
+    let svx = new Float32Array(0);
+    let svy = new Float32Array(0);
+    let active = new Float32Array(0);
+    let glow = new Float32Array(0);
+    const pointer = {
+      x: -1e9,
+      y: -1e9,
+      px: -1e9,
+      py: -1e9,
+      vx: 0,
+      vy: 0,
+      t: 0,
+      inside: false,
+    };
+    const noHover = matchMedia(
+      "(hover: none), (pointer: coarse), (width < 48rem)",
+    );
+
+    function onPointerMove(event: PointerEvent) {
+      if (noHover.matches) {
+        pointer.inside = false;
+        return;
+      }
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      const now = performance.now();
+      if (pointer.inside && now > pointer.t) {
+        const dt = Math.min(0.1, (now - pointer.t) / 1000);
+        pointer.vx = pointer.vx * 0.5 + ((x - pointer.x) / dt) * 0.5;
+        pointer.vy = pointer.vy * 0.5 + ((y - pointer.y) / dt) * 0.5;
+      }
+      if (!pointer.inside) {
+        pointer.px = x;
+        pointer.py = y;
+      }
+      pointer.x = x;
+      pointer.y = y;
+      pointer.t = now;
+      pointer.inside = true;
+    }
+    function onPointerLeave() {
+      pointer.inside = false;
+      pointer.vx = pointer.vy = 0;
+    }
+    if (motion) {
+      stage.addEventListener("pointermove", onPointerMove);
+      stage.addEventListener("pointerleave", onPointerLeave);
+    }
+
+    const jitter = () => Math.random() * 2 - 1;
+    function scatterStep(dt: number) {
+      const speed = Math.hypot(pointer.vx, pointer.vy);
+      const kick =
+        pointer.inside && speed > 40 && performance.now() - pointer.t < 120;
+      const radius = scatter.radius;
+      const r2 = radius * radius;
+      const ux = speed ? pointer.vx / speed : 0;
+      const uy = speed ? pointer.vy / speed : 0;
+      const impulse = Math.min(1600, speed) * scatter.gain;
+      const glowDecay = Math.exp(-config.glowFade * dt);
+      const subSteps = Math.max(1, Math.ceil(dt * 240));
+      const h = dt / subSteps;
+      const ax = pointer.px;
+      const ay = pointer.py;
+      const abx = pointer.x - ax;
+      const aby = pointer.y - ay;
+      const ab2 = abx * abx + aby * aby;
+      const minX = Math.min(ax, pointer.x) - radius;
+      const maxX = Math.max(ax, pointer.x) + radius;
+      const minY = Math.min(ay, pointer.y) - radius;
+      const maxY = Math.max(ay, pointer.y) + radius;
+      pointer.px = pointer.x;
+      pointer.py = pointer.y;
+
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = y * cols + x;
+          if (kick && glyphIndex[i]) {
+            const px = (x + 0.5) * config.cellW + sdx[i];
+            const py = (y + 0.5) * config.cellH + sdy[i];
+            if (px > minX && px < maxX && py > minY && py < maxY) {
+              const along =
+                ab2 > 0
+                  ? clamp(((px - ax) * abx + (py - ay) * aby) / ab2, 0, 1)
+                  : 1;
+              const ex = px - (ax + abx * along);
+              const ey = py - (ay + aby * along);
+              const d2 = ex * ex + ey * ey;
+              if (d2 < r2) {
+                const d = Math.sqrt(d2);
+                let f = 1 - d / radius;
+                f = f * f * (3 - 2 * f);
+                const nx = d > 0.001 ? ex / d : 0;
+                const ny = d > 0.001 ? ey / d : 0;
+                const vary = 1 + jitter() * 0.15;
+                const dirX =
+                  ux + nx * scatter.wake + jitter() * scatter.spread * 0.3;
+                const dirY =
+                  uy + ny * scatter.wake + jitter() * scatter.spread * 0.3;
+                svx[i] += dirX * impulse * f * vary * dt * 30;
+                svy[i] += dirY * impulse * f * vary * dt * 30;
+                active[i] = 1;
+                glow[i] = Math.max(glow[i], Math.sqrt(f));
+              }
+            }
+          }
+          if (glow[i] > 0) {
+            glow[i] *= glowDecay;
+            if (glow[i] < 0.02) glow[i] = 0;
+          }
+          if (active[i] <= 0) continue;
+          /* Small fixed sub-steps keep a stiff spring stable on a slow frame. */
+          for (let k = 0; k < subSteps; k++) {
+            svx[i] += (-sdx[i] * scatter.spring - svx[i] * scatter.damping) * h;
+            svy[i] += (-sdy[i] * scatter.spring - svy[i] * scatter.damping) * h;
+            sdx[i] += svx[i] * h;
+            sdy[i] += svy[i] * h;
+          }
+          const m = Math.hypot(sdx[i], sdy[i]);
+          if (m > scatter.maxDisp) {
+            sdx[i] *= scatter.maxDisp / m;
+            sdy[i] *= scatter.maxDisp / m;
+          }
+          if (m < 0.6 && Math.hypot(svx[i], svy[i]) < 4) {
+            sdx[i] = sdy[i] = svx[i] = svy[i] = 0;
+            active[i] = 0;
+          } else {
+            active[i] = 1;
+          }
+        }
+      }
+    }
+
+    function resize() {
+      const rect = canvas.getBoundingClientRect();
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      width = rect.width;
+      height = rect.height;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      cols = Math.ceil(width / config.cellW);
+      rows = Math.ceil(height / config.cellH);
+      const n = cols * rows;
+      sdx = new Float32Array(n);
+      sdy = new Float32Array(n);
+      svx = new Float32Array(n);
+      svy = new Float32Array(n);
+      active = new Float32Array(n);
+      glow = new Float32Array(n);
+      glyphIndex = new Uint8Array(n);
+      atlas = paintAtlas(look.glyph);
+      glowAtlas = paintAtlas(look.accent);
+    }
+
+    let previous = 0;
+    function draw(time: number) {
+      if (!context || !cols || !rows) return;
+      const dt = Math.min(0.1, (time - previous) / 1000) || 0.05;
+      previous = time;
+      const t = time * 0.001 * config.speed;
+      const unit = Math.min(width, height);
+      const wU = width / unit;
+      const hU = height / unit;
+      const cw = config.cellW * dpr;
+      const ch = config.cellH * dpr;
+      const last = ramp.length - 1;
+
+      for (let y = 0; y < rows; y++) {
+        const py = ((y + 0.5) * config.cellH) / unit;
+        const row = bayer[y & 7];
+        for (let x = 0; x < cols; x++) {
+          const i = y * cols + x;
+          const b = field(((x + 0.5) * config.cellW) / unit, py, t, wU, hU);
+          if (b <= 0.01) {
+            glyphIndex[i] = 0;
+            continue;
+          }
+          let k = 0;
+          while (k < last && ramp[k + 1].cov < b) k++;
+          let index = k;
+          if (k < last) {
+            const f = (b - ramp[k].cov) / (ramp[k + 1].cov - ramp[k].cov);
+            if (f > row[x & 7]) index = k + 1;
+          }
+          glyphIndex[i] = index;
+        }
+      }
+
+      if (motion) scatterStep(dt);
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const i = y * cols + x;
+          const index = glyphIndex[i];
+          if (!index) continue;
+          let gx = x;
+          let gy = y;
+          /* Displaced glyphs snap back to the grid, so the effect stays pixel. */
+          if (active[i] > 0) {
+            gx = Math.round((x * config.cellW + sdx[i]) / config.cellW);
+            gy = Math.round((y * config.cellH + sdy[i]) / config.cellH);
+            if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) continue;
+          }
+          context.drawImage(
+            atlas,
+            index * cw,
+            0,
+            cw,
+            ch,
+            gx * cw,
+            gy * ch,
+            cw,
+            ch,
+          );
+          if (glow[i] > 0) {
+            context.globalAlpha = glow[i];
+            context.drawImage(
+              glowAtlas,
+              index * cw,
+              0,
+              cw,
+              ch,
+              gx * cw,
+              gy * ch,
+              cw,
+              ch,
+            );
+            context.globalAlpha = 1;
+          }
+        }
+      }
+    }
+
+    /* Its own clock, advancing only while running, so a pause doesn't make
+       the swirl jump ahead. */
+    let frame = 0;
+    let clock = 0;
+    let lastNow = 0;
+    let lastFrame = -1e9;
+    function loop(now: number) {
+      frame = requestAnimationFrame(loop);
+      clock += Math.min(100, now - lastNow);
+      lastNow = now;
+      if (clock - lastFrame < 1000 / config.fps) return;
+      lastFrame = clock;
+      draw(clock);
+    }
+    function play() {
+      if (!motion || frame || !controller.running()) return;
+      lastNow = performance.now();
+      frame = requestAnimationFrame(loop);
+    }
+    function pause() {
+      cancelAnimationFrame(frame);
+      frame = 0;
+      /* Settle anything scattered, so nothing is half-displaced on return. */
+      [sdx, sdy, svx, svy, active, glow].forEach((values) => values.fill(0));
+      pointer.inside = false;
+    }
+    const still = () => {
+      if (!frame) draw(clock);
+    };
+
+    function applyGlyph(size: number) {
+      config.fontSize = size;
+      config.cellW = size * GLYPH.cellW;
+      config.cellH = size * GLYPH.cellH;
+    }
+    const onGlyph = (size: number) => {
+      if (Math.abs(size - config.fontSize) < 0.05) return;
+      applyGlyph(size);
+      buildRamp();
+      resize();
+      still();
+    };
+
+    applyGlyph(glyph.size);
+    buildRamp();
+    resize();
+    glyph.listeners.add(onGlyph);
+    const observer = new ResizeObserver(() => {
+      resize();
+      still();
+    });
+    observer.observe(canvas);
+    draw(clock);
+    controller.onChange((running) => (running ? play() : pause()));
+    play();
+
+    return {
+      play,
+      pause,
+      destroy() {
+        pause();
+        observer.disconnect();
+        glyph.listeners.delete(onGlyph);
+        stage.removeEventListener("pointermove", onPointerMove);
+        stage.removeEventListener("pointerleave", onPointerLeave);
+      },
+    };
+  }
+
+  /* ---------- Cubes: eight cubes slide together, merge, and zoom out to one ---------- */
+  function createCubes(
+    canvas: HTMLCanvasElement,
+    controller: Controller,
+    glyph: Glyph,
+    look: Look,
+    motion: boolean,
+  ): Engine {
+    const context = canvas.getContext("2d");
+    if (!context) return { play() {}, pause() {}, destroy() {} };
+
+    const BAYER = [
+      [0, 32, 8, 40, 2, 34, 10, 42],
+      [48, 16, 56, 24, 50, 18, 58, 26],
+      [12, 44, 4, 36, 14, 46, 6, 38],
+      [60, 28, 52, 20, 62, 30, 54, 22],
+      [3, 35, 11, 43, 1, 33, 9, 41],
+      [51, 19, 59, 27, 49, 17, 57, 25],
+      [15, 47, 7, 39, 13, 45, 5, 37],
+      [63, 31, 55, 23, 61, 29, 53, 21],
+    ];
+    const green = toRgb(look.accent);
+    const GRID_DARK: Rgb = [70, 70, 76];
+    const GRID_PEAK: Rgb = [240, 240, 245];
+    const HIGHLIGHT: Rgb = [255, 255, 250];
+    /* Camera distance, for a real perspective, and the loop length in seconds. */
+    const CAM = 9;
+    const LOOP = 7;
+    const SLOTS = [
+      [-0.5, -0.5, 0.5],
+      [0.5, -0.5, 0.5],
+      [-0.5, -0.5, -0.5],
+      [0.5, -0.5, -0.5],
+      [-0.5, 0.5, 0.5],
+      [0.5, 0.5, 0.5],
+      [-0.5, 0.5, -0.5],
+      [0.5, 0.5, -0.5],
+    ];
+    const first = SLOTS[0];
+
+    let size = 720;
+    let cw = 8;
+    let ch = 14;
+    let cols = 0;
+    let rows = 0;
+    let ox = 0;
+    let oy = 0;
+    let font = "";
+    let scale = 0;
+    let cx = 0;
+    let cy = 0;
+    let dpr = 1;
+
+    let ramp: string[] = [];
+    let coverage: number[] = [];
+    function buildRamp() {
+      const probe = document.createElement("canvas");
+      probe.width = cw;
+      probe.height = ch;
+      const g = probe.getContext("2d", { willReadFrequently: true });
+      if (!g) return;
+      g.font = font;
+      g.textBaseline = "top";
+      g.fillStyle = "#fff";
+      const measured: [number, string][] = [];
+      for (const glyphChar of GLYPHS) {
+        g.clearRect(0, 0, cw, ch);
+        g.fillText(glyphChar, 0, 0);
+        const data = g.getImageData(0, 0, probe.width, probe.height).data;
+        let sum = 0;
+        for (let i = 3; i < data.length; i += 4) sum += data[i];
+        measured.push([sum / 255 / (cw * ch), glyphChar]);
+      }
+      measured.sort((a, b) => a[0] - b[0]);
+      ramp = [];
+      const cov: number[] = [];
+      let last = -1;
+      for (const [value, glyphChar] of measured) {
+        if (value - last > 0.006) {
+          ramp.push(glyphChar);
+          cov.push(value);
+          last = value;
+        }
+      }
+      const max = cov[cov.length - 1] || 1;
+      coverage = cov.map((value) => value / max);
+    }
+    function toPosition(b: number) {
+      const n = ramp.length;
+      if (b >= 1) return n - 1;
+      let i = 1;
+      while (i < n && coverage[i] < b) i++;
+      return i - 1 + (b - coverage[i - 1]) / (coverage[i] - coverage[i - 1]);
+    }
+
+    let seam = new Uint8Array(0);
+    let brightness = new Float32Array(0);
+    let specular = new Float32Array(0);
+    let depth = new Float32Array(0);
+    let hit = new Uint8Array(0);
+    let alpha = new Float32Array(0);
+    let slot = new Int8Array(0);
+    let line = new Float32Array(0);
+
+    let R = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    function multiply(a: number[], b: number[]) {
+      const out = new Array<number>(9);
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          out[i * 3 + j] =
+            a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j];
+        }
+      }
+      return out;
+    }
+    function setRotation(yaw: number, tilt: number) {
+      const cyaw = Math.cos(yaw);
+      const syaw = Math.sin(yaw);
+      const ct = Math.cos(tilt);
+      const st = Math.sin(tilt);
+      R = multiply(
+        [1, 0, 0, 0, ct, -st, 0, st, ct],
+        [cyaw, 0, syaw, 0, 1, 0, -syaw, 0, cyaw],
+      );
+    }
+    function sdBox(
+      px: number,
+      py: number,
+      pz: number,
+      bx: number,
+      by: number,
+      bz: number,
+      h: number,
+      r: number,
+    ) {
+      const qx = Math.abs(px - bx) - h;
+      const qy = Math.abs(py - by) - h;
+      const qz = Math.abs(pz - bz) - h;
+      const ax = Math.max(qx, 0);
+      const ay = Math.max(qy, 0);
+      const az = Math.max(qz, 0);
+      return (
+        Math.sqrt(ax * ax + ay * ay + az * az) +
+        Math.min(Math.max(qx, Math.max(qy, qz)), 0) -
+        r
+      );
+    }
+
+    let zoom = 1;
+    let offsetX = 0;
+    let offsetY = 0;
+    let offsetZ = 0;
+    let gridBright = 0;
+    let cubes: number[][] = [];
+    let hitCube: number[] | null = null;
+    function sdf(x: number, y: number, z: number) {
+      const wx = R[0] * x + R[3] * y + R[6] * z;
+      const wy = R[1] * x + R[4] * y + R[7] * z;
+      const wz = R[2] * x + R[5] * y + R[8] * z;
+      const nx = (wx - offsetX) / zoom;
+      const ny = (wy - offsetY) / zoom;
+      const nz = (wz - offsetZ) / zoom;
+      let best = 1e9;
+      hitCube = null;
+      for (const cube of cubes) {
+        const d = sdBox(nx, ny, nz, cube[0], cube[1], cube[2], 0.5, 0.02);
+        if (d < best) {
+          best = d;
+          hitCube = cube;
+        }
+      }
+      return best * zoom;
+    }
+
+    const normalize = (v: number[]) => {
+      const l = Math.hypot(v[0], v[1], v[2]);
+      return v.map((c) => c / l);
+    };
+    const [LX, LY, LZ] = normalize([-0.45, 0.7, 0.55]);
+    const [HX, HY, HZ] = normalize([LX, LY, LZ + 1]);
+    /* Key light fixed to the cubes: top brightest, then right, front, left,
+       back, bottom darkest. */
+    const FL = normalize([0.33, 0.84, 0.43]);
+    const ss = (u: number) => smoothstep(0, 1, u);
+    const mix = (a: Rgb, b: Rgb, u: number): Rgb => [
+      a[0] + (b[0] - a[0]) * u,
+      a[1] + (b[1] - a[1]) * u,
+      a[2] + (b[2] - a[2]) * u,
+    ];
+
+    const SEGMENTS: number[][][] = [];
+    for (const a of [-1, 0, 1]) {
+      for (const b of [-1, 0, 1]) {
+        SEGMENTS.push([
+          [-1, a, b],
+          [1, a, b],
+        ]);
+        SEGMENTS.push([
+          [a, -1, b],
+          [a, 1, b],
+        ]);
+        SEGMENTS.push([
+          [a, b, -1],
+          [a, b, 1],
+        ]);
+      }
+    }
+    function toView(n: number[]) {
+      const wx = zoom * n[0] + offsetX;
+      const wy = zoom * n[1] + offsetY;
+      const wz = zoom * n[2] + offsetZ;
+      return [
+        R[0] * wx + R[1] * wy + R[2] * wz,
+        R[3] * wx + R[4] * wy + R[5] * wz,
+        R[6] * wx + R[7] * wy + R[8] * wz,
+      ];
+    }
+    function drawGrid(bright: number) {
+      line.fill(0);
+      if (bright <= 0.02) return;
+      for (const [from, to] of SEGMENTS) {
+        const p0 = toView(from);
+        const p1 = toView(to);
+        const k0 = CAM / (CAM - p0[2]);
+        const k1 = CAM / (CAM - p1[2]);
+        const x0 = cx + p0[0] * k0 * scale;
+        const y0 = cy - p0[1] * k0 * scale;
+        const x1 = cx + p1[0] * k1 * scale;
+        const y1 = cy - p1[1] * k1 * scale;
+        const steps = Math.max(2, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 2));
+        for (let k = 0; k <= steps; k++) {
+          const u = k / steps;
+          const sx = x0 + (x1 - x0) * u;
+          const sy = y0 + (y1 - y0) * u;
+          const sz = p0[2] + (p1[2] - p0[2]) * u;
+          const gx = Math.floor((sx - ox) / cw);
+          const gy = Math.floor((sy - oy) / ch);
+          if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) continue;
+          const i = gy * cols + gx;
+          if (hit[i] && sz < depth[i] - 0.03) continue;
+          const fx = (sx - ox) / cw - gx - 0.5;
+          const fy = (sy - oy) / ch - gy - 0.5;
+          const weight = 1 - Math.min(1, Math.hypot(fx, fy) * 1.1);
+          const b = (0.32 + 0.22 * weight) * bright;
+          if (b > line[i]) line[i] = b;
+        }
+      }
+    }
+
+    /* Dragging orbits the camera while the loop keeps playing. A horizontal
+       turn is kept on release, folded into the idle spin; a tilt eases back
+       to the original angle, taking longer the further it went. */
+    const drag = {
+      yaw: 0,
+      pitch: 0,
+      active: false,
+      lastX: 0,
+      lastY: 0,
+      sensitivity: 0.006,
+    };
+    const idle = {
+      yaw: 0,
+      spin: motion ? -0.24 : 0,
+      minDuration: 0.6,
+      perRadian: 0.35,
+      maxDuration: 1.6,
+    };
+    let tiltReturn: { from: number; t: number; duration: number } | null = null;
+    const easeInOutCubic = (u: number) =>
+      u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
+    function startReturn() {
+      idle.yaw += drag.yaw;
+      drag.yaw = 0;
+      const from = drag.pitch;
+      if (!motion || Math.abs(from) < 1e-3) {
+        drag.pitch = 0;
+        tiltReturn = null;
+        return;
+      }
+      tiltReturn = {
+        from,
+        t: 0,
+        duration: Math.min(
+          idle.maxDuration,
+          idle.minDuration + idle.perRadian * Math.abs(from),
+        ),
+      };
+    }
+    function applyInertia(dt: number) {
+      if (!drag.active) idle.yaw += idle.spin * dt;
+      if (drag.active || !tiltReturn) return;
+      tiltReturn.t += dt;
+      const u = Math.min(1, tiltReturn.t / tiltReturn.duration);
+      drag.pitch = tiltReturn.from * (1 - easeInOutCubic(u));
+      if (u >= 1) {
+        drag.pitch = 0;
+        tiltReturn = null;
+      }
+    }
+
+    let seamFill = 0;
+    const SEAM_ORDER = (() => {
+      const order = new Float32Array(4099);
+      let x = 12345;
+      for (let i = 0; i < order.length; i++) {
+        x = (x * 1103515245 + 12345) >>> 0;
+        order[i] = ((x >>> 8) / 16777216) * 0.8;
+      }
+      return order;
+    })();
+
+    /* The 7s loop: seven cubes slide in (0.5–3.9s), the seams between them
+       fill glyph by glyph (3.9–4.5s), the block shrinks to a single cube
+       (4.5–5.6s), and a grid fades in, holds and fades out (5.3–7s). */
+    function scene(time: number) {
+      const T = time % LOOP;
+      setRotation(
+        0.66 + 0.07 * Math.sin((T / LOOP) * Math.PI * 2) + idle.yaw + drag.yaw,
+        0.44 + drag.pitch,
+      );
+      const T0 = 0.5,
+        STEP = 0.49,
+        SLIDE = 0.45,
+        FILL_START = 3.9,
+        FILL_END = 4.5;
+      const ZOOM_START = 4.5,
+        ZOOM_END = 5.6,
+        GRID_IN = 5.3,
+        GRID_IN_END = 5.8,
+        GRID_OUT = 6.45,
+        GRID_OUT_END = 7.0;
+      cubes = [];
+      const zooming = T >= ZOOM_START;
+      seamFill = zooming ? 1 : ss((T - FILL_START) / (FILL_END - FILL_START));
+      if (!zooming) {
+        zoom = 1;
+        offsetX = offsetY = offsetZ = 0;
+        cubes.push([first[0], first[1], first[2], 1, 0]);
+        for (let k = 0; k < 7; k++) {
+          const tk = T0 + k * STEP;
+          const s = SLOTS[k + 1];
+          if (T >= tk + SLIDE) {
+            cubes.push([s[0], s[1], s[2], 1, k + 1]);
+          } else if (T >= tk - 0.2) {
+            const u = ss((T - tk) / SLIDE);
+            const x = 1.9 + (s[0] - 1.9) * u;
+            const a = Math.min(1, (T - (tk - 0.2)) / 0.2);
+            cubes.push([x, s[1], s[2], a, k + 1]);
+          }
+        }
+        gridBright = 0;
+      } else {
+        const uz = ss((T - ZOOM_START) / (ZOOM_END - ZOOM_START));
+        zoom = 2 - uz;
+        offsetX = -2 * first[0] * (1 - uz);
+        offsetY = -2 * first[1] * (1 - uz);
+        offsetZ = -2 * first[2] * (1 - uz);
+        cubes.push([first[0], first[1], first[2], 1, 0]);
+        gridBright =
+          T < GRID_OUT
+            ? ss((T - GRID_IN) / (GRID_IN_END - GRID_IN))
+            : 1 - ss((T - GRID_OUT) / (GRID_OUT_END - GRID_OUT));
+      }
+
+      brightness.fill(0);
+      hit.fill(0);
+      for (let gy = 0; gy < rows; gy++) {
+        for (let gx = 0; gx < cols; gx++) {
+          const X = (ox + gx * cw + cw / 2 - cx) / scale;
+          const Y = (cy - (oy + gy * ch + ch / 2)) / scale;
+          /* A ray from the camera through this cell of the image plane. */
+          const rl = Math.sqrt(X * X + Y * Y + CAM * CAM);
+          const rx = X / rl;
+          const ry = Y / rl;
+          const rz = -CAM / rl;
+          let t = CAM - 3.4;
+          let found = false;
+          let px = 0;
+          let py = 0;
+          let z = 0;
+          for (let step = 0; step < 64; step++) {
+            px = rx * t;
+            py = ry * t;
+            z = CAM + rz * t;
+            const d = sdf(px, py, z);
+            if (d < 0.004) {
+              found = true;
+              break;
+            }
+            if (t > CAM + 3.4) break;
+            t += Math.max(d * 0.95, 0.006);
+          }
+          const cube = hitCube as number[] | null;
+          if (!found || !cube) continue;
+          const i = gy * cols + gx;
+          hit[i] = 1;
+          depth[i] = z;
+          alpha[i] = cube[3];
+          slot[i] = cube[4];
+          const e = 0.008;
+          let nx = sdf(px + e, py, z) - sdf(px - e, py, z);
+          let ny = sdf(px, py + e, z) - sdf(px, py - e, z);
+          let nz = sdf(px, py, z + e) - sdf(px, py, z - e);
+          const nl = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+          nx /= nl;
+          ny /= nl;
+          nz /= nl;
+          const diffuse = Math.max(0, nx * LX + ny * LY + nz * LZ);
+          const spec = Math.pow(Math.max(0, nx * HX + ny * HY + nz * HZ), 16);
+          /* Face tone from the normal in cube space, so all six faces read as
+             different values from any camera angle. */
+          const wnx = R[0] * nx + R[3] * ny + R[6] * nz;
+          const wny = R[1] * nx + R[4] * ny + R[7] * nz;
+          const wnz = R[2] * nx + R[5] * ny + R[8] * nz;
+          const tone = 0.5 + 0.5 * (wnx * FL[0] + wny * FL[1] + wnz * FL[2]);
+          brightness[i] =
+            Math.min(1, 0.1 + 0.62 * tone + 0.18 * diffuse + 0.3 * spec) *
+            cube[3];
+          specular[i] = spec;
+        }
+      }
+
+      const total = cols * rows;
+      for (let i = 0; i < total; i++) {
+        if (!hit[i] || alpha[i] < 0.9) continue;
+        for (const j of [i - 1, i + 1, i - cols, i + cols]) {
+          if (j < 0 || j >= total) continue;
+          if (!hit[j] || Math.abs(depth[j] - depth[i]) > 0.12) {
+            brightness[i] = Math.max(brightness[i], 0.5);
+            break;
+          }
+        }
+      }
+
+      /* A cell whose right or lower neighbour shows a different cube is left
+         empty, a one-glyph line between cubes until they merge. */
+      seam.fill(0);
+      if (cubes.length > 1) {
+        for (let gy = 0; gy < rows; gy++) {
+          for (let gx = 0; gx < cols; gx++) {
+            const i = gy * cols + gx;
+            if (!hit[i]) continue;
+            if (
+              (gx < cols - 1 && hit[i + 1] && slot[i + 1] !== slot[i]) ||
+              (gy < rows - 1 && hit[i + cols] && slot[i + cols] !== slot[i])
+            ) {
+              seam[i] = 1;
+            }
+          }
+        }
+      }
+      drawGrid(gridBright);
+    }
+
+    function draw() {
+      if (!context) return;
+      context.clearRect(0, 0, size, size);
+      context.font = font;
+      context.textBaseline = "top";
+      const n = ramp.length;
+      for (let gy = 0; gy < rows; gy++) {
+        for (let gx = 0; gx < cols; gx++) {
+          const i = gy * cols + gx;
+          let b: number;
+          let color: Rgb;
+          const onGrid = line[i] > 0.02;
+          if (onGrid && !hit[i]) {
+            b = line[i];
+            color = mix(GRID_DARK, GRID_PEAK, ss(gridBright));
+          } else if (onGrid) {
+            /* The grid is an overlay at gridBright's opacity, so as it fades
+               these cells blend back into the cube rather than going dark. */
+            const a = ss(gridBright);
+            const lineB = gridBright > 0.001 ? line[i] / gridBright : 0;
+            let base = green;
+            if (specular[i] > 0.3)
+              base = mix(
+                base,
+                HIGHLIGHT,
+                Math.min(1, (specular[i] - 0.3) * 1.3) * 0.7,
+              );
+            b = brightness[i] + (lineB - brightness[i]) * a;
+            color = mix(base, mix(GRID_DARK, GRID_PEAK, a), a);
+            if (b <= 0.003) continue;
+          } else if (seam[i]) {
+            const threshold = SEAM_ORDER[i % SEAM_ORDER.length];
+            if (seamFill <= threshold) continue;
+            b = brightness[i] * Math.min(1, (seamFill - threshold) * 4);
+            if (b <= 0.003) continue;
+            color = green;
+          } else {
+            b = brightness[i];
+            if (b <= 0.003) continue;
+            color = green;
+            if (specular[i] > 0.3)
+              color = mix(
+                color,
+                HIGHLIGHT,
+                Math.min(1, (specular[i] - 0.3) * 1.3) * 0.7,
+              );
+          }
+          const index = Math.min(
+            n - 1,
+            Math.floor(toPosition(b) + (BAYER[gy & 7][gx & 7] + 0.5) / 64),
+          );
+          const glyphChar = ramp[index];
+          if (glyphChar === " ") continue;
+          const lum = 0.55 + 0.45 * b;
+          context.fillStyle = `rgb(${(color[0] * lum) | 0},${(color[1] * lum) | 0},${(color[2] * lum) | 0})`;
+          context.fillText(glyphChar, ox + gx * cw, oy + gy * ch);
+        }
+      }
+    }
+
+    /* Sized to the cube's real size on screen, so glyphs are true pixels,
+       and the glyph size shared with the background. */
+    function configure(measured: number) {
+      size = Math.max(120, Math.round(measured));
+      const g =
+        Math.round(
+          clamp((GLYPH.max * size) / GLYPH.fullAt, GLYPH.min, GLYPH.max) * 4,
+        ) / 4;
+      cw = g * GLYPH.cellW;
+      ch = g * GLYPH.cellH;
+      cols = Math.floor(size / cw);
+      rows = Math.floor(size / ch);
+      ox = (size - cols * cw) / 2;
+      oy = (size - rows * ch) / 2;
+      font = `${g}px ${look.font}`;
+      const n = cols * rows;
+      seam = new Uint8Array(n);
+      brightness = new Float32Array(n);
+      specular = new Float32Array(n);
+      depth = new Float32Array(n);
+      hit = new Uint8Array(n);
+      alpha = new Float32Array(n);
+      slot = new Int8Array(n);
+      line = new Float32Array(n);
+      scale = 0.175 * size;
+      cx = size / 2;
+      cy = size / 2 + 2;
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(size * dpr);
+      canvas.height = Math.round(size * dpr);
+      context?.setTransform(dpr, 0, 0, dpr, 0, 0);
+      buildRamp();
+      glyph.set(g);
+    }
+    let measuredSize = 0;
+    function watchSize() {
+      const measured = canvas.getBoundingClientRect().width;
+      if (Math.abs(measured - measuredSize) < 1) return;
+      measuredSize = measured;
+      configure(measured);
+    }
+
+    /* Its own clock: after a pause the cubes carry on from the same moment. */
+    let frame = 0;
+    let simTime = motion ? 0 : STILL_TIME;
+    let lastNow = 0;
+    let lastStep = -1e9;
+    function loop(now: number) {
+      frame = requestAnimationFrame(loop);
+      simTime += Math.min(100, now - lastNow);
+      lastNow = now;
+      if (simTime - lastStep < 33) return;
+      const dt = Math.min(0.1, (simTime - lastStep) / 1000);
+      lastStep = simTime;
+      applyInertia(dt);
+      scene(simTime / 1000);
+      draw();
+    }
+    function play() {
+      if (!motion || frame || !controller.running()) return;
+      lastNow = performance.now();
+      frame = requestAnimationFrame(loop);
+    }
+    function pause() {
+      cancelAnimationFrame(frame);
+      frame = 0;
+    }
+    function still() {
+      if (frame) return;
+      scene(simTime / 1000);
+      draw();
+    }
+
+    function onPointerDown(event: PointerEvent) {
+      drag.active = true;
+      tiltReturn = null;
+      drag.lastX = event.clientX;
+      drag.lastY = event.clientY;
+      canvas.setPointerCapture(event.pointerId);
+      canvas.classList.add("dragging");
+    }
+    function onPointerMove(event: PointerEvent) {
+      if (!drag.active) return;
+      drag.yaw += (event.clientX - drag.lastX) * drag.sensitivity;
+      drag.pitch = clamp(
+        drag.pitch + (event.clientY - drag.lastY) * drag.sensitivity,
+        -1.35 - 0.44,
+        1.35 - 0.44,
+      );
+      drag.lastX = event.clientX;
+      drag.lastY = event.clientY;
+      still();
+    }
+    function onPointerUp() {
+      if (!drag.active) return;
+      drag.active = false;
+      canvas.classList.remove("dragging");
+      startReturn();
+      still();
+    }
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("pointerup", onPointerUp);
+    canvas.addEventListener("pointercancel", onPointerUp);
+
+    watchSize();
+    const observer = new ResizeObserver(() => {
+      watchSize();
+      still();
+    });
+    observer.observe(canvas);
+    still();
+    controller.onChange((running) => (running ? play() : pause()));
+    play();
+
+    return {
+      play,
+      pause,
+      destroy() {
+        pause();
+        observer.disconnect();
+        canvas.removeEventListener("pointerdown", onPointerDown);
+        canvas.removeEventListener("pointermove", onPointerMove);
+        canvas.removeEventListener("pointerup", onPointerUp);
+        canvas.removeEventListener("pointercancel", onPointerUp);
+      },
+    };
+  }
+
+  const started = new WeakMap<HTMLElement, () => void>();
+
+  function start(stage: HTMLElement) {
+    const background = stage.querySelector<HTMLCanvasElement>(
+      ".ascii-stage_background",
+    );
+    const cubes = stage.querySelector<HTMLCanvasElement>(".ascii-stage_cubes");
+    if (!background || !cubes) return () => {};
+
+    const style = getComputedStyle(stage);
+    const look: Look = {
+      glyph: style.getPropertyValue("--_glyph").trim() || "#2a2a2a",
+      accent: style.getPropertyValue("--_accent").trim() || "#79d12d",
+      font: style.getPropertyValue("--_glyph-font").trim() || "monospace",
+    };
+    const motion =
+      !matchMedia("(prefers-reduced-motion: reduce)").matches &&
+      !document.documentElement.classList.contains("stacki-designer");
+
+    const glyph: Glyph = {
+      size: GLYPH.max,
+      listeners: new Set(),
+      set(size) {
+        if (Math.abs(size - glyph.size) < 0.01) return;
+        glyph.size = size;
+        glyph.listeners.forEach((listener) => listener(size));
+      },
+    };
+    const controller = createController(stage);
+    let engines: Engine[] = [];
+    let stopped = false;
+
+    document.fonts
+      .load(`12px ${look.font}`)
+      .catch(() => {})
+      .then(() => {
+        if (stopped) return;
+        engines = [
+          createBackground(background, controller, glyph, look, motion),
+          createCubes(cubes, controller, glyph, look, motion),
+        ];
+      });
+
+    return () => {
+      stopped = true;
+      engines.forEach((engine) => engine.destroy());
+      controller.destroy();
+    };
+  }
+
+  onPage(() => {
+    const stages = [
+      ...document.querySelectorAll<HTMLElement>(".ascii-stage_wrap"),
+    ].filter((stage) => !started.has(stage));
+    for (const stage of stages) started.set(stage, start(stage));
+
+    return () => {
+      for (const stage of stages) {
+        started.get(stage)?.();
+        started.delete(stage);
+      }
+    };
+  });
+</script>
+
+<style is:global>
+  @layer components {
+    .ascii-stage_wrap {
+      --_glyph: var(--dark-700);
+      --_accent: var(--brand-500);
+      --_glyph-font: var(--font-jetbrains-mono, monospace);
+      position: relative;
+      display: grid;
+      place-items: center;
+      width: 100%;
+      height: 100%;
+      min-height: 7.5rem;
+      overflow: hidden;
+      isolation: isolate;
+      container-type: size;
+      border: var(--border-width) dashed var(--border);
+    }
+
+    .ascii-stage_background {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      width: 100%;
+      height: 100%;
+    }
+
+    .ascii-stage_visual {
+      width: min(45rem, 100cqh, 100cqw);
+      height: min(45rem, 100cqh, 100cqw);
+    }
+
+    .ascii-stage_cubes {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+      touch-action: none;
+
+      &.dragging {
+        cursor: grabbing;
+      }
+    }
+  }
+</style>
