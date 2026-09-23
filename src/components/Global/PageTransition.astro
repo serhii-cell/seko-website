@@ -1,0 +1,146 @@
+<div class="page-transition_curtain" transition:persist aria-hidden="true">
+</div>
+
+<script is:inline>
+  if (!document.documentElement.classList.contains("stacki-designer")) {
+    document.documentElement.classList.add("page-intro");
+  }
+</script>
+
+<script>
+  import { gsap } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  const root = document.documentElement;
+  const curtainDuration = 1;
+  /* Fades start a little before the curtain's edge reaches the first text. */
+  const lead = 0.03;
+
+  let played = false;
+
+  /* When the rising curtain's bottom edge passes the top of `anchor`. */
+  function edgeTime(anchor: Element | null) {
+    if (!anchor) return curtainDuration / 2;
+    const top = anchor.getBoundingClientRect().top / innerHeight;
+    const risen = gsap.utils.clamp(0, 1, 1 - (top - lead));
+    const ease = gsap.parseEase("curtain");
+    let low = 0;
+    let high = 1;
+    for (let step = 0; step < 30; step++) {
+      const mid = (low + high) / 2;
+      if (ease(mid) < risen) low = mid;
+      else high = mid;
+    }
+    return ((low + high) / 2) * curtainDuration;
+  }
+
+  function afterFrames(count: number, done: () => void) {
+    let frame = 0;
+    const step = () => {
+      if (++frame >= count) done();
+      else requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  onPage(() => {
+    if (played || !root.classList.contains("page-intro")) return;
+    played = true;
+
+    const curtain = document.querySelector<HTMLElement>(
+      ".page-transition_curtain",
+    );
+    const targets = gsap.utils.toArray<HTMLElement>("[data-intro]");
+    let timeline: gsap.core.Timeline | undefined;
+    let cancelled = false;
+
+    const finish = () => {
+      root.classList.remove("page-intro", "page-intro-playing");
+      if (curtain) gsap.set(curtain, { clearProps: "all" });
+      gsap.set(targets, { clearProps: "opacity" });
+    };
+
+    const play = () => {
+      if (cancelled || timeline) return;
+      clearTimeout(fallback);
+      root.classList.add("page-intro-playing");
+      const opacity = targets.map((target) => getComputedStyle(target).opacity);
+      gsap.set(targets, { opacity: 0 });
+
+      const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      timeline = gsap.timeline({ onComplete: finish });
+      if (curtain) {
+        timeline.to(
+          curtain,
+          reduced
+            ? { opacity: 0, duration: 0.7, ease: "power1.inOut" }
+            : { yPercent: -100, duration: curtainDuration, ease: "curtain" },
+        );
+      }
+      timeline.to(
+        targets,
+        { opacity: (index: number) => Number(opacity[index]) },
+        reduced ? 0.25 : edgeTime(document.querySelector("main [data-intro]")),
+      );
+    };
+
+    /* Waits until the page is loaded, on screen and painting, so a page
+       opened in a background tab doesn't play its intro unseen. */
+    const onScreen = () => {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", onScreen);
+      afterFrames(12, () => setTimeout(play, 150));
+    };
+    const loaded = new Promise<void>((resolve) =>
+      document.readyState === "complete"
+        ? resolve()
+        : addEventListener("load", () => resolve(), { once: true }),
+    );
+    const fonts = Promise.race([
+      document.fonts.ready,
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
+    Promise.all([loaded, fonts]).then(() => {
+      document.addEventListener("visibilitychange", onScreen);
+      onScreen();
+    });
+    /* Never leave the page covered. */
+    const fallback = setTimeout(play, 6000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(fallback);
+      document.removeEventListener("visibilitychange", onScreen);
+      timeline?.kill();
+      finish();
+    };
+  });
+</script>
+
+<style is:global>
+  @layer components {
+    .page-transition_curtain {
+      display: none;
+    }
+
+    .page-intro {
+      & .page-transition_curtain {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 99;
+        background-color: black;
+        pointer-events: none;
+      }
+
+      /* The logo and clock sit on the curtain from the first frame. */
+      & .nav_wrap {
+        background-color: transparent;
+      }
+
+      &:not(.page-intro-playing) [data-intro] {
+        opacity: 0;
+      }
+    }
+  }
+</style>

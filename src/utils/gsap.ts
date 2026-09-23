@@ -11,5 +11,6 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 
 gsap.registerPlugin(ScrollTrigger);
 gsap.defaults({ duration: 0.8, ease: "power3.out" });
+gsap.registerEase("curtain", gsap.parseEase("power3.inOut"));
 
 export { gsap, ScrollTrigger };

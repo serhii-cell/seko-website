@@ -13,18 +13,21 @@ export default defineConfig({
   ],
   fonts: [
     {
-      name: "Inter",
-      cssVariable: "--font-inter",
-      provider: fontProviders.local(),
-      options: {
-        variants: [
-          {
-            weight: 400,
-            style: "normal",
-            src: ["./src/assets/fonts/inter-regular.woff2"],
-          },
-        ],
-      },
+      name: "Archivo",
+      cssVariable: "--font-archivo",
+      provider: fontProviders.google(),
+      weights: [400, 500, 700],
+      styles: ["normal"],
+      subsets: ["latin"],
+    },
+    {
+      name: "JetBrains Mono",
+      cssVariable: "--font-jetbrains-mono",
+      provider: fontProviders.google(),
+      weights: [400],
+      styles: ["normal"],
+      subsets: ["latin"],
+      fallbacks: ["monospace"],
     },
   ],
   vite: { build: { cssTarget: "safari15.4" } },

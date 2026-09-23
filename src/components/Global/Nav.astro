@@ -25,6 +25,10 @@ const { render = true, overlap = false } = Astro.props;
         <a class="nav_logo" href="/" aria-label={SITE_NAME}>
           <Icon src={logo} variant="full-width" />
         </a>
+        <p class="nav_clock">
+          <time class="nav_clock_time">--:-- --</time>
+          <span class="nav_clock_place">Ukraine</span>
+        </p>
         <button
           class="nav_toggle"
           type="button"
@@ -36,9 +40,11 @@ const { render = true, overlap = false } = Astro.props;
         </button>
         <nav class="nav_menu" id="nav-menu" aria-label="Main">
           <div class="nav_menu_inner">
-            <ul class="nav_links">
-              <NavLink href="/">Home</NavLink>
-              <NavLink href="/example-components">Example Components</NavLink>
+            <ul class="nav_links" data-intro>
+              <NavLink href="#">Work</NavLink>
+              <NavLink href="#">Services</NavLink>
+              <NavLink href="#">About</NavLink>
+              <NavLink href="#">Contact</NavLink>
             </ul>
           </div>
         </nav>
@@ -60,10 +66,38 @@ const { render = true, overlap = false } = Astro.props;
     .nav_menu_inner {
       opacity: 1;
     }
+    .nav_clock {
+      visibility: hidden;
+    }
   </style>
 </noscript>
 
 <script>
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  const kyiv = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Kyiv",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  onPage(() => {
+    const time = document.querySelector<HTMLTimeElement>(".nav_clock_time");
+    if (!time) return;
+
+    let timer = 0;
+    const tick = () => {
+      const now = new Date();
+      time.textContent = kyiv.format(now).replace(/\s+/g, " ");
+      time.dateTime = now.toISOString();
+      timer = window.setTimeout(tick, 1000 - (now.getTime() % 1000) + 5);
+    };
+    tick();
+
+    return () => clearTimeout(timer);
+  });
+
   const nav = document.querySelector<HTMLElement>(".nav_wrap");
   const toggle = nav?.querySelector<HTMLButtonElement>(".nav_toggle");
 
@@ -113,7 +147,6 @@ const { render = true, overlap = false } = Astro.props;
       padding-inline: var(--site-margin);
       background-color: var(--background);
       color: var(--text);
-      border-bottom: var(--border-width) solid var(--border);
 
       &.overlap {
         position: fixed;
@@ -122,24 +155,23 @@ const { render = true, overlap = false } = Astro.props;
     }
 
     .nav_inner {
+      position: relative;
       width: 100%;
       max-width: var(--max-width-main);
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 0 var(--space-6);
+      gap: 0 var(--space-3);
     }
 
     /* Bar height */
-    .nav_logo,
-    .nav_toggle {
+    .nav_logo {
       min-height: var(--nav-height);
     }
 
     .nav_logo {
       display: flex;
       align-items: center;
-      width: 6.5rem;
+      width: 5.9375rem;
       transition: opacity var(--hover-duration) var(--hover-ease);
       @media (hover: hover) {
         &:hover {
@@ -148,16 +180,32 @@ const { render = true, overlap = false } = Astro.props;
       }
     }
 
+    .nav_clock {
+      display: flex;
+      align-items: center;
+      margin-left: auto;
+      color: color-mix(in lab, currentcolor 20%, transparent);
+      font-size: var(--text-small);
+      font-weight: var(--primary-medium);
+      line-height: var(--line-height-huge);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .nav_clock_place {
+      display: none;
+    }
+
     .nav_toggle {
-      --_icon-width: 1.5rem;
-      --_bar-gap: 0.5rem;
+      --_icon-width: 1.125rem;
+      --_bar-gap: 0.3125rem;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-width: 2.75rem;
-      margin-right: calc((2.75rem - var(--_icon-width)) / -2);
+      width: 2.5rem;
+      height: 2.5rem;
+      background-color: var(--background-2);
       color: inherit;
-      border-radius: var(--radius-small);
       transition: opacity var(--hover-duration) var(--hover-ease);
       @media (hover: hover) {
         &:hover {
@@ -245,17 +293,14 @@ const { render = true, overlap = false } = Astro.props;
     .nav_link {
       display: block;
       padding-block: var(--space-3);
-      color: color-mix(in lab, currentcolor 60%, transparent);
+      color: var(--text);
       text-decoration: none;
       text-underline-offset: 0.4em;
       text-decoration-thickness: var(--border-width);
       transition: color var(--hover-duration) var(--hover-ease);
-      &[aria-current="page"] {
-        color: var(--text);
-      }
       @media (hover: hover) {
         &:hover {
-          color: var(--text);
+          color: var(--text-2);
         }
       }
     }
@@ -265,8 +310,21 @@ const { render = true, overlap = false } = Astro.props;
         display: none;
       }
 
+      .nav_clock_time::after {
+        content: ",";
+      }
+
+      .nav_clock_place {
+        display: inline;
+        margin-left: 0.3em;
+      }
+
       .nav_menu {
-        position: static;
+        position: absolute;
+        top: auto;
+        left: 50%;
+        right: auto;
+        translate: -50% 0;
         display: block;
         visibility: visible;
         background-color: transparent;
@@ -283,7 +341,7 @@ const { render = true, overlap = false } = Astro.props;
         flex-wrap: wrap;
         align-items: center;
         padding: 0;
-        gap: var(--space-4);
+        gap: var(--space-8);
         font-size: var(--text-small);
         & > li + li {
           border-top: 0;
