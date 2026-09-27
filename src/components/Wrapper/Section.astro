@@ -27,8 +27,10 @@ interface Props extends HTMLAttributes<"section"> {
   /**
    * Space above the content.
    *
-   * - `medium` — the usual gap between sections (default)
-   * - `none` — flush, for a section that meets the one above it
+   * - `none` — no space of its own; sections are spaced apart by the
+   *   page's section gap (default)
+   * - `medium` — the section gap's size, inside the section, for one with
+   *   its own background
    * - `even` — the site margin, matching the space at the sides
    * - `small`, `large` — tighter or looser than usual
    * - `navoverlap` — clears a nav sitting over the page
@@ -51,8 +53,8 @@ interface Props extends HTMLAttributes<"section"> {
 const {
   render = true,
   theme = "inherit",
-  paddingTop = "medium",
-  paddingBottom = "medium",
+  paddingTop = "none",
+  paddingBottom = "none",
   gap = "8",
   align,
   fullHeight = false,
@@ -65,14 +67,11 @@ const {
 const { class: containerAttrsClass, ...containerRest } = containerAttrs;
 
 const padSuffix: Partial<Record<SectionSpace, string>> = {
-  none: "0",
   even: "sitemargin",
 };
 
 const padClass = (side: "top" | "bottom", value: SectionSpace) =>
-  !!value &&
-  value !== "medium" &&
-  `padding-${side}-${padSuffix[value] ?? value}`;
+  !!value && value !== "none" && `padding-${side}-${padSuffix[value] ?? value}`;
 
 const content = await slotContent(Astro.slots);
 const background = await slotContent(Astro.slots, "background");

@@ -1,10 +1,13 @@
 ---
 import Layout from "@/layouts/BaseLayout.astro";
 import SectionHeroMain from "@/components/Section/SectionHeroMain.astro";
+import Section from "@/components/Wrapper/Section.astro";
+import ContentProblemMain from "@/components/Content/ContentProblemMain.astro";
 ---
 
 <Layout
   theme="dark"
+  reveal={true}
   description="Seko is a strategic design partner for small teams."
 >
   {/* Hero */}
@@ -13,4 +16,28 @@ import SectionHeroMain from "@/components/Section/SectionHeroMain.astro";
     text="Seko is a strategic design partner for small teams. We learn your business and product, design solutions around its needs using a structure, that your team can keep building on."
     buttonText="Book a Call"
   />
+
+  {/* Problem */}
+  <Section>
+    <ContentProblemMain
+      heading="You have an advanced product behind a confusing interface"
+      text={[
+        "Your engineers built infrastructure that handles complexity and holds up under load. Interface clarity never got the same attention. So the product still needs explaining every time it meets someone new — in demos, support tickets, and the same questions your team answers every week.",
+        "We take on the UX/UI and make the product explain itself.",
+      ]}
+    />
+  </Section>
+
+  {/* System */}
+  <Section>
+    <ContentProblemMain
+      heading="Every new feature you build restarts the same argument"
+      text={[
+        "The work was deliberate. The standard behind it was never set, so patterns contradict each other, developers make interface calls mid-sprint, and anyone joining the team spends their first months learning what isn't written anywhere.",
+        "We define the system: components, patterns, and the rules for using them, so the product stays consistent as it grows.",
+      ]}
+      model="gear"
+      modelSide="right"
+    />
+  </Section>
 </Layout>

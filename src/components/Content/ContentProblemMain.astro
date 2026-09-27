@@ -1,0 +1,69 @@
+---
+import ContentWrapper from "@/components/Wrapper/ContentWrapper.astro";
+import Heading from "@/components/Typography/Heading.astro";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+import AsciiModel from "@/components/Media/AsciiModel.astro";
+
+interface Props {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** The section heading. Nothing is output without it. */
+  heading?: string;
+  /** Paragraphs under the heading, one string each. */
+  text?: string[];
+  /** The ASCII model beside the text. Defaults to `monitor`. */
+  model?: "monitor" | "gear";
+  /**
+   * Which side the model sits on from 64rem up; below that it follows the
+   * text. The text column lines up with the hero's paragraph when the model
+   * is on the left, and with the hero's title when it is on the right.
+   * Defaults to `left`.
+   */
+  modelSide?: "left" | "right";
+}
+
+const {
+  render = true,
+  heading,
+  text = [],
+  model = "monitor",
+  modelSide = "left",
+} = Astro.props;
+---
+
+{
+  render && heading && (
+    <ContentWrapper
+      variant="columns"
+      reverse={modelSide === "left"}
+      class="problem-main_wrap"
+    >
+      <Heading tag="h2">{heading}</Heading>
+      {text.map((paragraph) => (
+        <Paragraph variant="main" class="problem-main_text color-faded">
+          {paragraph}
+        </Paragraph>
+      ))}
+      <AsciiModel slot="column2" variant={model} />
+    </ContentWrapper>
+  )
+}
+
+<style is:global>
+  @layer components {
+    .problem-main_wrap {
+      @media (width >= 64rem) {
+        &.columns {
+          grid-template-columns: var(--layout-split-reverse);
+        }
+        &.columns.reversed {
+          grid-template-columns: var(--layout-split);
+        }
+      }
+    }
+
+    .problem-main_text {
+      font-size: 1rem;
+    }
+  }
+</style>

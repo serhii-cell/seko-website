@@ -21,6 +21,7 @@
         .toArray<HTMLElement>(blocks, main)
         .filter(
           (block) =>
+            !block.hasAttribute("data-intro") &&
             block.getClientRects().length > 0 &&
             getComputedStyle(block).visibility !== "hidden" &&
             !ScrollTrigger.isInViewport(block),
@@ -29,7 +30,7 @@
         targets.map((block) => [block, getComputedStyle(block).opacity]),
       );
 
-      const settle = "opacity,visibility,transform";
+      const settle = "opacity,visibility";
 
       const reveal = context.add("reveal", (batch: Element[]) => {
         const passed = batch.filter(
@@ -42,14 +43,13 @@
           gsap.to(entering, {
             autoAlpha: (_: number, block: Element) =>
               Number(opacity.get(block)),
-            y: 0,
             stagger: 0.08,
             clearProps: settle,
           });
         }
       });
 
-      gsap.set(targets, { autoAlpha: 0, y: "2rem" });
+      gsap.set(targets, { autoAlpha: 0 });
       ScrollTrigger.batch(targets, {
         start: "top 90%",
         once: true,

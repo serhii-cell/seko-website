@@ -84,9 +84,10 @@ take no `render` prop; the layout decides where they appear.
   ticker, so ScrollTrigger reads the same scroll position. Its CSS is Lenis's
   own, class names included.
 - **`ScrollReveal`** runs on pages whose layout has `reveal`. It fades each
-  block up the first time it scrolls into view: every item in a section's
-  top-level `ContentWrapper`, every item of a top-level `Grid`, and any other
-  top-level block whole. Nothing inside Tabs, Sliders or Modals is touched, so a
+  block in from 0 opacity the first time it scrolls into view: every item in a
+  section's top-level `ContentWrapper`, every item of a top-level `Grid`, and
+  any other top-level block whole. Blocks marked `data-intro` are left to the
+  first-load intro. Nothing inside Tabs, Sliders or Modals is touched, so a
   hidden panel can't stay hidden. Blocks on screen at load are left alone,
   blocks already scrolled past settle without animating, and each fades back to
   its own opacity, so a card's dimmed media stays dimmed.

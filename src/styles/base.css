@@ -9,6 +9,7 @@
   --dark-900: #101010;
   --brand-500: #79d12d;
   --brand-text: #000000;
+  --blue-500: #2e43d1;
 
   /* Typography primitives */
   --primary-family: var(--font-archivo, "Helvetica Neue", Arial, sans-serif);
@@ -50,10 +51,12 @@
   /* Fluid scale range */
   --viewport-min: 320;
   --viewport-max: 1440;
+  --section-viewport-min: 360;
+  --section-viewport-max: 1920;
 
   /* Max width */
   --max-width-small: 70rem;
-  --max-width-main: calc(var(--viewport-max) / 16 * 1rem);
+  --max-width-main: 100rem;
   --max-width-full: 100%;
 
   /* Nav */
@@ -89,15 +92,15 @@
   --h1-text-wrap: balance;
 
   --h2: clamp(var(--h2-min) / 16 * 1rem, ((var(--h2-min) - ((var(--h2-max) - var(--h2-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--h2-max) - var(--h2-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--h2-max) / 16 * 1rem);
-  --h2-min: 40;
-  --h2-max: 64;
-  --h2-line-height: var(--line-height-small);
+  --h2-min: 28;
+  --h2-max: 40;
+  --h2-line-height: 1.2;
   --h2-letter-spacing: var(--letter-spacing-tight);
   --h2-text-transform: none;
   --h2-margin-top: var(--space-7);
-  --h2-margin-bottom: var(--space-5);
+  --h2-margin-bottom: var(--space-7);
   --h2-font-family: var(--primary-family);
-  --h2-font-weight: var(--primary-medium);
+  --h2-font-weight: var(--primary-regular);
   --h2-trim-top: var(--primary-trim-top);
   --h2-trim-bottom: var(--primary-trim-bottom);
   --h2-text-wrap: balance;
@@ -210,6 +213,8 @@
   --site-gutter-max: 32;
 
   --site-width: calc(100% - var(--site-margin) * 2);
+  --layout-split: minmax(0, 11fr) minmax(0, 8fr);
+  --layout-split-reverse: minmax(0, 8fr) minmax(0, 11fr);
 
   /* Spacing */
   --space-1: clamp(var(--space-1-min) / 16 * 1rem, ((var(--space-1-min) - ((var(--space-1-max) - var(--space-1-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--space-1-max) - var(--space-1-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--space-1-max) / 16 * 1rem);
@@ -240,9 +245,9 @@
   --section-space-small: clamp(var(--section-space-small-min) / 16 * 1rem, ((var(--section-space-small-min) - ((var(--section-space-small-max) - var(--section-space-small-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--section-space-small-max) - var(--section-space-small-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--section-space-small-max) / 16 * 1rem);
   --section-space-small-min: 48;
   --section-space-small-max: 80;
-  --section-space-medium: clamp(var(--section-space-medium-min) / 16 * 1rem, ((var(--section-space-medium-min) - ((var(--section-space-medium-max) - var(--section-space-medium-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--section-space-medium-max) - var(--section-space-medium-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--section-space-medium-max) / 16 * 1rem);
-  --section-space-medium-min: 64;
-  --section-space-medium-max: 112;
+  --section-space-medium: clamp(var(--section-space-medium-min) / 16 * 1rem, ((var(--section-space-medium-min) - ((var(--section-space-medium-max) - var(--section-space-medium-min)) / (var(--section-viewport-max) - var(--section-viewport-min)) * var(--section-viewport-min))) / 16 * 1rem + ((var(--section-space-medium-max) - var(--section-space-medium-min)) / (var(--section-viewport-max) - var(--section-viewport-min))) * 100vw), var(--section-space-medium-max) / 16 * 1rem);
+  --section-space-medium-min: 48;
+  --section-space-medium-max: 160;
   --section-space-large: clamp(var(--section-space-large-min) / 16 * 1rem, ((var(--section-space-large-min) - ((var(--section-space-large-max) - var(--section-space-large-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--section-space-large-max) - var(--section-space-large-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--section-space-large-max) / 16 * 1rem);
   --section-space-large-min: 88;
   --section-space-large-max: 160;
@@ -389,6 +394,7 @@ body {
     display: flex;
     flex-direction: column;
     flex-grow: 1;
+    row-gap: var(--section-space-medium);
   }
 }
 

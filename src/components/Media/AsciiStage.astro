@@ -26,103 +26,38 @@ const { render = true, class: className, ...rest } = Astro.props;
 
 <script>
   import { onPage } from "@/utils/lifecycle.ts";
+  import {
+    GLYPH,
+    GLYPHS,
+    clamp,
+    smoothstep,
+    mix,
+    toRgb,
+    readLook,
+    allowsMotion,
+    glyphForSize,
+    pageGlyph,
+    measureRamp,
+    pickGlyph,
+    createController,
+    createOrbit,
+    rotation,
+    LIGHT,
+    HALF,
+    KEY,
+    type Rgb,
+    type Engine,
+    type Controller,
+    type Look,
+  } from "@/utils/ascii.ts";
 
-  type Rgb = [number, number, number];
-  type Engine = { play(): void; pause(): void; destroy(): void };
-  type Controller = {
-    running(): boolean;
-    onChange(listener: (running: boolean) => void): void;
-    destroy(): void;
-  };
-  type Glyph = {
-    size: number;
-    listeners: Set<(size: number) => void>;
-    set(size: number): void;
-  };
-  type Look = { glyph: string; accent: string; font: string };
-
-  /* One glyph size for both effects, set by the cube: 12px when it shows at
-     its full 720px, scaled down with it, never below 6px. Cells keep the
-     8 × 14 proportion of the 12px grid. */
-  const GLYPH = { max: 12, min: 6, fullAt: 720, cellW: 8 / 12, cellH: 14 / 12 };
-  const GLYPHS = " .:-'^~=+*ctxowq#M%@";
   /* Still frames for reduced motion: the eight cubes joined into one. */
   const STILL_TIME = 4400;
-
-  const clamp = (value: number, min: number, max: number) =>
-    Math.min(max, Math.max(min, value));
-  const smoothstep = (edge0: number, edge1: number, x: number) => {
-    const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
-    return t * t * (3 - 2 * t);
-  };
-
-  function toRgb(color: string): Rgb {
-    const probe = document.createElement("canvas").getContext("2d");
-    if (!probe) return [255, 255, 255];
-    probe.fillStyle = color;
-    const hex = probe.fillStyle.replace("#", "");
-    return [0, 2, 4].map(
-      (at) => parseInt(hex.slice(at, at + 2), 16) || 0,
-    ) as Rgb;
-  }
-
-  /* Effects run only while the stage is on screen, with a 200px margin, and
-     start animating once the page has loaded and the browser is idle, so the
-     work stays out of the load that performance tools measure. */
-  function createController(stage: HTMLElement): Controller {
-    let visible = true;
-    let started = false;
-    let idle = 0;
-    let timer = 0;
-    const listeners = new Set<(running: boolean) => void>();
-    const notify = () =>
-      listeners.forEach((listener) => listener(started && visible));
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const now = entries.some((entry) => entry.isIntersecting);
-        if (now === visible) return;
-        visible = now;
-        notify();
-      },
-      { rootMargin: "200px 0px" },
-    );
-    observer.observe(stage);
-
-    const begin = () => {
-      timer = window.setTimeout(() => {
-        started = true;
-        notify();
-      }, 250);
-    };
-    const whenLoaded = () => {
-      if ("requestIdleCallback" in window) {
-        idle = requestIdleCallback(begin, { timeout: 1500 });
-      } else {
-        timer = self.setTimeout(begin, 300);
-      }
-    };
-    if (document.readyState === "complete") whenLoaded();
-    else addEventListener("load", whenLoaded, { once: true });
-
-    return {
-      running: () => started && visible,
-      onChange: (listener) => listeners.add(listener),
-      destroy() {
-        observer.disconnect();
-        removeEventListener("load", whenLoaded);
-        if (idle && "cancelIdleCallback" in window) cancelIdleCallback(idle);
-        clearTimeout(timer);
-        listeners.clear();
-      },
-    };
-  }
 
   /* ---------- Background: glyphs spiralling into a hole behind the cube ---------- */
   function createBackground(
     canvas: HTMLCanvasElement,
     controller: Controller,
-    glyph: Glyph,
     look: Look,
     motion: boolean,
   ): Engine {
@@ -598,10 +533,10 @@ const { render = true, class: className, ...rest } = Astro.props;
       still();
     };
 
-    applyGlyph(glyph.size);
+    applyGlyph(pageGlyph.size);
     buildRamp();
     resize();
-    glyph.listeners.add(onGlyph);
+    pageGlyph.listeners.add(onGlyph);
     const observer = new ResizeObserver(() => {
       resize();
       still();
@@ -617,7 +552,7 @@ const { render = true, class: className, ...rest } = Astro.props;
       destroy() {
         pause();
         observer.disconnect();
-        glyph.listeners.delete(onGlyph);
+        pageGlyph.listeners.delete(onGlyph);
         stage.removeEventListener("pointermove", onPointerMove);
         stage.removeEventListener("pointerleave", onPointerLeave);
       },
@@ -628,23 +563,12 @@ const { render = true, class: className, ...rest } = Astro.props;
   function createCubes(
     canvas: HTMLCanvasElement,
     controller: Controller,
-    glyph: Glyph,
     look: Look,
     motion: boolean,
   ): Engine {
     const context = canvas.getContext("2d");
     if (!context) return { play() {}, pause() {}, destroy() {} };
 
-    const BAYER = [
-      [0, 32, 8, 40, 2, 34, 10, 42],
-      [48, 16, 56, 24, 50, 18, 58, 26],
-      [12, 44, 4, 36, 14, 46, 6, 38],
-      [60, 28, 52, 20, 62, 30, 54, 22],
-      [3, 35, 11, 43, 1, 33, 9, 41],
-      [51, 19, 59, 27, 49, 17, 57, 25],
-      [15, 47, 7, 39, 13, 45, 5, 37],
-      [63, 31, 55, 23, 61, 29, 53, 21],
-    ];
     const green = toRgb(look.accent);
     const GRID_DARK: Rgb = [70, 70, 76];
     const GRID_PEAK: Rgb = [240, 240, 245];
@@ -679,45 +603,6 @@ const { render = true, class: className, ...rest } = Astro.props;
 
     let ramp: string[] = [];
     let coverage: number[] = [];
-    function buildRamp() {
-      const probe = document.createElement("canvas");
-      probe.width = cw;
-      probe.height = ch;
-      const g = probe.getContext("2d", { willReadFrequently: true });
-      if (!g) return;
-      g.font = font;
-      g.textBaseline = "top";
-      g.fillStyle = "#fff";
-      const measured: [number, string][] = [];
-      for (const glyphChar of GLYPHS) {
-        g.clearRect(0, 0, cw, ch);
-        g.fillText(glyphChar, 0, 0);
-        const data = g.getImageData(0, 0, probe.width, probe.height).data;
-        let sum = 0;
-        for (let i = 3; i < data.length; i += 4) sum += data[i];
-        measured.push([sum / 255 / (cw * ch), glyphChar]);
-      }
-      measured.sort((a, b) => a[0] - b[0]);
-      ramp = [];
-      const cov: number[] = [];
-      let last = -1;
-      for (const [value, glyphChar] of measured) {
-        if (value - last > 0.006) {
-          ramp.push(glyphChar);
-          cov.push(value);
-          last = value;
-        }
-      }
-      const max = cov[cov.length - 1] || 1;
-      coverage = cov.map((value) => value / max);
-    }
-    function toPosition(b: number) {
-      const n = ramp.length;
-      if (b >= 1) return n - 1;
-      let i = 1;
-      while (i < n && coverage[i] < b) i++;
-      return i - 1 + (b - coverage[i - 1]) / (coverage[i] - coverage[i - 1]);
-    }
 
     let seam = new Uint8Array(0);
     let brightness = new Float32Array(0);
@@ -729,26 +614,6 @@ const { render = true, class: className, ...rest } = Astro.props;
     let line = new Float32Array(0);
 
     let R = [1, 0, 0, 0, 1, 0, 0, 0, 1];
-    function multiply(a: number[], b: number[]) {
-      const out = new Array<number>(9);
-      for (let i = 0; i < 3; i++) {
-        for (let j = 0; j < 3; j++) {
-          out[i * 3 + j] =
-            a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j];
-        }
-      }
-      return out;
-    }
-    function setRotation(yaw: number, tilt: number) {
-      const cyaw = Math.cos(yaw);
-      const syaw = Math.sin(yaw);
-      const ct = Math.cos(tilt);
-      const st = Math.sin(tilt);
-      R = multiply(
-        [1, 0, 0, 0, ct, -st, 0, st, ct],
-        [cyaw, 0, syaw, 0, 1, 0, -syaw, 0, cyaw],
-      );
-    }
     function sdBox(
       px: number,
       py: number,
@@ -798,21 +663,10 @@ const { render = true, class: className, ...rest } = Astro.props;
       return best * zoom;
     }
 
-    const normalize = (v: number[]) => {
-      const l = Math.hypot(v[0], v[1], v[2]);
-      return v.map((c) => c / l);
-    };
-    const [LX, LY, LZ] = normalize([-0.45, 0.7, 0.55]);
-    const [HX, HY, HZ] = normalize([LX, LY, LZ + 1]);
-    /* Key light fixed to the cubes: top brightest, then right, front, left,
-       back, bottom darkest. */
-    const FL = normalize([0.33, 0.84, 0.43]);
+    const [LX, LY, LZ] = LIGHT;
+    const [HX, HY, HZ] = HALF;
+    const FL = KEY;
     const ss = (u: number) => smoothstep(0, 1, u);
-    const mix = (a: Rgb, b: Rgb, u: number): Rgb => [
-      a[0] + (b[0] - a[0]) * u,
-      a[1] + (b[1] - a[1]) * u,
-      a[2] + (b[2] - a[2]) * u,
-    ];
 
     const SEGMENTS: number[][][] = [];
     for (const a of [-1, 0, 1]) {
@@ -873,56 +727,7 @@ const { render = true, class: className, ...rest } = Astro.props;
       }
     }
 
-    /* Dragging orbits the camera while the loop keeps playing. A horizontal
-       turn is kept on release, folded into the idle spin; a tilt eases back
-       to the original angle, taking longer the further it went. */
-    const drag = {
-      yaw: 0,
-      pitch: 0,
-      active: false,
-      lastX: 0,
-      lastY: 0,
-      sensitivity: 0.006,
-    };
-    const idle = {
-      yaw: 0,
-      spin: motion ? -0.24 : 0,
-      minDuration: 0.6,
-      perRadian: 0.35,
-      maxDuration: 1.6,
-    };
-    let tiltReturn: { from: number; t: number; duration: number } | null = null;
-    const easeInOutCubic = (u: number) =>
-      u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
-    function startReturn() {
-      idle.yaw += drag.yaw;
-      drag.yaw = 0;
-      const from = drag.pitch;
-      if (!motion || Math.abs(from) < 1e-3) {
-        drag.pitch = 0;
-        tiltReturn = null;
-        return;
-      }
-      tiltReturn = {
-        from,
-        t: 0,
-        duration: Math.min(
-          idle.maxDuration,
-          idle.minDuration + idle.perRadian * Math.abs(from),
-        ),
-      };
-    }
-    function applyInertia(dt: number) {
-      if (!drag.active) idle.yaw += idle.spin * dt;
-      if (drag.active || !tiltReturn) return;
-      tiltReturn.t += dt;
-      const u = Math.min(1, tiltReturn.t / tiltReturn.duration);
-      drag.pitch = tiltReturn.from * (1 - easeInOutCubic(u));
-      if (u >= 1) {
-        drag.pitch = 0;
-        tiltReturn = null;
-      }
-    }
+    const orbit = createOrbit(canvas, motion, 0.44, () => still());
 
     let seamFill = 0;
     const SEAM_ORDER = (() => {
@@ -940,9 +745,9 @@ const { render = true, class: className, ...rest } = Astro.props;
        (4.5–5.6s), and a grid fades in, holds and fades out (5.3–7s). */
     function scene(time: number) {
       const T = time % LOOP;
-      setRotation(
-        0.66 + 0.07 * Math.sin((T / LOOP) * Math.PI * 2) + idle.yaw + drag.yaw,
-        0.44 + drag.pitch,
+      R = rotation(
+        0.66 + 0.07 * Math.sin((T / LOOP) * Math.PI * 2) + orbit.yaw(),
+        0.44 + orbit.pitch(),
       );
       const T0 = 0.5,
         STEP = 0.49,
@@ -1083,7 +888,6 @@ const { render = true, class: className, ...rest } = Astro.props;
       context.clearRect(0, 0, size, size);
       context.font = font;
       context.textBaseline = "top";
-      const n = ramp.length;
       for (let gy = 0; gy < rows; gy++) {
         for (let gx = 0; gx < cols; gx++) {
           const i = gy * cols + gx;
@@ -1125,11 +929,7 @@ const { render = true, class: className, ...rest } = Astro.props;
                 Math.min(1, (specular[i] - 0.3) * 1.3) * 0.7,
               );
           }
-          const index = Math.min(
-            n - 1,
-            Math.floor(toPosition(b) + (BAYER[gy & 7][gx & 7] + 0.5) / 64),
-          );
-          const glyphChar = ramp[index];
+          const glyphChar = pickGlyph(ramp, coverage, b, gx, gy);
           if (glyphChar === " ") continue;
           const lum = 0.55 + 0.45 * b;
           context.fillStyle = `rgb(${(color[0] * lum) | 0},${(color[1] * lum) | 0},${(color[2] * lum) | 0})`;
@@ -1142,10 +942,7 @@ const { render = true, class: className, ...rest } = Astro.props;
        and the glyph size shared with the background. */
     function configure(measured: number) {
       size = Math.max(120, Math.round(measured));
-      const g =
-        Math.round(
-          clamp((GLYPH.max * size) / GLYPH.fullAt, GLYPH.min, GLYPH.max) * 4,
-        ) / 4;
+      const g = glyphForSize(size);
       cw = g * GLYPH.cellW;
       ch = g * GLYPH.cellH;
       cols = Math.floor(size / cw);
@@ -1169,8 +966,8 @@ const { render = true, class: className, ...rest } = Astro.props;
       canvas.width = Math.round(size * dpr);
       canvas.height = Math.round(size * dpr);
       context?.setTransform(dpr, 0, 0, dpr, 0, 0);
-      buildRamp();
-      glyph.set(g);
+      ({ ramp, coverage } = measureRamp(font, cw, ch));
+      pageGlyph.set(g);
     }
     let measuredSize = 0;
     function watchSize() {
@@ -1192,7 +989,7 @@ const { render = true, class: className, ...rest } = Astro.props;
       if (simTime - lastStep < 33) return;
       const dt = Math.min(0.1, (simTime - lastStep) / 1000);
       lastStep = simTime;
-      applyInertia(dt);
+      orbit.step(dt);
       scene(simTime / 1000);
       draw();
     }
@@ -1211,38 +1008,6 @@ const { render = true, class: className, ...rest } = Astro.props;
       draw();
     }
 
-    function onPointerDown(event: PointerEvent) {
-      drag.active = true;
-      tiltReturn = null;
-      drag.lastX = event.clientX;
-      drag.lastY = event.clientY;
-      canvas.setPointerCapture(event.pointerId);
-      canvas.classList.add("dragging");
-    }
-    function onPointerMove(event: PointerEvent) {
-      if (!drag.active) return;
-      drag.yaw += (event.clientX - drag.lastX) * drag.sensitivity;
-      drag.pitch = clamp(
-        drag.pitch + (event.clientY - drag.lastY) * drag.sensitivity,
-        -1.35 - 0.44,
-        1.35 - 0.44,
-      );
-      drag.lastX = event.clientX;
-      drag.lastY = event.clientY;
-      still();
-    }
-    function onPointerUp() {
-      if (!drag.active) return;
-      drag.active = false;
-      canvas.classList.remove("dragging");
-      startReturn();
-      still();
-    }
-    canvas.addEventListener("pointerdown", onPointerDown);
-    canvas.addEventListener("pointermove", onPointerMove);
-    canvas.addEventListener("pointerup", onPointerUp);
-    canvas.addEventListener("pointercancel", onPointerUp);
-
     watchSize();
     const observer = new ResizeObserver(() => {
       watchSize();
@@ -1259,10 +1024,7 @@ const { render = true, class: className, ...rest } = Astro.props;
       destroy() {
         pause();
         observer.disconnect();
-        canvas.removeEventListener("pointerdown", onPointerDown);
-        canvas.removeEventListener("pointermove", onPointerMove);
-        canvas.removeEventListener("pointerup", onPointerUp);
-        canvas.removeEventListener("pointercancel", onPointerUp);
+        orbit.destroy();
       },
     };
   }
@@ -1276,25 +1038,8 @@ const { render = true, class: className, ...rest } = Astro.props;
     const cubes = stage.querySelector<HTMLCanvasElement>(".ascii-stage_cubes");
     if (!background || !cubes) return () => {};
 
-    const style = getComputedStyle(stage);
-    const look: Look = {
-      glyph: style.getPropertyValue("--_glyph").trim() || "#2a2a2a",
-      accent: style.getPropertyValue("--_accent").trim() || "#79d12d",
-      font: style.getPropertyValue("--_glyph-font").trim() || "monospace",
-    };
-    const motion =
-      !matchMedia("(prefers-reduced-motion: reduce)").matches &&
-      !document.documentElement.classList.contains("stacki-designer");
-
-    const glyph: Glyph = {
-      size: GLYPH.max,
-      listeners: new Set(),
-      set(size) {
-        if (Math.abs(size - glyph.size) < 0.01) return;
-        glyph.size = size;
-        glyph.listeners.forEach((listener) => listener(size));
-      },
-    };
+    const look = readLook(stage);
+    const motion = allowsMotion();
     const controller = createController(stage);
     let engines: Engine[] = [];
     let stopped = false;
@@ -1305,8 +1050,8 @@ const { render = true, class: className, ...rest } = Astro.props;
       .then(() => {
         if (stopped) return;
         engines = [
-          createBackground(background, controller, glyph, look, motion),
-          createCubes(cubes, controller, glyph, look, motion),
+          createBackground(background, controller, look, motion),
+          createCubes(cubes, controller, look, motion),
         ];
       });
 
@@ -1359,8 +1104,8 @@ const { render = true, class: className, ...rest } = Astro.props;
     }
 
     .ascii-stage_visual {
-      width: min(45rem, 100cqh, 100cqw);
-      height: min(45rem, 100cqh, 100cqw);
+      width: min(100cqh, 100cqw);
+      height: min(100cqh, 100cqw);
     }
 
     .ascii-stage_cubes {

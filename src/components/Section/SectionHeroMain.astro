@@ -34,7 +34,6 @@ const {
     <Section
       class="hero-main_wrap"
       paddingTop="even"
-      paddingBottom="even"
       containerClass="hero-main_container"
     >
       <div class="hero-main_stage">
@@ -70,8 +69,10 @@ const {
 
 <style is:global>
   @layer components {
+    /* One screen tall, less the site margin left free under the button; the
+       section gap follows it. */
     .hero-main_wrap {
-      height: calc(100svh - var(--nav-height));
+      height: calc(100svh - var(--nav-height) - var(--site-margin));
       min-height: 30rem;
     }
 
@@ -91,7 +92,7 @@ const {
       row-gap: var(--space-4);
       @media (width >= 64rem) {
         &.columns {
-          grid-template-columns: minmax(0, 11fr) minmax(0, 8fr);
+          grid-template-columns: var(--layout-split);
         }
       }
     }

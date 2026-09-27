@@ -1,4 +1,16 @@
+---
+import Icon from "@/components/Media/Icon.astro";
+import logo from "@/assets/logo/logo.svg";
+---
+
 <div class="page-transition_curtain" transition:persist aria-hidden="true">
+  <div class="page-transition_logo">
+    <Icon src={logo} variant="full-width" />
+    <div class="page-transition_fill">
+      <Icon src={logo} variant="full-width" />
+    </div>
+  </div>
+  <div class="page-transition_bar"></div>
 </div>
 
 <script is:inline>
@@ -13,6 +25,8 @@
 
   const root = document.documentElement;
   const curtainDuration = 1;
+  /* The loader shows at least this long, so it never just flashes past. */
+  const minimumLoad = 1.3;
   /* Fades start a little before the curtain's edge reaches the first text. */
   const lead = 0.03;
 
@@ -50,37 +64,74 @@
     const curtain = document.querySelector<HTMLElement>(
       ".page-transition_curtain",
     );
+    const bar = curtain?.querySelector<HTMLElement>(".page-transition_bar");
     const targets = gsap.utils.toArray<HTMLElement>("[data-intro]");
+    const started = performance.now();
     let timeline: gsap.core.Timeline | undefined;
     let cancelled = false;
+
+    /* While the page loads, the logo fills and the bar grows most of the way,
+       slowing as they go; they finish once it's ready. */
+    const loading = curtain
+      ? gsap.to(curtain, {
+          "--_progress": 0.85,
+          duration: 2.5,
+          ease: "power2.out",
+        })
+      : undefined;
 
     const finish = () => {
       root.classList.remove("page-intro", "page-intro-playing");
       if (curtain) gsap.set(curtain, { clearProps: "all" });
+      if (bar) gsap.set(bar, { clearProps: "opacity" });
       gsap.set(targets, { clearProps: "opacity" });
     };
 
     const play = () => {
       if (cancelled || timeline) return;
       clearTimeout(fallback);
+      loading?.kill();
       root.classList.add("page-intro-playing");
       const opacity = targets.map((target) => getComputedStyle(target).opacity);
       gsap.set(targets, { opacity: 0 });
 
       const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const elapsed = (performance.now() - started) / 1000;
+      const fill = Math.max(0.35, minimumLoad - elapsed);
       timeline = gsap.timeline({ onComplete: finish });
       if (curtain) {
-        timeline.to(
-          curtain,
-          reduced
-            ? { opacity: 0, duration: 0.7, ease: "power1.inOut" }
-            : { yPercent: -100, duration: curtainDuration, ease: "curtain" },
-        );
+        timeline
+          .to(curtain, {
+            "--_progress": 1,
+            duration: fill,
+            ease: "power1.inOut",
+          })
+          .to(
+            curtain,
+            reduced
+              ? { opacity: 0, duration: 0.7, ease: "power1.inOut" }
+              : { yPercent: -100, duration: curtainDuration, ease: "curtain" },
+            "+=0.15",
+          );
+        /* The bar is gone by the time the curtain is halfway up. */
+        if (bar) {
+          timeline.to(
+            bar,
+            { opacity: 0, duration: curtainDuration / 2, ease: "power1.out" },
+            "<",
+          );
+        }
       }
       timeline.to(
         targets,
         { opacity: (index: number) => Number(opacity[index]) },
-        reduced ? 0.25 : edgeTime(document.querySelector("main [data-intro]")),
+        curtain
+          ? fill +
+              0.15 +
+              (reduced
+                ? 0.25
+                : edgeTime(document.querySelector("main [data-intro]")))
+          : 0,
       );
     };
 
@@ -111,6 +162,7 @@
       cancelled = true;
       clearTimeout(fallback);
       document.removeEventListener("visibilitychange", onScreen);
+      loading?.kill();
       timeline?.kill();
       finish();
     };
@@ -125,22 +177,47 @@
 
     .page-intro {
       & .page-transition_curtain {
+        --_progress: 0;
         display: block;
         position: fixed;
         inset: 0;
-        z-index: 99;
+        /* Above the nav, so the whole page appears from under it. */
+        z-index: 101;
         background-color: black;
         pointer-events: none;
-      }
-
-      /* The logo and clock sit on the curtain from the first frame. */
-      & .nav_wrap {
-        background-color: transparent;
       }
 
       &:not(.page-intro-playing) [data-intro] {
         opacity: 0;
       }
+    }
+
+    /* The logo in grey, with a white copy over it revealed left to right. */
+    .page-transition_logo {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 7.5rem;
+      translate: -50% -50%;
+      color: color-mix(in lab, var(--light-100) 22%, transparent);
+    }
+
+    .page-transition_fill {
+      position: absolute;
+      inset: 0;
+      color: var(--light-100);
+      clip-path: inset(0 calc((1 - var(--_progress)) * 100%) 0 0);
+    }
+
+    .page-transition_bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 0.25rem;
+      background-color: var(--brand-500);
+      transform-origin: left;
+      scale: var(--_progress) 1;
     }
   }
 </style>
