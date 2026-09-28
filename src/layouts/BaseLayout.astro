@@ -7,6 +7,7 @@ import Footer from "@/components/Global/Footer.astro";
 import SmoothScroll from "@/components/Global/SmoothScroll.astro";
 import ScrollReveal from "@/components/Global/ScrollReveal.astro";
 import PageTransition from "@/components/Global/PageTransition.astro";
+import PageFrame from "@/components/Global/PageFrame.astro";
 import type { SeoProps } from "@/types.ts";
 
 type Props = SeoProps & {
@@ -43,6 +44,7 @@ const {
     <SkipLink />
     <PageTransition />
     <Nav overlap={overlap} />
+    <PageFrame />
     <main id="main" tabindex="-1" data-reveal={reveal ? "" : undefined}>
       <slot />
     </main>

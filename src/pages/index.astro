@@ -2,7 +2,10 @@
 import Layout from "@/layouts/BaseLayout.astro";
 import SectionHeroMain from "@/components/Section/SectionHeroMain.astro";
 import Section from "@/components/Wrapper/Section.astro";
-import ContentProblemMain from "@/components/Content/ContentProblemMain.astro";
+import SectionProblemsMain from "@/components/Section/SectionProblemsMain.astro";
+import ContentLogosMain from "@/components/Content/ContentLogosMain.astro";
+import ContentStatementMain from "@/components/Content/ContentStatementMain.astro";
+import adaptive from "@/assets/clients/adaptive.svg";
 ---
 
 <Layout
@@ -12,32 +15,60 @@ import ContentProblemMain from "@/components/Content/ContentProblemMain.astro";
 >
   {/* Hero */}
   <SectionHeroMain
-    heading="Design agency that scales your product to your ambitions."
+    heading="Design agency that scales products to your ambitions."
     text="Seko is a strategic design partner for small teams. We learn your business and product, design solutions around its needs using a structure, that your team can keep building on."
     buttonText="Book a Call"
   />
 
-  {/* Problem */}
+  {/* Clients */}
   <Section>
-    <ContentProblemMain
-      heading="You have an advanced product behind a confusing interface"
-      text={[
-        "Your engineers built infrastructure that handles complexity and holds up under load. Interface clarity never got the same attention. So the product still needs explaining every time it meets someone new — in demos, support tickets, and the same questions your team answers every week.",
-        "We take on the UX/UI and make the product explain itself.",
+    <ContentLogosMain
+      text="Trusted by teams around the world"
+      logos={[
+        { src: adaptive, name: "Adaptive & Co" },
+        { src: adaptive, name: "Adaptive & Co" },
+        { src: adaptive, name: "Adaptive & Co" },
+        { src: adaptive, name: "Adaptive & Co" },
+        { src: adaptive, name: "Adaptive & Co" },
       ]}
     />
   </Section>
 
-  {/* System */}
+  {/* Statement */}
   <Section>
-    <ContentProblemMain
-      heading="Every new feature you build restarts the same argument"
-      text={[
-        "The work was deliberate. The standard behind it was never set, so patterns contradict each other, developers make interface calls mid-sprint, and anyone joining the team spends their first months learning what isn't written anywhere.",
-        "We define the system: components, patterns, and the rules for using them, so the product stays consistent as it grows.",
-      ]}
-      model="gear"
-      modelSide="right"
+    <ContentStatementMain
+      heading="Every product carries the decisions of the team that builds it. Without consistent UX, those decisions drift apart, and after a year or two the product needs a redesign to feel whole again."
     />
   </Section>
+
+  {/* Problems */}
+  <SectionProblemsMain
+    problems={[
+      {
+        heading: "You have an advanced product behind a confusing interface",
+        text: [
+          "Your engineers built infrastructure that handles complexity and holds up under load. Interface clarity never got the same attention. So the product still needs explaining every time it meets someone new — in demos, support tickets, and the same questions your team answers every week.",
+          "We take on the UX/UI and make the product explain itself.",
+        ],
+        model: "controls",
+      },
+      {
+        heading: "Every new feature you build restarts the same argument",
+        text: [
+          "The work was deliberate. The standard behind it was never set, so patterns contradict each other, developers make interface calls mid-sprint, and anyone joining the team spends their first months learning what isn't written anywhere.",
+          "We define the system: components, patterns, and the rules for using them, so the product stays consistent as it grows.",
+        ],
+        model: "gear",
+      },
+      {
+        heading:
+          "The product works. It doesn't look like it's worth what you charge",
+        text: [
+          "The functionality is solid. The interface still looks like a tool your team built for itself, and that's what buyers price against. Decisions take longer, more proof gets asked for, and prospects lean toward products that do less but feel finished.",
+          "We bring the interface up to the level the product is already at, so the value is visible without explaining it.",
+        ],
+        model: "tractor",
+      },
+    ]}
+  />
 </Layout>

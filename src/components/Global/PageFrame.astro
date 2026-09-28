@@ -1,0 +1,25 @@
+<div class="page-frame_wrap" aria-hidden="true"></div>
+
+<style is:global>
+  @layer components {
+    /* Dashed lines down the edges of the content, over the nav, under the
+       loading curtain. */
+    .page-frame_wrap {
+      --_line: repeating-linear-gradient(
+        to bottom,
+        var(--border) 0 var(--dash),
+        transparent 0 calc(var(--dash) * 2)
+      );
+      position: fixed;
+      inset-block: 0;
+      left: 50%;
+      z-index: 100;
+      width: min(var(--site-width), var(--max-width-main));
+      translate: -50% 0;
+      pointer-events: none;
+      background:
+        var(--_line) left / var(--border-width) 100% no-repeat,
+        var(--_line) right / var(--border-width) 100% no-repeat;
+    }
+  }
+</style>

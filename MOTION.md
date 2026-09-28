@@ -86,8 +86,13 @@ take no `render` prop; the layout decides where they appear.
 - **`ScrollReveal`** runs on pages whose layout has `reveal`. It fades each
   block in from 0 opacity the first time it scrolls into view: every item in a
   section's top-level `ContentWrapper`, every item of a top-level `Grid`, and
-  any other top-level block whole. Blocks marked `data-intro` are left to the
-  first-load intro. Nothing inside Tabs, Sliders or Modals is touched, so a
+  any other top-level block whole. Headings and body text get the marker
+  reveal from `src/utils/marker.ts` instead: each line starts under a bar in
+  the text colour that wipes away left to right. A small supporting line opts
+  out of it with `data-marker="off"` and fades. Blocks marked `data-intro` are
+  left to the first-load intro, which uses the same marker for its text. A
+  block marked `data-reveal="own"` runs its own reveal and is skipped, as
+  `SectionProblemsMain` does for its sticky, step-by-step text. Nothing inside Tabs, Sliders or Modals is touched, so a
   hidden panel can't stay hidden. Blocks on screen at load are left alone,
   blocks already scrolled past settle without animating, and each fades back to
   its own opacity, so a card's dimmed media stays dimmed.

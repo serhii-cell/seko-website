@@ -1,6 +1,7 @@
 <script>
   import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
+  import { createMarker, isMarkerText, type Marker } from "@/utils/marker.ts";
 
   const blocks = [
     ".section > .container > .layout > * > *",
@@ -22,12 +23,20 @@
         .filter(
           (block) =>
             !block.hasAttribute("data-intro") &&
+            !block.closest('[data-reveal="own"]') &&
             block.getClientRects().length > 0 &&
             getComputedStyle(block).visibility !== "hidden" &&
             !ScrollTrigger.isInViewport(block),
         );
+      /* Headings and body text get the marker; everything else fades. */
+      const markers = new Map<Element, Marker>(
+        targets
+          .filter(isMarkerText)
+          .map((block) => [block, createMarker(block)]),
+      );
+      const faders = targets.filter((block) => !markers.has(block));
       const opacity = new Map<Element, string>(
-        targets.map((block) => [block, getComputedStyle(block).opacity]),
+        faders.map((block) => [block, getComputedStyle(block).opacity]),
       );
 
       const settle = "opacity,visibility";
@@ -49,12 +58,31 @@
         }
       });
 
-      gsap.set(targets, { autoAlpha: 0 });
-      ScrollTrigger.batch(targets, {
+      gsap.set(faders, { autoAlpha: 0 });
+      ScrollTrigger.batch(faders, {
         start: "top 90%",
         once: true,
         onEnter: (batch) => reveal(batch),
       });
+
+      /* Text starts as soon as its first line is fully on screen. Ending at
+         the page's end means a block already scrolled past plays at once. */
+      const firstLine = (block: Element) => {
+        const style = getComputedStyle(block);
+        const height = parseFloat(style.lineHeight);
+        return Number.isNaN(height) ? parseFloat(style.fontSize) * 1.2 : height;
+      };
+      markers.forEach((marker, block) => {
+        ScrollTrigger.create({
+          trigger: block,
+          start: () => `top+=${firstLine(block)} bottom`,
+          end: "max",
+          once: true,
+          onEnter: () => marker.play(),
+        });
+      });
+
+      return () => markers.forEach((marker) => marker.revert());
     });
 
     return () => mm.revert();

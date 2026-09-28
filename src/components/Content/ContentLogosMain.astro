@@ -1,0 +1,127 @@
+---
+import type { SvgComponent } from "astro/types";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+import Icon from "@/components/Media/Icon.astro";
+
+interface Props {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** The line above the logos. */
+  text?: string;
+  /** One cell per logo: the SVG, and the client's name for screen readers. */
+  logos?: { src: SvgComponent; name: string }[];
+}
+
+const { render = true, text, logos = [] } = Astro.props;
+---
+
+{
+  render && logos.length > 0 && (
+    <div class="logos-main_wrap">
+      <Paragraph
+        variant="main"
+        class="logos-main_text color-faded"
+        data-marker="off"
+        render={!!text}
+      >
+        {text}
+      </Paragraph>
+      <ul class="logos-main_list">
+        {logos.map((logo) => (
+          <li class="logos-main_item">
+            <span class="logos-main_logo">
+              <Icon
+                src={logo.src}
+                variant="full-width"
+                role="img"
+                aria-label={logo.name}
+              />
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+<style is:global>
+  @layer components {
+    .logos-main_wrap {
+      --_line-x: repeating-linear-gradient(
+        to right,
+        var(--border) 0 var(--dash),
+        transparent 0 calc(var(--dash) * 2)
+      );
+      --_line-y: repeating-linear-gradient(
+        to bottom,
+        var(--border) 0 var(--dash),
+        transparent 0 calc(var(--dash) * 2)
+      );
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+      width: 100%;
+    }
+
+    /* Out to the page frame's lines, dashed above and below. */
+    .logos-main_list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-inline: calc(var(--content-inset) * -1);
+      padding-block: var(--border-width);
+      background:
+        var(--_line-x) top / 100% var(--border-width) no-repeat,
+        var(--_line-x) bottom / 100% var(--border-width) no-repeat;
+      @media (width >= 48rem) {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+      }
+    }
+
+    /* Cells are split by dashed lines; the outer edges are the frame's. */
+    .logos-main_item {
+      --_left: none;
+      --_top: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-6) var(--space-5);
+      background:
+        var(--_left) left / var(--border-width) 100% no-repeat,
+        var(--_top) top / 100% var(--border-width) no-repeat,
+        color-mix(in lab, var(--background-2) 45%, var(--background));
+      &:nth-child(even) {
+        --_left: var(--_line-y);
+      }
+      &:nth-child(n + 3) {
+        --_top: var(--_line-x);
+      }
+      /* An odd one out on phones takes the whole last row. */
+      &:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+      }
+      @media (width >= 48rem) {
+        &:nth-child(n) {
+          --_left: var(--_line-y);
+          --_top: none;
+        }
+        &:first-child {
+          --_left: none;
+        }
+        &:last-child:nth-child(odd) {
+          grid-column: auto;
+        }
+      }
+    }
+
+    .logos-main_text {
+      align-self: center;
+      text-align: center;
+    }
+
+    /* Grey, so the logos read without pulling focus. */
+    .logos-main_logo {
+      flex: 0 1 9.125rem;
+      color: color-mix(in lab, var(--text) 40%, transparent);
+    }
+  }
+</style>

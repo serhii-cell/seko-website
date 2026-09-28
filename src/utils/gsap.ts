@@ -8,9 +8,10 @@
  */
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { SplitText } from "gsap/SplitText";
 
-gsap.registerPlugin(ScrollTrigger);
+gsap.registerPlugin(ScrollTrigger, SplitText);
 gsap.defaults({ duration: 0.8, ease: "power3.out" });
 gsap.registerEase("curtain", gsap.parseEase("power3.inOut"));
 
-export { gsap, ScrollTrigger };
+export { gsap, ScrollTrigger, SplitText };

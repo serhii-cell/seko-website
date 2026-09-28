@@ -20,11 +20,11 @@ export type Look = {
   font: string;
 };
 
-/* 12px glyphs from a 720px model up, where a bigger model gets more glyphs
+/* 10px glyphs from a 720px model up, where a bigger model gets more glyphs
    rather than bigger ones, and scaled down below that, never under 6px.
-   Cells keep the 8 × 14 proportion of the 12px grid. */
+   Cells keep the 8 × 14 proportion of the original 12px grid. */
 export const GLYPH = {
-  max: 12,
+  max: 10,
   min: 6,
   fullAt: 720,
   cellW: 8 / 12,

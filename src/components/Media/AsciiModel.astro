@@ -9,8 +9,10 @@ interface Props extends HTMLAttributes<"div"> {
    *
    * - `monitor` — a 90s CRT with a BIOS-style screen of live charts (default)
    * - `gear` — a spinning gear, with speech bubbles asking "Are you sure?"
+   * - `tractor` — a tractor with an open cab, its wheels turning
+   * - `controls` — a cockpit-style control deck of gauges, switches and levers
    */
-  variant?: "monitor" | "gear";
+  variant?: "monitor" | "gear" | "tractor" | "controls";
 }
 
 const {
@@ -49,6 +51,7 @@ const {
     extrude,
     type Grid,
     type ModelSpec,
+    type Paint,
   } from "@/utils/ascii-model.ts";
 
   const WHITE: Rgb = [242, 242, 242];
@@ -283,8 +286,9 @@ const {
       -x * sin + y * cos,
     ];
     return {
-      /* A tooth tip's outer corner, from the axle. */
-      radius: 1.25,
+      /* A tooth tip's outer corner is 1.25 from the axle; the room past it
+         draws the gear smaller, level with the other models. */
+      radius: 1.5,
       restYaw: 0.5,
       restTilt: 0.45,
       /* Still frames land on "Are you sure?", fully typed. */
@@ -349,8 +353,505 @@ const {
     };
   }
 
+  /* ---------- Tractor ---------- */
+
+  const TYRE = 0;
+  const RIM = 1;
+  const PANEL = 2;
+  const DARK = 3;
+  const LAMP = 4;
+  const LAMP_LIGHT: Rgb = [255, 246, 205];
+
+  /* A box centred on (cx, cy, cz), half-extents (hx, hy, hz) plus a rounding
+     of r added all round. */
+  const box = (
+    x: number,
+    y: number,
+    z: number,
+    cx: number,
+    cy: number,
+    cz: number,
+    hx: number,
+    hy: number,
+    hz: number,
+    r: number,
+  ) => roundBox(x - cx, y - cy, z - cz, hx + r, hy + r, hz + r, r);
+
+  const ball = (
+    x: number,
+    y: number,
+    z: number,
+    cx: number,
+    cy: number,
+    cz: number,
+    r: number,
+  ) => Math.hypot(x - cx, y - cy, z - cz) - r;
+
+  /* A wheel on an axle along z at (u, v, w) from its centre: a treaded tyre
+     of radius R around a dished rim with three spokes and a domed hub,
+     turned by `turn`. Sets `wheelPart` to the tyre or the rim. */
+  let wheelPart = TYRE;
+  function wheel(
+    u: number,
+    v: number,
+    w: number,
+    R: number,
+    halfWidth: number,
+    turn: number,
+  ) {
+    const bound = Math.hypot(u, v, w) - (R + 0.1);
+    wheelPart = TYRE;
+    if (bound > 0.22) return bound;
+    const r = Math.hypot(u, v);
+    const a = Math.atan2(v, u) + turn;
+    const tread = Math.cos(14 * a) > 0.1 ? 0.04 : 0;
+    const tyre = extrude(r - (R + tread), w, halfWidth);
+    const dish = extrude(
+      Math.max(r - 0.8 * R, 0.36 * R - r),
+      w,
+      halfWidth + 0.2,
+    );
+    const face = halfWidth - 0.07 - Math.abs(w);
+    const spokes = r * Math.abs(Math.sin(3 * a)) * 0.6 - 0.07;
+    let d = Math.max(tyre, -Math.max(dish, Math.max(face, -spokes)));
+    d = Math.min(d, Math.hypot(u, v, w) - 0.2 * R);
+    if (r <= 0.83 * R) wheelPart = RIM;
+    return d;
+  }
+
+  /* A tractor facing +x with its wheels on y = 0: chassis, rounded hood,
+     grille and headlights, fenders over the big rear wheels, an open cab of
+     four pillars and a roof round a seat and a tilted steering wheel, and an
+     exhaust stack. `turn` spins the wheels, the small front ones faster.
+     Sets `part` to what the nearest surface is. Distances in model units. */
+  let part = PANEL;
+  function tractor(x: number, y: number, z: number, turn: number) {
+    let best = Infinity;
+    const add = (d: number, kind: number) => {
+      if (d < best) {
+        best = d;
+        part = kind;
+      }
+    };
+    add(box(x, y, z, 0.15, 0.68, 0, 1.35, 0.12, 0.33, 0.03), DARK);
+    add(box(x, y, z, 0.85, 1.06, 0, 0.62, 0.28, 0.36, 0.09), PANEL);
+    add(box(x, y, z, 1.5, 1.0, 0, 0.04, 0.2, 0.28, 0.02), DARK);
+    add(ball(x, y, z, 1.53, 1.22, 0.22, 0.07), LAMP);
+    add(ball(x, y, z, 1.53, 1.22, -0.22, 0.07), LAMP);
+    add(box(x, y, z, -0.55, 1.06, 0, 0.62, 0.22, 0.42, 0.05), PANEL);
+    for (const [px, pz] of [
+      [-1.13, 0.4],
+      [-1.13, -0.4],
+      [0.03, 0.4],
+      [0.03, -0.4],
+    ]) {
+      add(box(x, y, z, px, 1.7, pz, 0.035, 0.42, 0.035, 0.01), PANEL);
+    }
+    add(box(x, y, z, -0.55, 2.15, 0, 0.72, 0.045, 0.5, 0.03), PANEL);
+    add(box(x, y, z, -0.75, 1.45, 0, 0.16, 0.17, 0.2, 0.04), DARK);
+    add(box(x, y, z, -0.93, 1.72, 0, 0.04, 0.22, 0.2, 0.03), DARK);
+    const sx = x + 0.2;
+    const sy = y - 1.62;
+    const along = 0.62 * sx + 0.78 * sy;
+    const across = -0.78 * sx + 0.62 * sy;
+    add(Math.hypot(Math.hypot(across, z) - 0.17, along) - 0.025, DARK);
+    add(extrude(Math.hypot(x - 0.72, z - 0.16) - 0.055, y - 1.83, 0.52), DARK);
+    add(ball(x, y, z, 0.72, 2.36, 0.16, 0.08), DARK);
+    add(box(x, y, z, -0.85, 1.52, 0.62, 0.45, 0.035, 0.2, 0.02), PANEL);
+    add(box(x, y, z, -0.85, 1.52, -0.62, 0.45, 0.035, 0.2, 0.02), PANEL);
+    const front = (turn * 0.75) / 0.42;
+    for (const side of [1, -1]) {
+      add(
+        wheel(x + 0.85, y - 0.75, z - side * 0.62, 0.75, 0.16, turn),
+        wheelPart,
+      );
+      add(
+        wheel(x - 1.15, y - 0.42, z - side * 0.5, 0.42, 0.11, front),
+        wheelPart,
+      );
+    }
+    return best;
+  }
+
+  /* Red paint, grey metal and rubber, as in the original tractor. */
+  function tractorSpec(look: Look): ModelSpec {
+    const colors: Rgb[] = [
+      [82, 82, 90],
+      [208, 208, 215],
+      toRgb(look.accent),
+      [125, 125, 134],
+    ];
+    let turn = 0;
+    return {
+      /* The rear tyres' outer edges, from the middle it turns about. */
+      radius: 1.92,
+      pivot: [0, 1.1, 0],
+      restYaw: -0.9,
+      restTilt: 0.34,
+      frame(time) {
+        turn = time * 3;
+      },
+      field(x, y, z) {
+        /* The treads bend the distance, so steps are shortened to stay safe. */
+        return tractor(x, y, z, turn) * 0.8;
+      },
+      glow(x, y, z, _time, paint) {
+        tractor(x, y, z, turn);
+        if (part !== LAMP) return false;
+        paint.color = LAMP_LIGHT;
+        paint.brightness = 0.9;
+        return true;
+      },
+      tint(x, y, z) {
+        tractor(x, y, z, turn);
+        return colors[part];
+      },
+    };
+  }
+
+  /* ---------- Controls ---------- */
+
+  /* A control deck in the cockpit style, meant to look hard to use: a brown
+     case whose recessed face is split into six cells by raised ribs, holding
+     gauges, lamps, toggle switches, throttle levers and lit push buttons,
+     nearly all of them moving. Few, large parts, so each still reads at the
+     page's glyph size, and the face is on top, so it stays in view as the
+     model turns. Distances in model units; the face is at y = FACE. */
+  const FACE = -0.02;
+  const D_CASE = 0;
+  const D_METAL = 1;
+  const D_DARK = 2;
+  const D_BUTTON = 3;
+  const D_LAMP = 4;
+  const RED: Rgb = [209, 64, 45];
+  const AMBER: Rgb = [242, 170, 58];
+
+  /* Gauges as [x, z, radius, speed, phase]. */
+  const GAUGES = [
+    [-0.55, -0.32, 0.25, 0.8, 0],
+    [0.55, -0.32, 0.25, 0.55, 2.1],
+    [-0.13, -0.42, 0.12, 1.6, 1.2],
+    [0.13, -0.42, 0.12, 1.2, 4],
+  ];
+  const LAMPS = [
+    [-0.15, -0.16],
+    [0, -0.16],
+    [0.15, -0.16],
+  ];
+  const TOGGLES = [-0.72, -0.55, -0.38];
+  const THROTTLES = [-0.11, 0.11];
+  const BUTTONS = [0.18, 0.42].flatMap((bz) =>
+    [0.44, 0.66].map((bx) => [bx, bz]),
+  );
+  const ROW = 0.3;
+
+  /* Distance to a rod from a to b of radius r. */
+  function capsule(
+    x: number,
+    y: number,
+    z: number,
+    a: [number, number, number],
+    b: [number, number, number],
+    r: number,
+  ) {
+    const px = x - a[0];
+    const py = y - a[1];
+    const pz = z - a[2];
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const dz = b[2] - a[2];
+    const h = clamp(
+      (px * dx + py * dy + pz * dz) / (dx * dx + dy * dy + dz * dz),
+      0,
+      1,
+    );
+    return Math.hypot(px - dx * h, py - dy * h, pz - dz * h) - r;
+  }
+
+  /* Distance to a box, for skipping a cell's detail while far from it. */
+  const bounds = (
+    x: number,
+    y: number,
+    z: number,
+    cx: number,
+    cy: number,
+    cz: number,
+    hx: number,
+    hy: number,
+    hz: number,
+  ) => roundBox(x - cx, y - cy, z - cz, hx, hy, hz, 0);
+
+  /* Moving parts, set once per frame. */
+  const deck = {
+    needles: GAUGES.map(() => 0.5),
+    toggles: TOGGLES.map(() => 0.5),
+    throttles: THROTTLES.map(() => 0),
+    buttons: BUTTONS.map(() => false),
+    lamps: LAMPS.map(() => false),
+  };
+
+  /* A switch that flips every `period` seconds, snapping over 0.12s. */
+  function flip(t: number, period: number, phase: number) {
+    const u = (t + phase) / period;
+    const side = Math.floor(u) % 2 === 0 ? 1 : -1;
+    const snap = clamp(((u - Math.floor(u)) * period) / 0.12, 0, 1);
+    return 0.5 * side * (2 * snap - 1);
+  }
+
+  function deckFrame(t: number) {
+    GAUGES.forEach(([, , , speed, phase], i) => {
+      deck.needles[i] = clamp(
+        0.5 +
+          0.3 * Math.sin(t * speed + phase) +
+          0.08 * Math.sin(t * speed * 3.7 + phase * 2),
+        0.03,
+        0.97,
+      );
+    });
+    deck.toggles = TOGGLES.map((_, i) => flip(t, 2.1 + i * 0.9, i * 1.7));
+    deck.throttles = THROTTLES.map(
+      (_, i) => 0.3 * Math.sin(t * (0.55 + i * 0.3) + i * 2),
+    );
+    deck.buttons = BUTTONS.map(
+      (_, i) => Math.floor(t * (0.8 + i * 0.35) + i * 1.9) % 3 !== 0,
+    );
+    deck.lamps = LAMPS.map(
+      (_, i) => Math.floor(t * (1.8 + i * 0.7) + i) % 2 === 0,
+    );
+  }
+
+  /* A toggle switch at (cx, cz): a round nut and a lever leaning `angle`
+     toward +z, with a ball on its tip. */
+  function toggleSwitch(
+    x: number,
+    y: number,
+    z: number,
+    cx: number,
+    cz: number,
+    angle: number,
+  ) {
+    const nut = extrude(
+      Math.hypot(x - cx, z - cz) - 0.065,
+      y - (FACE + 0.02),
+      0.02,
+    );
+    const tip: [number, number, number] = [
+      cx,
+      FACE + 0.04 + 0.24 * Math.cos(angle),
+      cz + 0.24 * Math.sin(angle),
+    ];
+    const lever = capsule(x, y, z, [cx, FACE + 0.04, cz], tip, 0.035);
+    const ball = Math.hypot(x - tip[0], y - tip[1], z - tip[2]) - 0.05;
+    return Math.min(nut, lever, ball);
+  }
+
+  /* Sets `deckPart` to what the nearest surface is, and `deckIndex` to
+     which one for buttons and lamps. */
+  let deckPart = D_CASE;
+  let deckIndex = 0;
+  function controls(x: number, y: number, z: number) {
+    let best = Infinity;
+    const add = (d: number, kind: number, index = 0) => {
+      if (d < best) {
+        best = d;
+        deckPart = kind;
+        deckIndex = index;
+      }
+    };
+
+    /* The case, its face sunk inside a rim and cut with slots for the
+       levers; ribs split the face into cells; a screw in each corner. */
+    let body = roundBox(x, y + 0.21, z, 0.85, 0.21, 0.65, 0.04);
+    body = Math.max(body, -roundBox(x, y, z, 0.815, 0.02, 0.615, 0.01));
+    for (const lx of THROTTLES) {
+      body = Math.max(
+        body,
+        -roundBox(x - lx, y - FACE, z - ROW, 0.045, 0.06, 0.2, 0.012),
+      );
+    }
+    add(body, D_CASE);
+    for (const rx of [-0.275, 0.275]) {
+      add(
+        roundBox(x - rx, y - FACE - 0.01, z, 0.014, 0.01, 0.615, 0.005),
+        D_CASE,
+      );
+    }
+    add(
+      roundBox(x, y - FACE - 0.01, z + 0.02, 0.815, 0.01, 0.014, 0.005),
+      D_CASE,
+    );
+    for (const sx of [-0.79, 0.79]) {
+      for (const sz of [-0.59, 0.59]) {
+        add(Math.hypot(x - sx, y - FACE, z - sz) - 0.03, D_METAL);
+      }
+    }
+
+    /* Everything else stands on the face. */
+    if (y > 0.45 || y < FACE - 0.2) return best;
+
+    if (bounds(x, y, z, 0, FACE + 0.04, -0.32, 0.82, 0.06, 0.3) < 0.05) {
+      for (const [gx, gz, r] of GAUGES) {
+        const ring = Math.abs(Math.hypot(x - gx, z - gz) - r) - r * 0.1;
+        add(extrude(ring, y - (FACE + 0.025), 0.025), D_METAL);
+      }
+      LAMPS.forEach(([lx, lz], i) =>
+        add(Math.hypot(x - lx, y - FACE, z - lz) - 0.05, D_LAMP, i),
+      );
+    }
+
+    if (bounds(x, y, z, -0.55, FACE + 0.15, ROW, 0.26, 0.22, 0.3) < 0.05) {
+      TOGGLES.forEach((tx, i) =>
+        add(toggleSwitch(x, y, z, tx, ROW, deck.toggles[i]), D_METAL),
+      );
+    }
+
+    if (bounds(x, y, z, 0, FACE + 0.15, ROW, 0.24, 0.4, 0.34) < 0.05) {
+      THROTTLES.forEach((lx, i) => {
+        const a = deck.throttles[i];
+        const pivot = FACE - 0.15;
+        const top: [number, number, number] = [
+          lx,
+          pivot + 0.44 * Math.cos(a),
+          ROW + 0.44 * Math.sin(a),
+        ];
+        add(capsule(x, y, z, [lx, pivot, ROW], top, 0.035), D_DARK);
+        add(
+          roundBox(x - top[0], y - top[1], z - top[2], 0.1, 0.055, 0.07, 0.022),
+          D_METAL,
+        );
+      });
+    }
+
+    if (bounds(x, y, z, 0.55, FACE + 0.04, ROW, 0.24, 0.06, 0.26) < 0.05) {
+      BUTTONS.forEach(([bx, bz], i) =>
+        add(
+          roundBox(x - bx, y - FACE - 0.04, z - bz, 0.09, 0.04, 0.09, 0.02),
+          D_BUTTON,
+          i,
+        ),
+      );
+    }
+    return best;
+  }
+
+  /* A gauge face at (dx, dz) from its centre, as a share of its radius:
+     ticks and a green, amber, red band round a 270° sweep, the needle at
+     `value`, and a hub. Returns false for the black face between them. */
+  function gaugeFace(
+    dx: number,
+    dz: number,
+    value: number,
+    paint: Paint,
+    band: Rgb[],
+    hub: Rgb,
+  ) {
+    const rho = Math.hypot(dx, dz);
+    const angle = (Math.atan2(dx, -dz) * 180) / Math.PI;
+    const needle = ((-135 + value * 270) * Math.PI) / 180;
+    const nx = Math.sin(needle);
+    const nz = -Math.cos(needle);
+    const along = clamp(dx * nx + dz * nz, -0.15, 0.85);
+    if (rho < 0.16) {
+      paint.color = hub;
+      paint.brightness = 0.7;
+      return true;
+    }
+    if (Math.hypot(dx - nx * along, dz - nz * along) < 0.09) {
+      paint.color = WHITE;
+      paint.brightness = 1;
+      return true;
+    }
+    if (Math.abs(angle) > 135) return false;
+    const u = (angle + 135) / 270;
+    const tick = u * 8;
+    if (rho > 0.72 && rho < 0.93 && Math.abs(tick - Math.round(tick)) < 0.2) {
+      paint.color = WHITE;
+      paint.brightness = 0.85;
+      return true;
+    }
+    if (rho > 0.52 && rho < 0.68) {
+      paint.color = u < 0.6 ? band[0] : u < 0.82 ? band[1] : band[2];
+      paint.brightness = 0.85;
+      return true;
+    }
+    return false;
+  }
+
+  /* Brown case, a faint flat face, silver metal, dark lever shafts, and
+     buttons and lamps that light green, amber or red. */
+  function controlsSpec(look: Look): ModelSpec {
+    const green = toRgb(look.accent);
+    const metal: Rgb = [210, 210, 216];
+    const plate: Rgb = [168, 120, 84];
+    const shades: Rgb[] = [
+      [170, 118, 80],
+      metal,
+      [58, 48, 42],
+      [80, 66, 56],
+      [80, 66, 56],
+    ];
+    const band = [green, AMBER, RED];
+    return {
+      /* The case's bottom corners, from the middle it turns about. */
+      radius: 1.12,
+      pivot: [0, -0.08, 0],
+      restYaw: 0.45,
+      restTilt: 0.95,
+      frame: deckFrame,
+      field: (x, y, z) => controls(x, y, z),
+      glow(x, y, z, _time, paint) {
+        controls(x, y, z);
+        if (deckPart === D_CASE && y < FACE + 0.006) {
+          for (let i = 0; i < GAUGES.length; i++) {
+            const [gx, gz, r] = GAUGES[i];
+            if (Math.hypot(x - gx, z - gz) >= r * 0.9) continue;
+            const dx = (x - gx) / r;
+            const dz = (z - gz) / r;
+            if (!gaugeFace(dx, dz, deck.needles[i], paint, band, metal)) {
+              paint.color = WHITE;
+              paint.brightness = 0;
+            }
+            return true;
+          }
+          /* The bare face is drawn flat and faint, so the controls stand out. */
+          if (Math.abs(x) < 0.815 && Math.abs(z) < 0.615) {
+            paint.color = plate;
+            paint.brightness = 0.2;
+            return true;
+          }
+          return false;
+        }
+        if (
+          deckPart === D_BUTTON &&
+          y > FACE + 0.07 &&
+          deck.buttons[deckIndex]
+        ) {
+          paint.color = deckIndex === 1 ? green : deckIndex === 2 ? RED : AMBER;
+          paint.brightness = 0.95;
+          return true;
+        }
+        if (deckPart === D_LAMP && deck.lamps[deckIndex]) {
+          paint.color = band[deckIndex];
+          paint.brightness = 1;
+          return true;
+        }
+        return false;
+      },
+      tint(x, y, z) {
+        controls(x, y, z);
+        return shades[deckPart];
+      },
+    };
+  }
+
   mountModels(".ascii-model_wrap", ".ascii-model_canvas", (look, wrap) =>
-    wrap.dataset.model === "gear" ? gearSpec(look) : monitorSpec(look),
+    wrap.dataset.model === "gear"
+      ? gearSpec(look)
+      : wrap.dataset.model === "tractor"
+        ? tractorSpec(look)
+        : wrap.dataset.model === "controls"
+          ? controlsSpec(look)
+          : monitorSpec(look),
   );
 </script>
 
@@ -363,6 +864,10 @@ const {
       --_glyph-font: var(--font-jetbrains-mono, monospace);
       width: 100%;
       height: 35rem;
+
+      &[data-model="tractor"] {
+        --_accent: var(--red-500);
+      }
     }
 
     .ascii-model_canvas {

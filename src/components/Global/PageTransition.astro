@@ -22,6 +22,7 @@ import logo from "@/assets/logo/logo.svg";
 <script>
   import { gsap } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
+  import { createMarker, isMarkerText, type Marker } from "@/utils/marker.ts";
 
   const root = document.documentElement;
   const curtainDuration = 1;
@@ -36,7 +37,11 @@ import logo from "@/assets/logo/logo.svg";
   function edgeTime(anchor: Element | null) {
     if (!anchor) return curtainDuration / 2;
     const top = anchor.getBoundingClientRect().top / innerHeight;
-    const risen = gsap.utils.clamp(0, 1, 1 - (top - lead));
+    return riseTime(gsap.utils.clamp(0, 1, 1 - (top - lead)));
+  }
+
+  /* When the curtain has risen by `risen`, a share of the screen's height. */
+  function riseTime(risen: number) {
     const ease = gsap.parseEase("curtain");
     let low = 0;
     let high = 1;
@@ -68,6 +73,7 @@ import logo from "@/assets/logo/logo.svg";
     const targets = gsap.utils.toArray<HTMLElement>("[data-intro]");
     const started = performance.now();
     let timeline: gsap.core.Timeline | undefined;
+    let markers: Marker[] = [];
     let cancelled = false;
 
     /* While the page loads, the logo fills and the bar grows most of the way,
@@ -80,11 +86,21 @@ import logo from "@/assets/logo/logo.svg";
         })
       : undefined;
 
+    /* The hero cube waits for this to grow in: sent once the curtain is half
+       way up, or when the intro ends early. */
+    let revealed = false;
+    const reveal = () => {
+      if (revealed) return;
+      revealed = true;
+      document.dispatchEvent(new Event("page-intro:done"));
+    };
+
     const finish = () => {
       root.classList.remove("page-intro", "page-intro-playing");
       if (curtain) gsap.set(curtain, { clearProps: "all" });
       if (bar) gsap.set(bar, { clearProps: "opacity" });
       gsap.set(targets, { clearProps: "opacity" });
+      reveal();
     };
 
     const play = () => {
@@ -92,10 +108,14 @@ import logo from "@/assets/logo/logo.svg";
       clearTimeout(fallback);
       loading?.kill();
       root.classList.add("page-intro-playing");
-      const opacity = targets.map((target) => getComputedStyle(target).opacity);
-      gsap.set(targets, { opacity: 0 });
-
       const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      /* Headings and body text wait under their marker bars; the rest fades. */
+      const marked = reduced ? [] : targets.filter(isMarkerText);
+      const faders = targets.filter((target) => !marked.includes(target));
+      markers = marked.map(createMarker);
+      const opacity = faders.map((target) => getComputedStyle(target).opacity);
+      gsap.set(faders, { opacity: 0 });
+
       const elapsed = (performance.now() - started) / 1000;
       const fill = Math.max(0.35, minimumLoad - elapsed);
       timeline = gsap.timeline({ onComplete: finish });
@@ -112,27 +132,36 @@ import logo from "@/assets/logo/logo.svg";
               ? { opacity: 0, duration: 0.7, ease: "power1.inOut" }
               : { yPercent: -100, duration: curtainDuration, ease: "curtain" },
             "+=0.15",
-          );
+          )
+          .addLabel("rise", "<")
+          .call(reveal, undefined, `rise+=${reduced ? 0.35 : riseTime(0.5)}`);
         /* The bar is gone by the time the curtain is halfway up. */
         if (bar) {
           timeline.to(
             bar,
             { opacity: 0, duration: curtainDuration / 2, ease: "power1.out" },
-            "<",
+            "rise",
           );
         }
       }
-      timeline.to(
-        targets,
-        { opacity: (index: number) => Number(opacity[index]) },
-        curtain
-          ? fill +
-              0.15 +
-              (reduced
-                ? 0.25
-                : edgeTime(document.querySelector("main [data-intro]")))
-          : 0,
-      );
+      const enter = curtain
+        ? fill +
+          0.15 +
+          (reduced
+            ? 0.25
+            : edgeTime(document.querySelector("main [data-intro]")))
+        : 0;
+      timeline
+        .to(
+          faders,
+          { opacity: (index: number) => Number(opacity[index]) },
+          enter,
+        )
+        .call(
+          () => markers.forEach((marker, index) => marker.play(index * 0.15)),
+          undefined,
+          enter,
+        );
     };
 
     /* Waits until the page is loaded, on screen and painting, so a page
@@ -164,6 +193,7 @@ import logo from "@/assets/logo/logo.svg";
       document.removeEventListener("visibilitychange", onScreen);
       loading?.kill();
       timeline?.kill();
+      markers.forEach((marker) => marker.revert());
       finish();
     };
   });

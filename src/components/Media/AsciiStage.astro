@@ -52,7 +52,23 @@ const { render = true, class: className, ...rest } = Astro.props;
   } from "@/utils/ascii.ts";
 
   /* Still frames for reduced motion: the eight cubes joined into one. */
-  const STILL_TIME = 4400;
+  const STILL_TIME = 4300;
+
+  /* On the first load the stage waits unseen under the curtain, which sends
+     `page-intro:done` as it rises. */
+  type Gate = { waiting: () => boolean; destroy: () => void };
+  function createGate(motion: boolean): Gate {
+    let waiting =
+      motion && document.documentElement.classList.contains("page-intro");
+    const open = () => {
+      waiting = false;
+    };
+    if (waiting) document.addEventListener("page-intro:done", open);
+    return {
+      waiting: () => waiting,
+      destroy: () => document.removeEventListener("page-intro:done", open),
+    };
+  }
 
   /* ---------- Background: glyphs spiralling into a hole behind the cube ---------- */
   function createBackground(
@@ -60,6 +76,7 @@ const { render = true, class: className, ...rest } = Astro.props;
     controller: Controller,
     look: Look,
     motion: boolean,
+    gate: Gate,
   ): Engine {
     const context = canvas.getContext("2d");
     const stage = canvas.parentElement;
@@ -128,12 +145,19 @@ const { render = true, class: className, ...rest } = Astro.props;
     /* Density from 0 (empty) to 1. Glyphs swirl round a hole in the middle of
        the stage in spiral arms and drift inward, thinning to dots as they fall
        in. Positions are in units of the stage's shorter side. */
-    function field(px: number, py: number, t: number, wU: number, hU: number) {
+    function field(
+      px: number,
+      py: number,
+      t: number,
+      wU: number,
+      hU: number,
+      radius: number,
+    ) {
       const hole = config.hole;
       const dx = px - wU / 2;
       const dy = py - hU / 2;
       const r = Math.hypot(dx, dy);
-      const r0 = (Math.min(wU, hU) / 2) * hole.radius;
+      const r0 = (Math.min(wU, hU) / 2) * radius;
       if (r <= r0) return 0;
 
       const lr = Math.log(r / r0 + 1e-6);
@@ -411,6 +435,18 @@ const { render = true, class: className, ...rest } = Astro.props;
       glowAtlas = paintAtlas(look.accent);
     }
 
+    /* On the first load the hole opens past the stage's corners, then closes
+       in on the cube with the glyphs following it in from every side, over
+       this many milliseconds. */
+    const ENTER = 1500;
+    let entered = gate.waiting() ? 0 : ENTER;
+    function holeRadius(wU: number, hU: number) {
+      if (entered >= ENTER) return config.hole.radius;
+      const eased = 1 - Math.pow(1 - entered / ENTER, 3);
+      const outside = Math.hypot(wU, hU) + 0.05;
+      return outside + (config.hole.radius - outside) * eased;
+    }
+
     let previous = 0;
     function draw(time: number) {
       if (!context || !cols || !rows) return;
@@ -423,13 +459,21 @@ const { render = true, class: className, ...rest } = Astro.props;
       const cw = config.cellW * dpr;
       const ch = config.cellH * dpr;
       const last = ramp.length - 1;
+      const radius = holeRadius(wU, hU);
 
       for (let y = 0; y < rows; y++) {
         const py = ((y + 0.5) * config.cellH) / unit;
         const row = bayer[y & 7];
         for (let x = 0; x < cols; x++) {
           const i = y * cols + x;
-          const b = field(((x + 0.5) * config.cellW) / unit, py, t, wU, hU);
+          const b = field(
+            ((x + 0.5) * config.cellW) / unit,
+            py,
+            t,
+            wU,
+            hU,
+            radius,
+          );
           if (b <= 0.01) {
             glyphIndex[i] = 0;
             continue;
@@ -498,8 +542,11 @@ const { render = true, class: className, ...rest } = Astro.props;
     let lastFrame = -1e9;
     function loop(now: number) {
       frame = requestAnimationFrame(loop);
-      clock += Math.min(100, now - lastNow);
+      const delta = Math.min(100, now - lastNow);
+      clock += delta;
       lastNow = now;
+      if (!gate.waiting() && entered < ENTER)
+        entered = Math.min(ENTER, entered + delta);
       if (clock - lastFrame < 1000 / config.fps) return;
       lastFrame = clock;
       draw(clock);
@@ -565,17 +612,19 @@ const { render = true, class: className, ...rest } = Astro.props;
     controller: Controller,
     look: Look,
     motion: boolean,
+    gate: Gate,
   ): Engine {
     const context = canvas.getContext("2d");
     if (!context) return { play() {}, pause() {}, destroy() {} };
 
     const green = toRgb(look.accent);
-    const GRID_DARK: Rgb = [70, 70, 76];
-    const GRID_PEAK: Rgb = [240, 240, 245];
     const HIGHLIGHT: Rgb = [255, 255, 250];
     /* Camera distance, for a real perspective, and the loop length in seconds. */
     const CAM = 9;
-    const LOOP = 7;
+    const LOOP = 5.5;
+    /* On the first load the cube grows in place from nothing once the curtain
+       is up, over this many milliseconds, before the loop starts. */
+    const GROW = 1000;
     const SLOTS = [
       [-0.5, -0.5, 0.5],
       [0.5, -0.5, 0.5],
@@ -611,7 +660,6 @@ const { render = true, class: className, ...rest } = Astro.props;
     let hit = new Uint8Array(0);
     let alpha = new Float32Array(0);
     let slot = new Int8Array(0);
-    let line = new Float32Array(0);
 
     let R = [1, 0, 0, 0, 1, 0, 0, 0, 1];
     function sdBox(
@@ -641,7 +689,6 @@ const { render = true, class: className, ...rest } = Astro.props;
     let offsetX = 0;
     let offsetY = 0;
     let offsetZ = 0;
-    let gridBright = 0;
     let cubes: number[][] = [];
     let hitCube: number[] | null = null;
     function sdf(x: number, y: number, z: number) {
@@ -668,65 +715,6 @@ const { render = true, class: className, ...rest } = Astro.props;
     const FL = KEY;
     const ss = (u: number) => smoothstep(0, 1, u);
 
-    const SEGMENTS: number[][][] = [];
-    for (const a of [-1, 0, 1]) {
-      for (const b of [-1, 0, 1]) {
-        SEGMENTS.push([
-          [-1, a, b],
-          [1, a, b],
-        ]);
-        SEGMENTS.push([
-          [a, -1, b],
-          [a, 1, b],
-        ]);
-        SEGMENTS.push([
-          [a, b, -1],
-          [a, b, 1],
-        ]);
-      }
-    }
-    function toView(n: number[]) {
-      const wx = zoom * n[0] + offsetX;
-      const wy = zoom * n[1] + offsetY;
-      const wz = zoom * n[2] + offsetZ;
-      return [
-        R[0] * wx + R[1] * wy + R[2] * wz,
-        R[3] * wx + R[4] * wy + R[5] * wz,
-        R[6] * wx + R[7] * wy + R[8] * wz,
-      ];
-    }
-    function drawGrid(bright: number) {
-      line.fill(0);
-      if (bright <= 0.02) return;
-      for (const [from, to] of SEGMENTS) {
-        const p0 = toView(from);
-        const p1 = toView(to);
-        const k0 = CAM / (CAM - p0[2]);
-        const k1 = CAM / (CAM - p1[2]);
-        const x0 = cx + p0[0] * k0 * scale;
-        const y0 = cy - p0[1] * k0 * scale;
-        const x1 = cx + p1[0] * k1 * scale;
-        const y1 = cy - p1[1] * k1 * scale;
-        const steps = Math.max(2, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 2));
-        for (let k = 0; k <= steps; k++) {
-          const u = k / steps;
-          const sx = x0 + (x1 - x0) * u;
-          const sy = y0 + (y1 - y0) * u;
-          const sz = p0[2] + (p1[2] - p0[2]) * u;
-          const gx = Math.floor((sx - ox) / cw);
-          const gy = Math.floor((sy - oy) / ch);
-          if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) continue;
-          const i = gy * cols + gx;
-          if (hit[i] && sz < depth[i] - 0.03) continue;
-          const fx = (sx - ox) / cw - gx - 0.5;
-          const fy = (sy - oy) / ch - gy - 0.5;
-          const weight = 1 - Math.min(1, Math.hypot(fx, fy) * 1.1);
-          const b = (0.32 + 0.22 * weight) * bright;
-          if (b > line[i]) line[i] = b;
-        }
-      }
-    }
-
     const orbit = createOrbit(canvas, motion, 0.44, () => still());
 
     let seamFill = 0;
@@ -740,26 +728,23 @@ const { render = true, class: className, ...rest } = Astro.props;
       return order;
     })();
 
-    /* The 7s loop: seven cubes slide in (0.5–3.9s), the seams between them
-       fill glyph by glyph (3.9–4.5s), the block shrinks to a single cube
-       (4.5–5.6s), and a grid fades in, holds and fades out (5.3–7s). */
-    function scene(time: number) {
+    /* The 5.5s loop: seven cubes slide in (0.4–3.8s), the seams between them
+       fill glyph by glyph (3.8–4.4s), the block shrinks to a single cube
+       (4.4–5.5s), and the next cube shows 0.2s later. `grow` scales the cube
+       about its own centre for the first-load intro. */
+    function scene(time: number, grow = 1) {
       const T = time % LOOP;
       R = rotation(
         0.66 + 0.07 * Math.sin((T / LOOP) * Math.PI * 2) + orbit.yaw(),
         0.44 + orbit.pitch(),
       );
-      const T0 = 0.5,
+      const T0 = 0.4,
         STEP = 0.49,
         SLIDE = 0.45,
-        FILL_START = 3.9,
-        FILL_END = 4.5;
-      const ZOOM_START = 4.5,
-        ZOOM_END = 5.6,
-        GRID_IN = 5.3,
-        GRID_IN_END = 5.8,
-        GRID_OUT = 6.45,
-        GRID_OUT_END = 7.0;
+        FILL_START = 3.8,
+        FILL_END = 4.4;
+      const ZOOM_START = 4.4,
+        ZOOM_END = 5.5;
       cubes = [];
       const zooming = T >= ZOOM_START;
       seamFill = zooming ? 1 : ss((T - FILL_START) / (FILL_END - FILL_START));
@@ -779,7 +764,6 @@ const { render = true, class: className, ...rest } = Astro.props;
             cubes.push([x, s[1], s[2], a, k + 1]);
           }
         }
-        gridBright = 0;
       } else {
         const uz = ss((T - ZOOM_START) / (ZOOM_END - ZOOM_START));
         zoom = 2 - uz;
@@ -787,10 +771,13 @@ const { render = true, class: className, ...rest } = Astro.props;
         offsetY = -2 * first[1] * (1 - uz);
         offsetZ = -2 * first[2] * (1 - uz);
         cubes.push([first[0], first[1], first[2], 1, 0]);
-        gridBright =
-          T < GRID_OUT
-            ? ss((T - GRID_IN) / (GRID_IN_END - GRID_IN))
-            : 1 - ss((T - GRID_OUT) / (GRID_OUT_END - GRID_OUT));
+      }
+      if (grow < 1) {
+        const g = Math.max(0.001, grow);
+        offsetX += zoom * first[0] * (1 - g);
+        offsetY += zoom * first[1] * (1 - g);
+        offsetZ += zoom * first[2] * (1 - g);
+        zoom *= g;
       }
 
       brightness.fill(0);
@@ -880,12 +867,13 @@ const { render = true, class: className, ...rest } = Astro.props;
           }
         }
       }
-      drawGrid(gridBright);
     }
 
-    function draw() {
+    function draw(opacity = 1) {
       if (!context) return;
       context.clearRect(0, 0, size, size);
+      if (opacity <= 0) return;
+      context.globalAlpha = opacity;
       context.font = font;
       context.textBaseline = "top";
       for (let gy = 0; gy < rows; gy++) {
@@ -893,26 +881,7 @@ const { render = true, class: className, ...rest } = Astro.props;
           const i = gy * cols + gx;
           let b: number;
           let color: Rgb;
-          const onGrid = line[i] > 0.02;
-          if (onGrid && !hit[i]) {
-            b = line[i];
-            color = mix(GRID_DARK, GRID_PEAK, ss(gridBright));
-          } else if (onGrid) {
-            /* The grid is an overlay at gridBright's opacity, so as it fades
-               these cells blend back into the cube rather than going dark. */
-            const a = ss(gridBright);
-            const lineB = gridBright > 0.001 ? line[i] / gridBright : 0;
-            let base = green;
-            if (specular[i] > 0.3)
-              base = mix(
-                base,
-                HIGHLIGHT,
-                Math.min(1, (specular[i] - 0.3) * 1.3) * 0.7,
-              );
-            b = brightness[i] + (lineB - brightness[i]) * a;
-            color = mix(base, mix(GRID_DARK, GRID_PEAK, a), a);
-            if (b <= 0.003) continue;
-          } else if (seam[i]) {
+          if (seam[i]) {
             const threshold = SEAM_ORDER[i % SEAM_ORDER.length];
             if (seamFill <= threshold) continue;
             b = brightness[i] * Math.min(1, (seamFill - threshold) * 4);
@@ -936,6 +905,7 @@ const { render = true, class: className, ...rest } = Astro.props;
           context.fillText(glyphChar, ox + gx * cw, oy + gy * ch);
         }
       }
+      context.globalAlpha = 1;
     }
 
     /* Sized to the cube's real size on screen, so glyphs are true pixels,
@@ -958,7 +928,6 @@ const { render = true, class: className, ...rest } = Astro.props;
       hit = new Uint8Array(n);
       alpha = new Float32Array(n);
       slot = new Int8Array(n);
-      line = new Float32Array(n);
       scale = 0.175 * size;
       cx = size / 2;
       cy = size / 2 + 2;
@@ -977,21 +946,37 @@ const { render = true, class: className, ...rest } = Astro.props;
       configure(measured);
     }
 
-    /* Its own clock: after a pause the cubes carry on from the same moment. */
+    let grown = gate.waiting() ? 0 : GROW;
+    const growth = () => {
+      const u = grown / GROW;
+      return {
+        scale: 1 - Math.pow(1 - u, 3),
+        opacity: gate.waiting() ? 0 : u,
+      };
+    };
+
+    /* Its own clock: after a pause the cubes carry on from the same moment,
+       and it holds still until the cube has grown. */
     let frame = 0;
     let simTime = motion ? 0 : STILL_TIME;
+    let clock = 0;
     let lastNow = 0;
     let lastStep = -1e9;
     function loop(now: number) {
       frame = requestAnimationFrame(loop);
-      simTime += Math.min(100, now - lastNow);
+      const delta = Math.min(100, now - lastNow);
       lastNow = now;
-      if (simTime - lastStep < 33) return;
-      const dt = Math.min(0.1, (simTime - lastStep) / 1000);
-      lastStep = simTime;
+      if (gate.waiting()) return;
+      clock += delta;
+      if (grown < GROW) grown = Math.min(GROW, grown + delta);
+      else simTime += delta;
+      if (clock - lastStep < 33) return;
+      const dt = Math.min(0.1, (clock - lastStep) / 1000);
+      lastStep = clock;
       orbit.step(dt);
-      scene(simTime / 1000);
-      draw();
+      const { scale, opacity } = growth();
+      scene(simTime / 1000, scale);
+      draw(opacity);
     }
     function play() {
       if (!motion || frame || !controller.running()) return;
@@ -1004,8 +989,9 @@ const { render = true, class: className, ...rest } = Astro.props;
     }
     function still() {
       if (frame) return;
-      scene(simTime / 1000);
-      draw();
+      const { scale, opacity } = growth();
+      scene(simTime / 1000, scale);
+      draw(opacity);
     }
 
     watchSize();
@@ -1041,6 +1027,7 @@ const { render = true, class: className, ...rest } = Astro.props;
     const look = readLook(stage);
     const motion = allowsMotion();
     const controller = createController(stage);
+    const gate = createGate(motion);
     let engines: Engine[] = [];
     let stopped = false;
 
@@ -1050,8 +1037,8 @@ const { render = true, class: className, ...rest } = Astro.props;
       .then(() => {
         if (stopped) return;
         engines = [
-          createBackground(background, controller, look, motion),
-          createCubes(cubes, controller, look, motion),
+          createBackground(background, controller, look, motion, gate),
+          createCubes(cubes, controller, look, motion, gate),
         ];
       });
 
@@ -1059,6 +1046,7 @@ const { render = true, class: className, ...rest } = Astro.props;
       stopped = true;
       engines.forEach((engine) => engine.destroy());
       controller.destroy();
+      gate.destroy();
     };
   }
 
@@ -1092,7 +1080,6 @@ const { render = true, class: className, ...rest } = Astro.props;
       overflow: hidden;
       isolation: isolate;
       container-type: size;
-      border: var(--border-width) dashed var(--border);
     }
 
     .ascii-stage_background {
