@@ -101,6 +101,11 @@ const {
           grid-template-columns: var(--layout-split);
         }
       }
+      /* The button sits closer to the paragraph than a button wrapper's own
+         space allows. */
+      & .button-wrapper {
+        margin-top: 1rem;
+      }
     }
 
     /* Short screens: the type gives way so the hero still fits one screen. */

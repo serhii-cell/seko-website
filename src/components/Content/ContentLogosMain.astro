@@ -2,7 +2,6 @@
 import type { SvgComponent } from "astro/types";
 import Eyebrow from "@/components/Typography/Eyebrow.astro";
 import Icon from "@/components/Media/Icon.astro";
-import Marquee from "@/components/Interactive/Marquee.astro";
 
 interface Props {
   /** Set to `false` to skip rendering this component and its children. */
@@ -11,11 +10,9 @@ interface Props {
   text?: string;
   /** One item per logo: the SVG, and the client's name for screen readers. */
   logos?: { src: SvgComponent; name: string }[];
-  /** Which way the logos travel. Defaults to `forwards`, which runs them leftwards. */
-  direction?: "forwards" | "backwards";
 }
 
-const { render = true, text, logos = [], direction = "forwards" } = Astro.props;
+const { render = true, text, logos = [] } = Astro.props;
 ---
 
 {
@@ -28,13 +25,13 @@ const { render = true, text, logos = [], direction = "forwards" } = Astro.props;
       >
         {text}
       </Eyebrow>
-      <Marquee label="Clients" direction={direction} class="logos-main_strip">
+      <ul class="logos-main_list">
         {logos.map((logo) => (
-          <span class="logos-main_logo">
+          <li class="logos-main_item">
             <Icon src={logo.src} role="img" aria-label={logo.name} />
-          </span>
+          </li>
         ))}
-      </Marquee>
+      </ul>
     </div>
   )
 }
@@ -59,9 +56,9 @@ const { render = true, text, logos = [], direction = "forwards" } = Astro.props;
           var(--border-width) no-repeat;
     }
 
-    /* A label rather than a sentence: caps, small and tracked out, with no
-       marker beside it and no margin of its own, so the band's padding holds
-       it the same distance from both lines. */
+    /* A label rather than a sentence: mono caps, small and tracked out, with no
+       marker beside it and no margin of its own, so the band's padding holds it
+       the same distance from both lines. */
     .logos-main_text {
       align-self: center;
       margin-block: 0;
@@ -70,45 +67,31 @@ const { render = true, text, logos = [], direction = "forwards" } = Astro.props;
         display: none;
       }
       & .eyebrow_text {
+        font-family: var(--mono-family);
         font-size: 0.75rem;
         letter-spacing: var(--letter-spacing-wide);
         text-transform: uppercase;
       }
     }
 
-    /* The strip runs edge to edge, so a logo leaves the page rather than
-       stopping at the content's inset. It drifts rather than scrolls. */
-    .logos-main_strip {
-      --_gap-size: var(--space-8);
-      --_item-height: 1.75rem;
-      --_speed: 8s;
-    }
-
-    /* The control stays for anyone who needs to stop the motion, and comes
-       back into view on focus, but it is out of the way of the logos. */
-    .logos-main_strip .marquee_toggle {
-      white-space: nowrap;
-      clip: rect(0, 0, 0, 0);
-      border-width: 0;
-      width: 1px;
-      height: 1px;
-      margin-inline: auto;
-      padding: 0;
-      position: absolute;
-      inset: 0% 0% auto;
-      overflow: hidden;
-      &:focus-visible {
-        clip: auto;
-        width: auto;
-        height: auto;
-        position: static;
-        overflow: visible;
+    /* One row spread across the band, wrapping onto a second where a narrow
+       screen leaves no room. */
+    .logos-main_list {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: var(--space-5) var(--space-6);
+      padding-inline: var(--content-inset);
+      /* Spread only where they fit on one line; wrapped rows read better
+         centred. */
+      @media (width >= 48rem) {
+        justify-content: space-between;
       }
     }
 
-    /* Each mark keeps its own width at a shared height, as a row of real
-       logos does. Grey, so they read without pulling focus. */
-    .logos-main_logo {
+    /* Grey, so the logos read without pulling focus. */
+    .logos-main_item {
       display: flex;
       align-items: center;
       color: color-mix(in lab, var(--text) 40%, transparent);
@@ -117,7 +100,7 @@ const { render = true, text, logos = [], direction = "forwards" } = Astro.props;
            width rather than the icon default's square. */
         aspect-ratio: auto;
         width: auto;
-        height: var(--_item-height);
+        height: 1.75rem;
       }
     }
   }

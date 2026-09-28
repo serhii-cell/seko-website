@@ -51,11 +51,12 @@ const {
        Osmo built them; only the colours, the radius and the scale are ours. */
     .button-wipe_wrap {
       --_color: var(--text);
-      --_background: color-mix(in lab, var(--text) 10%, transparent);
+      --_background: var(--background);
       --_hover-color: var(--brand-text);
       --_hover-background: var(--brand-500);
       --_radius: 0;
-      --_padding: 0.7em 1.4em;
+      --_padding: 0 1.25em;
+      --_height: 2.5rem;
       --_gap: 0.125em;
       --_focus-inset: -0.125em;
       --_hover-scale: 1.065 1.095;
@@ -68,8 +69,9 @@ const {
       padding: 0;
       background-color: transparent;
       outline-style: none;
+      height: var(--_height);
       font-size: 0.875rem;
-      font-weight: var(--primary-bold);
+      font-weight: var(--primary-regular);
       line-height: 1;
       text-decoration: none;
       user-select: none;
@@ -162,6 +164,7 @@ const {
         width: calc(100% - var(--border-width));
         height: calc(100% - var(--border-width));
         background-color: var(--_background);
+        border: var(--border-width) solid var(--border);
       }
     }
 
