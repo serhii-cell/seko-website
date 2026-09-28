@@ -32,12 +32,7 @@ const { render = true, text, logos = [], direction = "forwards" } = Astro.props;
       <Marquee label="Clients" direction={direction} class="logos-main_strip">
         {logos.map((logo) => (
           <span class="logos-main_logo">
-            <Icon
-              src={logo.src}
-              variant="full-width"
-              role="img"
-              aria-label={logo.name}
-            />
+            <Icon src={logo.src} role="img" aria-label={logo.name} />
           </span>
         ))}
       </Marquee>
@@ -71,19 +66,48 @@ const { render = true, text, logos = [], direction = "forwards" } = Astro.props;
     }
 
     /* The strip runs edge to edge, so a logo leaves the page rather than
-       stopping at the content's inset. */
+       stopping at the content's inset. It drifts rather than scrolls. */
     .logos-main_strip {
       --_gap-size: var(--space-8);
       --_item-height: 1.25rem;
-      --_speed: 3s;
+      --_speed: 8s;
     }
 
-    /* Grey, so the logos read without pulling focus. */
+    /* The control stays for anyone who needs to stop the motion, and comes
+       back into view on focus, but it is out of the way of the logos. */
+    .logos-main_strip .marquee_toggle {
+      white-space: nowrap;
+      clip: rect(0, 0, 0, 0);
+      border-width: 0;
+      width: 1px;
+      height: 1px;
+      margin-inline: auto;
+      padding: 0;
+      position: absolute;
+      inset: 0% 0% auto;
+      overflow: hidden;
+      &:focus-visible {
+        clip: auto;
+        width: auto;
+        height: auto;
+        position: static;
+        overflow: visible;
+      }
+    }
+
+    /* Each mark keeps its own width at a shared height, as a row of real
+       logos does. Grey, so they read without pulling focus. */
     .logos-main_logo {
       display: flex;
       align-items: center;
-      width: 9.125rem;
       color: color-mix(in lab, var(--text) 40%, transparent);
+      & .icon {
+        /* A wordmark is wider than it is tall, so its own ratio decides the
+           width rather than the icon default's square. */
+        aspect-ratio: auto;
+        width: auto;
+        height: var(--_item-height);
+      }
     }
   }
 </style>

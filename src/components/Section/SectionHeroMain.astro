@@ -70,6 +70,9 @@ const {
     .hero-main_wrap {
       height: calc(100svh - var(--nav-height) - var(--site-margin));
       min-height: 30rem;
+      /* What follows sits as far below the button as the stage's line sits
+         above the heading, in place of the page's usual section rhythm. */
+      margin-bottom: calc(var(--space-8) - var(--section-space-medium));
     }
 
     .hero-main_container {
