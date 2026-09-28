@@ -162,12 +162,8 @@ const { render = true, overlap = false } = Astro.props;
       align-items: center;
       gap: 0 var(--space-3);
       padding-inline: var(--content-inset);
-      background: repeating-linear-gradient(
-          to right,
-          var(--border) 0 var(--dash),
-          transparent 0 calc(var(--dash) * 2)
-        )
-        bottom / 100% var(--border-width) no-repeat;
+      background: linear-gradient(var(--border-faint) 0 0) bottom / 100%
+        var(--border-width) no-repeat;
     }
 
     /* Bar height */

@@ -4,7 +4,7 @@ import ContentWrapper from "@/components/Wrapper/ContentWrapper.astro";
 import Heading from "@/components/Typography/Heading.astro";
 import Paragraph from "@/components/Typography/Paragraph.astro";
 import ButtonWrapper from "@/components/Wrapper/ButtonWrapper.astro";
-import Button from "@/components/Button.astro";
+import ButtonWipe from "@/components/ButtonWipe.astro";
 import AsciiStage from "@/components/Media/AsciiStage.astro";
 
 interface Props {
@@ -31,10 +31,7 @@ const {
 
 {
   render && heading && (
-    <Section
-      class="hero-main_wrap"
-      containerClass="hero-main_container"
-    >
+    <Section class="hero-main_wrap" containerClass="hero-main_container">
       <div class="hero-main_stage">
         <AsciiStage />
       </div>
@@ -56,9 +53,11 @@ const {
             {text}
           </Paragraph>
           <ButtonWrapper data-intro render={!!buttonText}>
-            <Button element="link" href={buttonHref} class="hero-main_button">
-              {buttonText}
-            </Button>
+            <ButtonWipe
+              text={buttonText}
+              href={buttonHref}
+              class="hero-main_button"
+            />
           </ButtonWrapper>
         </Fragment>
       </ContentWrapper>
@@ -73,6 +72,9 @@ const {
     .hero-main_wrap {
       height: calc(100svh - var(--nav-height) - var(--site-margin));
       min-height: 30rem;
+      /* What follows sits as far below the button as the stage's line sits
+         above the heading, in place of the page's usual section rhythm. */
+      margin-bottom: calc(var(--space-8) - var(--section-space-medium));
     }
 
     .hero-main_container {
@@ -81,16 +83,12 @@ const {
       align-items: stretch;
     }
 
-    /* Out to the page frame's lines, dashed below; the nav's line is above. */
+    /* Out to the page frame's lines, ruled below; the nav's line is above. */
     .hero-main_stage {
       flex: 1 1 auto;
       min-height: 7.5rem;
       margin-inline: calc(var(--content-inset) * -1);
-      --_line: repeating-linear-gradient(
-        to right,
-        var(--border) 0 var(--dash),
-        transparent 0 calc(var(--dash) * 2)
-      );
+      --_line: linear-gradient(var(--border-faint) 0 0);
       padding-bottom: var(--border-width);
       background: var(--_line) bottom / 100% var(--border-width) no-repeat;
     }
@@ -103,10 +101,11 @@ const {
           grid-template-columns: var(--layout-split);
         }
       }
-    }
-
-    .hero-main_button {
-      min-height: calc(var(--space-6) + var(--space-4));
+      /* The button sits closer to the paragraph than a button wrapper's own
+         space allows. */
+      & .button-wrapper {
+        margin-top: 1rem;
+      }
     }
 
     /* Short screens: the type gives way so the hero still fits one screen. */

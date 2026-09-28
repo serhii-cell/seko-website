@@ -1,0 +1,182 @@
+---
+import type { HTMLAttributes } from "astro/types";
+
+type Props = HTMLAttributes<"a"> & {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** What it says. Nothing is output without it. */
+  text?: string;
+  /** Where it goes. */
+  href?: string;
+};
+
+const {
+  render = true,
+  text,
+  href = "#",
+  class: className,
+  ...rest
+} = Astro.props;
+---
+
+{
+  render && text && (
+    <a
+      data-button-076
+      href={href}
+      aria-label={text}
+      class:list={["button-wipe_wrap", className]}
+      {...rest}
+    >
+      <span class="button-wipe_hover">
+        <span class="button-wipe_bg hover" />
+        <span class="button-wipe_inner">
+          <span class="button-wipe_text">{text}</span>
+        </span>
+      </span>
+      <span aria-hidden="true" class="button-wipe_default">
+        <span class="button-wipe_bg default" />
+        <span class="button-wipe_inner">
+          <span class="button-wipe_text">{text}</span>
+        </span>
+      </span>
+    </a>
+  )
+}
+
+<style is:global>
+  @layer components {
+    /* Osmo's Button 076: two faces stacked, the hover one wiping across the
+       default on a diagonal. Its sizes, clip paths and easings are left as
+       Osmo built them; only the colours, the radius and the scale are ours. */
+    .button-wipe_wrap {
+      --_color: var(--text);
+      --_background: var(--background);
+      --_hover-color: var(--brand-text);
+      --_hover-background: var(--brand-500);
+      --_radius: 0;
+      --_padding: 0 1.25em;
+      --_height: 2.5rem;
+      --_gap: 0.125em;
+      --_focus-inset: -0.125em;
+      --_hover-scale: 1.065 1.095;
+      --_click-scale: 0.955 0.925;
+      --_ease-hover: cubic-bezier(0.4, 0.15, 0, 1);
+      --_ease-click: cubic-bezier(0.4, 0, 0.2, 1);
+      --_ease-focus: cubic-bezier(0.32, 0.72, 0, 1);
+      display: inline-grid;
+      position: relative;
+      padding: 0;
+      background-color: transparent;
+      outline-style: none;
+      height: var(--_height);
+      font-size: 0.875rem;
+      font-weight: var(--primary-regular);
+      line-height: 1;
+      text-decoration: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition:
+        scale 0.45s var(--_ease-hover),
+        transform 0.15s var(--_ease-click);
+
+      &::after {
+        content: "";
+        display: block;
+        position: absolute;
+        inset: var(--_focus-inset);
+        z-index: 1;
+        border-radius: var(--_radius);
+        pointer-events: none;
+        transition: box-shadow 0.3s var(--_ease-focus);
+      }
+
+      &:focus-visible::after {
+        box-shadow: 0 0 0 var(--focus-width) var(--_color);
+      }
+
+      &:active {
+        scale: var(--_click-scale);
+      }
+
+      @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+        &:is(:hover, :focus-visible) {
+          scale: var(--_hover-scale);
+        }
+
+        &:is(:hover, :focus-visible) .button-wipe_hover {
+          clip-path: polygon(
+            50% 0%,
+            50% 0%,
+            100% 0%,
+            100% 100%,
+            50% 100%,
+            50% 100%,
+            0% 100%,
+            0 0%
+          );
+          transition-delay: 0.05s;
+        }
+      }
+    }
+
+    .button-wipe_hover {
+      grid-area: 1 / 1;
+      z-index: 1;
+      display: grid;
+      width: 100%;
+      height: 100%;
+      color: var(--_hover-color);
+      clip-path: polygon(
+        50% 100%,
+        50% 0%,
+        100% 0%,
+        100% 0%,
+        50% 0%,
+        50% 100%,
+        0% 100%,
+        0 100%
+      );
+      transition: clip-path 0.55s var(--_ease-hover);
+    }
+
+    .button-wipe_default {
+      grid-area: 1 / 1;
+      display: grid;
+      width: 100%;
+      height: 100%;
+      color: var(--_color);
+    }
+
+    .button-wipe_bg {
+      grid-area: 1 / 1;
+      width: 100%;
+      height: 100%;
+      padding: 0;
+      border-radius: var(--_radius);
+
+      &.hover {
+        background-color: var(--_hover-background);
+      }
+
+      /* Held a hair inside the hover face, so no edge of it shows through. */
+      &.default {
+        width: calc(100% - var(--border-width));
+        height: calc(100% - var(--border-width));
+        background-color: var(--_background);
+        border: var(--border-width) solid var(--border);
+      }
+    }
+
+    .button-wipe_inner {
+      grid-area: 1 / 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: var(--_gap);
+      width: 100%;
+      height: 100%;
+      padding: var(--_padding);
+    }
+  }
+</style>
