@@ -23,6 +23,7 @@
   /* Letter spacing */
   --letter-spacing-tight: -0.02em;
   --letter-spacing-normal: 0em;
+  --letter-spacing-wide: 0.0833em;
 
   /* Line height */
   --line-height-small: 1;
@@ -275,7 +276,7 @@
   --text: var(--dark-900);
   --text-2: color-mix(in lab, currentcolor 60%, transparent);
   --border: color-mix(in lab, var(--text) 20%, transparent);
-  --border-faint: color-mix(in lab, var(--text) 7%, transparent);
+  --border-faint: color-mix(in lab, var(--text) 5%, transparent);
   --heading-accent: color-mix(in srgb, var(--brand-500), black 20%);
 
   --selection-background: var(--text);
@@ -312,7 +313,7 @@
   --text: var(--light-100);
   --text-2: color-mix(in lab, currentcolor 60%, transparent);
   --border: color-mix(in lab, var(--text) 20%, transparent);
-  --border-faint: color-mix(in lab, var(--text) 7%, transparent);
+  --border-faint: color-mix(in lab, var(--text) 5%, transparent);
   --heading-accent: var(--brand-500);
 
   --selection-background: var(--text);
@@ -348,7 +349,7 @@
   --text: var(--brand-text);
   --text-2: color-mix(in lab, currentcolor 60%, transparent);
   --border: color-mix(in lab, var(--text) 20%, transparent);
-  --border-faint: color-mix(in lab, var(--text) 7%, transparent);
+  --border-faint: color-mix(in lab, var(--text) 5%, transparent);
   --heading-accent: color-mix(in srgb, var(--text), white 20%);
 
   --selection-background: var(--text);
