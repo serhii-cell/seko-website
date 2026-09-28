@@ -4,7 +4,7 @@ import ContentWrapper from "@/components/Wrapper/ContentWrapper.astro";
 import Heading from "@/components/Typography/Heading.astro";
 import Paragraph from "@/components/Typography/Paragraph.astro";
 import ButtonWrapper from "@/components/Wrapper/ButtonWrapper.astro";
-import Button from "@/components/Button.astro";
+import ButtonWipe from "@/components/ButtonWipe.astro";
 import AsciiStage from "@/components/Media/AsciiStage.astro";
 
 interface Props {
@@ -53,9 +53,11 @@ const {
             {text}
           </Paragraph>
           <ButtonWrapper data-intro render={!!buttonText}>
-            <Button element="link" href={buttonHref} class="hero-main_button">
-              {buttonText}
-            </Button>
+            <ButtonWipe
+              text={buttonText}
+              href={buttonHref}
+              class="hero-main_button"
+            />
           </ButtonWrapper>
         </Fragment>
       </ContentWrapper>
@@ -99,10 +101,6 @@ const {
           grid-template-columns: var(--layout-split);
         }
       }
-    }
-
-    .hero-main_button {
-      min-height: calc(var(--space-6) + var(--space-4));
     }
 
     /* Short screens: the type gives way so the hero still fits one screen. */
