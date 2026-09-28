@@ -4,9 +4,9 @@
   --light-100: #ffffff;
   --light-200: #ebebeb;
   --light-300: #d9d9d9;
-  --dark-700: #2a2a2a;
-  --dark-800: #1f1f1f;
-  --dark-900: #101010;
+  --dark-700: #333333;
+  --dark-800: #262626;
+  --dark-900: #1c1c1c;
   --brand-500: #79d12d;
   --brand-text: #000000;
   --blue-500: #2e43d1;
@@ -32,7 +32,6 @@
 
   /* Borders & focus */
   --border-width: 0.0625rem;
-  --dash: 0.1875rem;
   --focus-width: 0.125rem;
   --focus-offset: 0.1827rem;
   --focus-offset-inner: calc(var(--focus-width) * -1);
@@ -276,6 +275,7 @@
   --text: var(--dark-900);
   --text-2: color-mix(in lab, currentcolor 60%, transparent);
   --border: color-mix(in lab, var(--text) 20%, transparent);
+  --border-faint: color-mix(in lab, var(--text) 12%, transparent);
   --heading-accent: color-mix(in srgb, var(--brand-500), black 20%);
 
   --selection-background: var(--text);
@@ -312,6 +312,7 @@
   --text: var(--light-100);
   --text-2: color-mix(in lab, currentcolor 60%, transparent);
   --border: color-mix(in lab, var(--text) 20%, transparent);
+  --border-faint: color-mix(in lab, var(--text) 12%, transparent);
   --heading-accent: var(--brand-500);
 
   --selection-background: var(--text);
@@ -347,6 +348,7 @@
   --text: var(--brand-text);
   --text-2: color-mix(in lab, currentcolor 60%, transparent);
   --border: color-mix(in lab, var(--text) 20%, transparent);
+  --border-faint: color-mix(in lab, var(--text) 12%, transparent);
   --heading-accent: color-mix(in srgb, var(--text), white 20%);
 
   --selection-background: var(--text);

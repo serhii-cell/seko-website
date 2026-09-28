@@ -31,10 +31,7 @@ const {
 
 {
   render && heading && (
-    <Section
-      class="hero-main_wrap"
-      containerClass="hero-main_container"
-    >
+    <Section class="hero-main_wrap" containerClass="hero-main_container">
       <div class="hero-main_stage">
         <AsciiStage />
       </div>
@@ -81,16 +78,12 @@ const {
       align-items: stretch;
     }
 
-    /* Out to the page frame's lines, dashed below; the nav's line is above. */
+    /* Out to the page frame's lines, ruled below; the nav's line is above. */
     .hero-main_stage {
       flex: 1 1 auto;
       min-height: 7.5rem;
       margin-inline: calc(var(--content-inset) * -1);
-      --_line: repeating-linear-gradient(
-        to right,
-        var(--border) 0 var(--dash),
-        transparent 0 calc(var(--dash) * 2)
-      );
+      --_line: linear-gradient(var(--border-faint) 0 0);
       padding-bottom: var(--border-width);
       background: var(--_line) bottom / 100% var(--border-width) no-repeat;
     }

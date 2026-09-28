@@ -2,14 +2,10 @@
 
 <style is:global>
   @layer components {
-    /* Dashed lines down the edges of the content, over the nav, under the
-       loading curtain. */
+    /* Lines down the edges of the content, over the nav, under the loading
+       curtain. */
     .page-frame_wrap {
-      --_line: repeating-linear-gradient(
-        to bottom,
-        var(--border) 0 var(--dash),
-        transparent 0 calc(var(--dash) * 2)
-      );
+      --_line: linear-gradient(var(--border-faint) 0 0);
       position: fixed;
       inset-block: 0;
       left: 50%;
