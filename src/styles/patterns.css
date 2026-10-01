@@ -13,8 +13,6 @@
 }
 
 .section {
-  padding-top: var(--section-space-medium);
-  padding-bottom: var(--section-space-medium);
   background-color: var(--background);
   color: var(--text);
   display: flex;
@@ -73,6 +71,11 @@
     object-fit: contain;
   }
 }
+/* Space after the last section, before the footer */
+main > .section:last-child {
+  padding-bottom: var(--section-space-medium);
+}
+
 /* Section background children */
 .section > :where(:not(.container)) {
   pointer-events: none;

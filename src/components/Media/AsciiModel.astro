@@ -1,0 +1,236 @@
+---
+import type { HTMLAttributes } from "astro/types";
+
+interface Props extends HTMLAttributes<"div"> {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /**
+   * Which model it draws.
+   *
+   * - `smiley` — a smiling ball, a placeholder for now (default)
+   * - `gear` — a gear with one hole through the middle, turning
+   * - `tractor` — a red tractor with an open cab
+   */
+  variant?: "smiley" | "gear" | "tractor";
+}
+
+const {
+  render = true,
+  variant = "smiley",
+  class: className,
+  ...rest
+} = Astro.props;
+---
+
+{
+  render && (
+    <div
+      class:list={["ascii-model_wrap", className]}
+      data-model={variant}
+      aria-hidden="true"
+      {...rest}
+    >
+      <canvas class="ascii-model_canvas" />
+    </div>
+  )
+}
+
+<script>
+  import { clamp, toRgb, type Rgb, type Look } from "@/utils/ascii.ts";
+  import {
+    mountModels,
+    roundBox,
+    extrude,
+    type ModelSpec,
+  } from "@/utils/ascii-model.ts";
+
+  /* Drawn at the page's 8px glyph in boxes a few hundred pixels across, so
+     every model is a few large, simple shapes. */
+
+  /* ---------- Smiley ---------- */
+
+  /* A ball whose face, toward +z, has two round eyes and a smile cut out of
+     it as dark glyph-free marks. */
+  function smileySpec(look: Look): ModelSpec {
+    const body = toRgb(look.body);
+    return {
+      radius: 1.02,
+      restYaw: 0,
+      restTilt: 0.15,
+      field: (x, y, z) => Math.hypot(x, y, z) - 1,
+      glow(x, y, z, _time, paint) {
+        if (z < 0.2) return false;
+        const eye = Math.min(
+          Math.hypot(x - 0.34, y - 0.3),
+          Math.hypot(x + 0.34, y - 0.3),
+        );
+        const smile =
+          y < -0.05 && Math.abs(Math.hypot(x, y - 0.12) - 0.56) < 0.09;
+        if (eye > 0.15 && !smile) return false;
+        paint.color = body;
+        paint.brightness = 0;
+        return true;
+      },
+    };
+  }
+
+  /* ---------- Gear ---------- */
+
+  const GEAR = {
+    radius: 0.82,
+    tooth: 0.26,
+    teeth: 8,
+    hole: 0.3,
+    thickness: 0.22,
+  };
+  const TOOTH_ANGLE = (Math.PI * 2) / GEAR.teeth;
+
+  /* A gear on its axle, facing +z: a ring of broad square teeth around one
+     round hole. Distances in model units. */
+  function gear(x: number, y: number, z: number) {
+    const r = Math.hypot(x, y);
+    let u = (Math.atan2(y, x) / TOOTH_ANGLE) % 1;
+    if (u < 0) u += 1;
+    const tooth = clamp((0.27 - Math.abs(u - 0.5)) / 0.06, 0, 1);
+    const ring = Math.max(r - (GEAR.radius + GEAR.tooth * tooth), GEAR.hole - r);
+    return extrude(ring, z, GEAR.thickness);
+  }
+
+  function gearSpec(): ModelSpec {
+    let cos = 1;
+    let sin = 0;
+    return {
+      /* A tooth tip's outer corner, from the axle. */
+      radius: 1.1,
+      restYaw: 0.5,
+      restTilt: 0.45,
+      frame(time) {
+        cos = Math.cos(time * 0.8);
+        sin = Math.sin(time * 0.8);
+      },
+      /* The teeth bend the distance, so steps are shortened to stay safe. */
+      field: (x, y, z) => gear(x * cos + y * sin, -x * sin + y * cos, z) * 0.8,
+    };
+  }
+
+  /* ---------- Tractor ---------- */
+
+  const TYRE = 0;
+  const HUB = 1;
+  const PAINT = 2;
+  const METAL = 3;
+
+  /* A box centred on (cx, cy, cz), half-extents (hx, hy, hz), corners
+     rounded by r. */
+  const box = (
+    x: number,
+    y: number,
+    z: number,
+    cx: number,
+    cy: number,
+    cz: number,
+    hx: number,
+    hy: number,
+    hz: number,
+    r: number,
+  ) => roundBox(x - cx, y - cy, z - cz, hx, hy, hz, r);
+
+  /* A wheel with its axle along z: a plain tyre with a hub disc standing
+     out of its face. Sets `wheelPart` to the tyre or the hub. */
+  let wheelPart = TYRE;
+  function wheel(
+    x: number,
+    y: number,
+    z: number,
+    cx: number,
+    cy: number,
+    cz: number,
+    r: number,
+    half: number,
+  ) {
+    const radial = Math.hypot(x - cx, y - cy);
+    const tyre = extrude(radial - r, z - cz, half);
+    const hub = extrude(radial - r * 0.5, z - cz, half + 0.03);
+    wheelPart = hub < tyre - 0.005 || radial < r * 0.5 ? HUB : TYRE;
+    return Math.min(tyre, hub);
+  }
+
+  /* A tractor facing +x, centred on its own middle: a long hood, a cab with
+     its sides open under a roof, big rear wheels and small front ones, and
+     an exhaust stack. Sets `part` to what the nearest surface is. */
+  let part = PAINT;
+  function tractor(x: number, y: number, z: number) {
+    let best = Infinity;
+    const add = (d: number, kind: number) => {
+      if (d < best) {
+        best = d;
+        part = kind;
+      }
+    };
+    add(box(x, y, z, 0.15, -0.2, 0, 1.0, 0.12, 0.32, 0.03), METAL);
+    add(box(x, y, z, 0.55, 0.12, 0, 0.55, 0.24, 0.3, 0.08), PAINT);
+    let cab = box(x, y, z, -0.48, 0.32, 0, 0.36, 0.42, 0.36, 0.05);
+    cab = Math.max(cab, -box(x, y, z, -0.48, 0.42, 0, 0.27, 0.24, 0.5, 0.02));
+    add(cab, PAINT);
+    add(box(x, y, z, -0.48, 0.78, 0, 0.44, 0.05, 0.42, 0.03), PAINT);
+    add(extrude(Math.hypot(x - 0.6, z - 0.12) - 0.05, y - 0.55, 0.22), METAL);
+    for (const side of [1, -1]) {
+      add(wheel(x, y, z, -0.6, -0.42, side * 0.5, 0.48, 0.15), wheelPart);
+      add(wheel(x, y, z, 0.78, -0.58, side * 0.42, 0.3, 0.11), wheelPart);
+    }
+    return best;
+  }
+
+  /* Red paint matched to the brand green's strength, dark rubber, light
+     grey hubs and metal. */
+  function tractorSpec(look: Look): ModelSpec {
+    const colors: Rgb[] = [
+      [82, 82, 90],
+      [208, 208, 215],
+      toRgb(look.accent),
+      [150, 150, 158],
+    ];
+    return {
+      /* The rear tyres' outer edges, from the middle it turns about. */
+      radius: 1.4,
+      restYaw: -0.6,
+      restTilt: 0.32,
+      field: (x, y, z) => tractor(x, y, z),
+      tint(x, y, z) {
+        tractor(x, y, z);
+        return colors[part];
+      },
+    };
+  }
+
+  mountModels(".ascii-model_wrap", ".ascii-model_canvas", (look, wrap) =>
+    wrap.dataset.model === "gear"
+      ? gearSpec()
+      : wrap.dataset.model === "tractor"
+        ? tractorSpec(look)
+        : smileySpec(look),
+  );
+</script>
+
+<style is:global>
+  @layer components {
+    /* Fills the box it is given; the model fits inside from every angle. */
+    .ascii-model_wrap {
+      --_body: var(--light-200);
+      --_accent: var(--brand-500);
+      --_glyph-font: var(--font-jetbrains-mono, monospace);
+      width: 100%;
+      height: 100%;
+
+      &[data-model="tractor"] {
+        --_accent: var(--red-500);
+      }
+    }
+
+    .ascii-model_canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+  }
+</style>

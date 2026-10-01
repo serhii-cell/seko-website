@@ -1,0 +1,236 @@
+---
+import Section from "@/components/Wrapper/Section.astro";
+import Heading from "@/components/Typography/Heading.astro";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+import AsciiModel from "@/components/Media/AsciiModel.astro";
+import type { ComponentProps } from "astro/types";
+
+type Issue = {
+  heading: string;
+  text: string;
+  model: ComponentProps<typeof AsciiModel>["variant"];
+};
+
+interface Props {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** The small label beside the heading. */
+  label?: string;
+  /** The section heading. Nothing is output without it. */
+  heading?: string;
+  /** One card per issue: its heading, its text and the model above them. */
+  issues?: Issue[];
+}
+
+const { render = true, label, heading, issues = [] } = Astro.props;
+const number = (index: number) => String(index + 1).padStart(2, "0");
+---
+
+{
+  render && heading && (
+    <Section class="help-main_wrap" containerClass="help-main_container">
+      <div class="help-main_header">
+        <Paragraph
+          variant="mono"
+          class="help-main_label color-faded"
+          render={!!label}
+        >
+          {label}
+        </Paragraph>
+        <Heading tag="h2" class="help-main_heading">
+          {heading}
+        </Heading>
+      </div>
+      <div class="help-main_band" data-reveal="own">
+        <ol class="help-main_columns">
+          {issues.map((issue, index) => (
+            <li class="help-main_column">
+              <article class="help-main_card" data-torch>
+                <span class="help-main_number text-style-h3" aria-hidden="true">
+                  {number(index)}
+                </span>
+                <div class="help-main_media">
+                  <AsciiModel variant={issue.model} />
+                </div>
+                <div class="help-main_body">
+                  <Heading tag="h3" variant="h4" class="help-main_title">
+                    {issue.heading}
+                  </Heading>
+                  <Paragraph variant="mono" class="help-main_text color-faded">
+                    {issue.text}
+                  </Paragraph>
+                </div>
+              </article>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </Section>
+  )
+}
+
+<script>
+  import { gsap } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  /* From 64rem up the section fills the screen with its content centred and
+     holds there, and scrolling slides each card up from below into its
+     column in turn. */
+  function setUp(section: HTMLElement) {
+    const cards = gsap.utils.toArray<HTMLElement>(".help-main_card", section);
+    const mm = gsap.matchMedia();
+    mm.add(
+      "(width >= 64rem) and (prefers-reduced-motion: no-preference)",
+      () => {
+        const timeline = gsap.timeline({
+          defaults: { ease: "power2.out" },
+          scrollTrigger: {
+            trigger: section,
+            start: "top top",
+            end: () => `+=${innerHeight * 1.8}`,
+            pin: true,
+            /* Off by default inside a flex parent like <main>. */
+            pinSpacing: true,
+            scrub: 0.6,
+            invalidateOnRefresh: true,
+          },
+        });
+        cards.forEach((card, index) =>
+          timeline.fromTo(
+            card,
+            { yPercent: 100 },
+            { yPercent: 0, duration: 1 },
+            index * 0.85,
+          ),
+        );
+        timeline.to({}, { duration: 0.3 });
+        return () => gsap.set(cards, { clearProps: "transform" });
+      },
+    );
+    return () => mm.revert();
+  }
+
+  onPage(() => {
+    const cleanups = [
+      ...document.querySelectorAll<HTMLElement>(".help-main_wrap"),
+    ].map(setUp);
+    return () => cleanups.forEach((cleanup) => cleanup());
+  });
+</script>
+
+<style is:global>
+  @layer components {
+    /* A screen tall, its content in the middle, so while it holds nothing
+       else is in view. */
+    .help-main_wrap {
+      overflow-x: clip;
+      @media (width >= 64rem) {
+        min-height: 100svh;
+        padding-block: var(--space-8);
+      }
+      @media (width < 64rem) {
+        padding-top: calc(var(--section-space-xlarge) / 2);
+      }
+    }
+
+    .help-main_container {
+      gap: var(--space-10);
+    }
+
+    /* The label and heading on the same columns as the observations. */
+    .help-main_header {
+      display: grid;
+      gap: var(--space-4);
+      width: 100%;
+      @media (width >= 64rem) {
+        grid-template-columns:
+          minmax(0, 260fr) minmax(0, 154fr) minmax(0, 950fr)
+          minmax(0, 276fr);
+        & > :nth-child(2) {
+          grid-column: 3;
+        }
+      }
+    }
+
+    .help-main_label,
+    .help-main_heading {
+      margin: 0;
+    }
+
+    /* A full-width band, ruled above and below, with the columns in the
+       working area under a faint diagonal hatch. */
+    .help-main_band {
+      width: 100vw;
+      margin-inline: calc(50% - 50vw);
+      border-block: var(--border-width) solid var(--stroke);
+    }
+
+    .help-main_columns {
+      position: relative;
+      display: grid;
+      width: min(var(--site-width), var(--max-width-main));
+      margin: 0 auto;
+      padding: 0;
+      list-style: none;
+      border-inline: var(--border-width) solid var(--stroke);
+      @media (width >= 64rem) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+          -60deg,
+          color-mix(in lab, var(--light-100) 2%, transparent) 0 1px,
+          transparent 1px 0.5rem
+        );
+      }
+    }
+
+    /* An empty column until its card slides up into it. */
+    .help-main_column {
+      position: relative;
+      display: grid;
+      overflow: hidden;
+      & + & {
+        border-top: var(--border-width) solid var(--stroke);
+        @media (width >= 64rem) {
+          border-top: 0;
+          border-left: var(--border-width) solid var(--stroke);
+        }
+      }
+    }
+
+    .help-main_number {
+      color: var(--stroke);
+      line-height: 1;
+    }
+
+    .help-main_card {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-8);
+      padding: var(--space-9);
+      background-color: var(--background-2);
+    }
+
+    .help-main_media {
+      aspect-ratio: 433 / 275;
+    }
+
+    .help-main_body {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-5);
+    }
+
+    .help-main_title,
+    .help-main_text {
+      margin: 0;
+    }
+  }
+</style>

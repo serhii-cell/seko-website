@@ -1,34 +1,44 @@
 ---
 import Icon from "@/components/Media/Icon.astro";
 import NavLink from "@/components/Global/NavLink.astro";
+import Button from "@/components/Button.astro";
 import logo from "@/assets/logo/logo.svg";
 import { SITE_NAME } from "@/consts.ts";
 
 interface Props {
   /** Set to `false` to skip rendering this component and its children. */
   render?: boolean;
-  /**
-   * Fix the nav over the page rather than letting it stick in flow, so the
-   * first section starts underneath it. Give that section
-   * `paddingTop="navoverlap"` to clear the bar.
-   */
-  overlap?: boolean;
 }
 
-const { render = true, overlap = false } = Astro.props;
+const { render = true } = Astro.props;
 ---
 
 {
   render && (
-    <header class:list={["nav_wrap", overlap && "overlap"]}>
+    <header class="nav_wrap">
       <div class="nav_inner">
-        <a class="nav_logo" href="/" aria-label={SITE_NAME}>
+        <nav class="nav_menu" id="nav-menu" aria-label="Main">
+          <div class="nav_menu_inner">
+            <ul class="nav_links">
+              <NavLink href="#" data-intro>Work</NavLink>
+              <NavLink href="#" data-intro>Services</NavLink>
+              <NavLink href="#" data-intro>About</NavLink>
+              <NavLink href="#" data-intro>Contact</NavLink>
+            </ul>
+          </div>
+        </nav>
+        <a class="nav_logo" href="/" aria-label={SITE_NAME} data-intro>
           <Icon src={logo} variant="full-width" />
         </a>
-        <p class="nav_clock">
-          <time class="nav_clock_time">--:-- --</time>
-          <span class="nav_clock_place">Ukraine</span>
-        </p>
+        <div class="nav_aside">
+          <p class="nav_clock" data-intro>
+            <time class="nav_clock_time">--:-- --</time>
+            <span class="nav_clock_place">Ukraine</span>
+          </p>
+          <Button element="link" href="#" class="nav_button" data-intro>
+            Book a Call
+          </Button>
+        </div>
         <button
           class="nav_toggle"
           type="button"
@@ -38,16 +48,6 @@ const { render = true, overlap = false } = Astro.props;
         >
           <span class="nav_toggle_icon" />
         </button>
-        <nav class="nav_menu" id="nav-menu" aria-label="Main">
-          <div class="nav_menu_inner">
-            <ul class="nav_links" data-intro>
-              <NavLink href="#">Work</NavLink>
-              <NavLink href="#">Services</NavLink>
-              <NavLink href="#">About</NavLink>
-              <NavLink href="#">Contact</NavLink>
-            </ul>
-          </div>
-        </nav>
       </div>
     </header>
   )
@@ -101,6 +101,24 @@ const { render = true, overlap = false } = Astro.props;
   const nav = document.querySelector<HTMLElement>(".nav_wrap");
   const toggle = nav?.querySelector<HTMLButtonElement>(".nav_toggle");
 
+  /* Scrolling down past the bar hides it: the menus and the clock fade
+     out and the logo slides up out of view. Scrolling up brings it back. */
+  if (nav) {
+    let lastY = scrollY;
+    const onScroll = () => {
+      const y = scrollY;
+      if (nav.classList.contains("open")) {
+        lastY = y;
+        return;
+      }
+      if (y < nav.offsetHeight) nav.classList.remove("hidden");
+      else if (y > lastY + 4) nav.classList.add("hidden");
+      else if (y < lastY - 4) nav.classList.remove("hidden");
+      if (Math.abs(y - lastY) > 4) lastY = y;
+    };
+    addEventListener("scroll", onScroll, { passive: true });
+  }
+
   if (nav && toggle) {
     const setOpen = (open: boolean) => {
       nav.classList.toggle("open", open);
@@ -129,7 +147,7 @@ const { render = true, overlap = false } = Astro.props;
     });
 
     window
-      .matchMedia("(width >= 48rem)")
+      .matchMedia("(width >= 64rem)")
       .addEventListener("change", (event) => {
         if (event.matches) setOpen(false);
       });
@@ -138,62 +156,79 @@ const { render = true, overlap = false } = Astro.props;
 
 <style is:global>
   @layer components {
+    /* Fixed over the page and see-through; only its own parts take clicks,
+       so the band it covers stays usable when it hides. */
     .nav_wrap {
-      position: sticky;
+      position: fixed;
+      inset-inline: 0;
       top: 0;
       z-index: 100;
       display: flex;
       justify-content: center;
       padding-inline: var(--site-margin);
-      background-color: var(--background);
       color: var(--text);
-
-      &.overlap {
-        position: fixed;
-        inset-inline: 0;
-      }
+      pointer-events: none;
     }
 
     .nav_inner {
       position: relative;
       width: 100%;
       max-width: var(--max-width-main);
-      display: flex;
+      min-height: var(--nav-height);
+      display: grid;
+      grid-template-columns: 1fr auto;
       align-items: center;
       gap: 0 var(--space-3);
-    }
-
-    /* Bar height */
-    .nav_logo {
-      min-height: var(--nav-height);
+      & > * {
+        pointer-events: auto;
+      }
     }
 
     .nav_logo {
       display: flex;
       align-items: center;
-      width: 5.9375rem;
-      transition: opacity var(--hover-duration) var(--hover-ease);
+      width: 4.75rem;
+      color: color-mix(in lab, currentcolor 30%, transparent);
+      transition: color var(--hover-duration) var(--hover-ease);
       @media (hover: hover) {
         &:hover {
-          opacity: 0.6;
+          color: var(--light-100);
         }
       }
+    }
+
+    .nav_aside {
+      display: none;
+      align-items: center;
+      gap: var(--space-5);
+      justify-self: end;
     }
 
     .nav_clock {
       display: flex;
       align-items: center;
-      margin-left: auto;
-      color: color-mix(in lab, currentcolor 20%, transparent);
-      font-size: var(--text-small);
+      color: color-mix(in lab, currentcolor 40%, transparent);
+      font-size: var(--text-main);
       font-weight: var(--primary-medium);
       line-height: var(--line-height-huge);
       white-space: nowrap;
       font-variant-numeric: tabular-nums;
     }
 
+    .nav_clock_time::after {
+      content: ",";
+    }
+
     .nav_clock_place {
-      display: none;
+      margin-left: 0.3em;
+    }
+
+    .nav_button.button_wrap {
+      min-height: 2.5rem;
+      padding-block: 0;
+      padding-inline: var(--space-4);
+      border-radius: var(--radius-round);
+      font-weight: var(--primary-semibold);
     }
 
     .nav_toggle {
@@ -202,9 +237,11 @@ const { render = true, overlap = false } = Astro.props;
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      justify-self: end;
       width: 2.5rem;
       height: 2.5rem;
       background-color: var(--background-2);
+      border: var(--border-width) solid var(--stroke);
       color: inherit;
       transition: opacity var(--hover-duration) var(--hover-ease);
       @media (hover: hover) {
@@ -218,21 +255,22 @@ const { render = true, overlap = false } = Astro.props;
       position: relative;
       display: block;
       width: var(--_icon-width);
-      height: calc(var(--_bar-gap) + var(--border-width));
+      height: var(--border-width);
       &::before,
       &::after {
         content: "";
         position: absolute;
-        inset-inline: 0;
+        left: 0;
+        width: 100%;
         height: var(--border-width);
         background-color: currentcolor;
         transition: transform var(--open-duration) var(--open-ease);
       }
       &::before {
-        top: 0;
+        transform: translateY(calc(var(--_bar-gap) / -2));
       }
       &::after {
-        top: var(--_bar-gap);
+        transform: translateY(calc(var(--_bar-gap) / 2));
       }
     }
 
@@ -245,6 +283,7 @@ const { render = true, overlap = false } = Astro.props;
       }
     }
 
+    /* Below 64rem the menu drops down from the bar. */
     .nav_menu {
       position: absolute;
       top: 100%;
@@ -257,7 +296,7 @@ const { render = true, overlap = false } = Astro.props;
       overflow-y: auto;
       overscroll-behavior: contain;
       background-color: var(--background);
-      border-bottom: var(--border-width) solid var(--border);
+      border: var(--border-width) solid var(--stroke);
       transition:
         grid-template-rows var(--open-duration) var(--open-ease),
         visibility var(--open-duration) var(--open-ease);
@@ -282,53 +321,70 @@ const { render = true, overlap = false } = Astro.props;
     .nav_links {
       display: flex;
       flex-direction: column;
-      padding: var(--space-2) var(--site-margin) var(--space-4);
+      padding: var(--space-2) var(--space-4) var(--space-4);
       font-size: var(--text-main);
-      font-weight: var(--primary-medium);
       & > li + li {
-        border-top: var(--border-width) solid var(--border);
+        border-top: var(--border-width) solid var(--stroke);
       }
     }
 
     .nav_link {
       display: block;
       padding-block: var(--space-3);
-      color: var(--text);
+      color: var(--brand-500);
       text-decoration: none;
-      text-underline-offset: 0.4em;
-      text-decoration-thickness: var(--border-width);
-      transition: color var(--hover-duration) var(--hover-ease);
-      @media (hover: hover) {
-        &:hover {
-          color: var(--text-2);
-        }
+      transition:
+        color var(--hover-duration) var(--hover-ease),
+        border-color var(--hover-duration) var(--hover-ease);
+    }
+
+    /* Hidden on scroll: everything in the bar slides up and fades out
+       together, and comes back down from the top. */
+    .nav_logo,
+    .nav_aside,
+    .nav_toggle {
+      transition:
+        color var(--hover-duration) var(--hover-ease),
+        opacity 0.45s var(--open-ease),
+        translate 0.55s var(--open-ease),
+        visibility 0.55s var(--open-ease);
+    }
+
+    .nav_wrap.hidden {
+      & .nav_logo,
+      & .nav_aside,
+      & .nav_toggle {
+        opacity: 0;
+        visibility: hidden;
+        translate: 0 calc(var(--nav-height) * -0.75);
       }
     }
 
-    @media (width >= 48rem) {
+    @media (width >= 64rem) {
+      .nav_inner {
+        grid-template-columns: 1fr auto 1fr;
+      }
+
       .nav_toggle {
         display: none;
       }
 
-      .nav_clock_time::after {
-        content: ",";
+      .nav_logo {
+        order: 0;
       }
 
-      .nav_clock_place {
-        display: inline;
-        margin-left: 0.3em;
+      .nav_aside {
+        display: flex;
       }
 
       .nav_menu {
-        position: absolute;
-        top: auto;
-        left: 50%;
-        right: auto;
-        translate: -50% 0;
+        position: static;
         display: block;
         visibility: visible;
-        background-color: transparent;
-        border-bottom: 0;
+        max-height: none;
+        overflow: visible;
+        background: none;
+        border: 0;
       }
 
       .nav_menu_inner {
@@ -336,23 +392,50 @@ const { render = true, overlap = false } = Astro.props;
         opacity: 1;
       }
 
+      .nav_menu {
+        transition:
+          opacity 0.45s var(--open-ease),
+          translate 0.55s var(--open-ease),
+          visibility 0.55s var(--open-ease);
+      }
+
+      .nav_wrap.hidden .nav_menu {
+        opacity: 0;
+        visibility: hidden;
+        translate: 0 calc(var(--nav-height) * -0.75);
+      }
+
       .nav_links {
         flex-direction: row;
-        flex-wrap: wrap;
-        align-items: center;
+        gap: 0.75rem;
         padding: 0;
-        gap: var(--space-8);
-        font-size: var(--text-small);
         & > li + li {
           border-top: 0;
         }
       }
 
+      /* Pills; the outline turns green on hover. */
       .nav_link {
-        padding-block: 0;
-        &[aria-current="page"] {
-          text-decoration: underline;
+        display: flex;
+        align-items: center;
+        min-height: 2.5rem;
+        padding: 0 var(--space-3);
+        background-color: var(--background);
+        border: var(--border-width) solid var(--border);
+        border-radius: var(--radius-round);
+        line-height: var(--line-height-huge);
+        @media (hover: hover) {
+          &:hover {
+            border-color: var(--brand-500);
+          }
         }
+      }
+    }
+
+    /* Narrow: the logo leads on the left, the toggle on the right. */
+    @media (width < 64rem) {
+      .nav_logo {
+        order: -1;
       }
     }
   }

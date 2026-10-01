@@ -1,4 +1,16 @@
+---
+import Icon from "@/components/Media/Icon.astro";
+import logo from "@/assets/logo/logo.svg";
+---
+
 <div class="page-transition_curtain" transition:persist aria-hidden="true">
+  <div class="page-transition_logo">
+    <Icon src={logo} variant="full-width" />
+    <div class="page-transition_fill">
+      <Icon src={logo} variant="full-width" />
+    </div>
+  </div>
+  <div class="page-transition_bar"></div>
 </div>
 
 <script is:inline>
@@ -13,6 +25,8 @@
 
   const root = document.documentElement;
   const curtainDuration = 1;
+  /* The loader shows at least this long, so it never just flashes past. */
+  const minimumLoad = 1.3;
   /* Fades start a little before the curtain's edge reaches the first text. */
   const lead = 0.03;
 
@@ -22,7 +36,11 @@
   function edgeTime(anchor: Element | null) {
     if (!anchor) return curtainDuration / 2;
     const top = anchor.getBoundingClientRect().top / innerHeight;
-    const risen = gsap.utils.clamp(0, 1, 1 - (top - lead));
+    return riseTime(gsap.utils.clamp(0, 1, 1 - (top - lead)));
+  }
+
+  /* When the curtain has risen by `risen`, a share of the screen's height. */
+  function riseTime(risen: number) {
     const ease = gsap.parseEase("curtain");
     let low = 0;
     let high = 1;
@@ -50,38 +68,84 @@
     const curtain = document.querySelector<HTMLElement>(
       ".page-transition_curtain",
     );
-    const targets = gsap.utils.toArray<HTMLElement>("[data-intro]");
+    const bar = curtain?.querySelector<HTMLElement>(".page-transition_bar");
+    const started = performance.now();
     let timeline: gsap.core.Timeline | undefined;
     let cancelled = false;
+
+    /* While the page loads, the logo fills and the bar grows most of the way,
+       slowing as they go; they finish once it's ready. */
+    const loading = curtain
+      ? gsap.to(curtain, {
+          "--_progress": 0.85,
+          duration: 2.5,
+          ease: "power2.out",
+        })
+      : undefined;
+
+    /* Two signals, each sent once and at the latest when the intro ends:
+       `page-intro:done` as the curtain is half way up (the hero's ASCII
+       container opens), and `page-intro:content` as its edge reaches the
+       first heading (the page's first screen of content starts to appear,
+       see ScrollReveal). */
+    const sent = new Set<string>();
+    const signal = (name: string) => {
+      if (sent.has(name)) return;
+      sent.add(name);
+      document.dispatchEvent(new Event(name));
+    };
+    const reveal = () => signal("page-intro:done");
+    const content = () => signal("page-intro:content");
 
     const finish = () => {
       root.classList.remove("page-intro", "page-intro-playing");
       if (curtain) gsap.set(curtain, { clearProps: "all" });
-      gsap.set(targets, { clearProps: "opacity" });
+      if (bar) gsap.set(bar, { clearProps: "opacity" });
+      reveal();
+      content();
     };
 
     const play = () => {
       if (cancelled || timeline) return;
       clearTimeout(fallback);
+      loading?.kill();
       root.classList.add("page-intro-playing");
-      const opacity = targets.map((target) => getComputedStyle(target).opacity);
-      gsap.set(targets, { opacity: 0 });
-
       const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      const elapsed = (performance.now() - started) / 1000;
+      const fill = Math.max(0.35, minimumLoad - elapsed);
       timeline = gsap.timeline({ onComplete: finish });
       if (curtain) {
-        timeline.to(
-          curtain,
-          reduced
-            ? { opacity: 0, duration: 0.7, ease: "power1.inOut" }
-            : { yPercent: -100, duration: curtainDuration, ease: "curtain" },
-        );
+        timeline
+          .to(curtain, {
+            "--_progress": 1,
+            duration: fill,
+            ease: "power1.inOut",
+          })
+          .to(
+            curtain,
+            reduced
+              ? { opacity: 0, duration: 0.7, ease: "power1.inOut" }
+              : { yPercent: -100, duration: curtainDuration, ease: "curtain" },
+            "+=0.15",
+          )
+          .addLabel("rise", "<")
+          .call(reveal, undefined, `rise+=${reduced ? 0.35 : riseTime(0.5)}`);
+        /* The bar is gone by the time the curtain is halfway up. */
+        if (bar) {
+          timeline.to(
+            bar,
+            { opacity: 0, duration: curtainDuration / 2, ease: "power1.out" },
+            "rise",
+          );
+        }
       }
-      timeline.to(
-        targets,
-        { opacity: (index: number) => Number(opacity[index]) },
-        reduced ? 0.25 : edgeTime(document.querySelector("main [data-intro]")),
-      );
+      const enter = curtain
+        ? fill +
+          0.15 +
+          (reduced ? 0.25 : edgeTime(document.querySelector("main .heading")))
+        : 0;
+      timeline.call(content, undefined, enter);
     };
 
     /* Waits until the page is loaded, on screen and painting, so a page
@@ -111,6 +175,7 @@
       cancelled = true;
       clearTimeout(fallback);
       document.removeEventListener("visibilitychange", onScreen);
+      loading?.kill();
       timeline?.kill();
       finish();
     };
@@ -125,22 +190,43 @@
 
     .page-intro {
       & .page-transition_curtain {
+        --_progress: 0;
         display: block;
         position: fixed;
         inset: 0;
-        z-index: 99;
+        /* Above the nav, so the whole page appears from under it. */
+        z-index: 101;
         background-color: black;
         pointer-events: none;
       }
+    }
 
-      /* The logo and clock sit on the curtain from the first frame. */
-      & .nav_wrap {
-        background-color: transparent;
-      }
+    /* The logo in grey, with a white copy over it revealed left to right. */
+    .page-transition_logo {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 7.5rem;
+      translate: -50% -50%;
+      color: color-mix(in lab, var(--light-100) 22%, transparent);
+    }
 
-      &:not(.page-intro-playing) [data-intro] {
-        opacity: 0;
-      }
+    .page-transition_fill {
+      position: absolute;
+      inset: 0;
+      color: var(--light-100);
+      clip-path: inset(0 calc((1 - var(--_progress)) * 100%) 0 0);
+    }
+
+    .page-transition_bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 0.25rem;
+      background-color: var(--brand-500);
+      transform-origin: left;
+      scale: var(--_progress) 1;
     }
   }
 </style>

@@ -1,16 +1,71 @@
 ---
 import Layout from "@/layouts/BaseLayout.astro";
+import Section from "@/components/Wrapper/Section.astro";
+import Paragraph from "@/components/Typography/Paragraph.astro";
 import SectionHeroMain from "@/components/Section/SectionHeroMain.astro";
+import ContentLogosMain from "@/components/Content/ContentLogosMain.astro";
+import SectionObservationsMain from "@/components/Section/SectionObservationsMain.astro";
+import SectionHelpMain from "@/components/Section/SectionHelpMain.astro";
+import adaptive from "@/assets/clients/adaptive.svg";
+
+const logo = { src: adaptive, name: "Adaptive & Co" };
 ---
 
 <Layout
   theme="dark"
+  reveal={true}
   description="Seko is a strategic design partner for small teams."
 >
   {/* Hero */}
   <SectionHeroMain
-    heading="Design agency that scales your product to your ambitions."
+    heading="Design agency that scales products to your ambitions."
     text="Seko is a strategic design partner for small teams. We learn your business and product, design solutions around its needs using a structure, that your team can keep building on."
-    buttonText="Book a Call"
+    facts={[
+      { label: "Areas", value: "SaaS, B2C, B2B" },
+      { label: "Happy clients", value: "50+" },
+    ]}
   />
+
+  {/* Clients */}
+  <Section class="overflow-x-clip">
+    <ContentLogosMain
+      text="Trusted by teams around the world"
+      logos={[logo, logo, logo, logo, logo, logo]}
+    />
+  </Section>
+
+  {/* Observations */}
+  <SectionObservationsMain
+    label="Our observations"
+    heading="Every product carries the decisions of the team that builds it. Without consistency, those decisions drift apart, and after a year or two the product needs a redesign to feel whole again."
+    chartLabel="Product complexity"
+  />
+
+  {/* Help */}
+  <SectionHelpMain
+    label="Common client issues"
+    heading="Where we can help your business"
+    issues={[
+      {
+        heading: "You have an advanced product behind a confusing interface",
+        text: "Your infrastructure handles complexity and holds up under load, but the interface never got the same attention. Now every new user means another demo, another support ticket, another round of last week's questions",
+        model: "smiley",
+      },
+      {
+        heading: "Every new feature you build restarts the same conversations",
+        text: "The work was deliberate. No standard held it together, so patterns contradict each other, developers make interface calls mid-sprint, and new hires spend a lot of time learning unwritten rules.",
+        model: "gear",
+      },
+      {
+        heading: "The product works. It doesn't look like it's worth what you charge",
+        text: "The interface still looks like an internal tool, and that's what buyers price against. Decisions take longer, prospects ask for more proof and lean toward products that do less but feel finished.",
+        model: "tractor",
+      },
+    ]}
+  />
+
+  {/* Placeholder: the next section, still to be designed */}
+  <Section fullHeight={true} align="center">
+    <Paragraph variant="mono" class="color-muted">Next section</Paragraph>
+  </Section>
 </Layout>
