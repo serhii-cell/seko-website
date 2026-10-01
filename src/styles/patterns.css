@@ -32,7 +32,6 @@
   gap: var(--space-8);
   position: relative;
   margin-inline: auto;
-  padding-inline: var(--content-inset);
   & > [class] {
     margin-top: 0;
     margin-bottom: 0;

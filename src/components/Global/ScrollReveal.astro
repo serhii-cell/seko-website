@@ -1,13 +1,31 @@
 <script>
   import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
-  import { createMarker, isMarkerText, type Marker } from "@/utils/marker.ts";
+  import { createLines, isLineText, type Lines } from "@/utils/lines.ts";
 
   const blocks = [
     ".section > .container > .layout > * > *",
     ".section > .container > .grid > *",
     ".section > .container > :not(.layout, .grid)",
+    "[data-fade]",
   ].join(", ");
+  const TEXT = ".heading, .text, [data-lines]";
+  /* Time between one item and the next in the first screen's sequence. */
+  const STEP = 0.07;
+
+  /* When the first line of `element` is fully on screen. */
+  const firstLine = (element: Element) => {
+    const style = getComputedStyle(element);
+    const height = parseFloat(style.lineHeight);
+    return `top+=${Number.isNaN(height) ? parseFloat(style.fontSize) * 1.2 : height} bottom`;
+  };
+
+  /* Reading order: rows top to bottom, left to right within a row. */
+  const byReadingOrder = (a: Element, b: Element) => {
+    const ra = a.getBoundingClientRect();
+    const rb = b.getBoundingClientRect();
+    return Math.abs(ra.top - rb.top) > 4 ? ra.top - rb.top : ra.left - rb.left;
+  };
 
   onPage(() => {
     const main = document.querySelector<HTMLElement>("main[data-reveal]");
@@ -18,71 +36,99 @@
     const mm = gsap.matchMedia();
 
     mm.add("(prefers-reduced-motion: no-preference)", (context) => {
-      const targets = gsap.utils
-        .toArray<HTMLElement>(blocks, main)
-        .filter(
-          (block) =>
-            !block.hasAttribute("data-intro") &&
-            !block.closest('[data-reveal="own"]') &&
-            block.getClientRects().length > 0 &&
-            getComputedStyle(block).visibility !== "hidden" &&
-            !ScrollTrigger.isInViewport(block),
-        );
-      /* Headings and body text get the marker; everything else fades. */
-      const markers = new Map<Element, Marker>(
-        targets
-          .filter(isMarkerText)
-          .map((block) => [block, createMarker(block)]),
+      const shown = (element: Element) =>
+        !element.closest('[data-reveal="own"]') &&
+        element.getClientRects().length > 0 &&
+        getComputedStyle(element).visibility !== "hidden";
+
+      /* Every heading and paragraph rises in line by line; blocks with no
+         text of their own, the nav's parts and anything marked `data-fade`
+         fade in instead. */
+      const texts = gsap.utils
+        .toArray<HTMLElement>(TEXT, main)
+        .filter((element) => isLineText(element) && shown(element));
+      const faders = [
+        ...gsap.utils.toArray<HTMLElement>("[data-intro]"),
+        ...gsap.utils
+          .toArray<HTMLElement>(blocks, main)
+          .filter(
+            (block) =>
+              block.hasAttribute("data-fade") ||
+              (!isLineText(block) && !block.querySelector(TEXT)),
+          ),
+      ].filter((block) => shown(block) && !texts.includes(block));
+
+      const lines = new Map<Element, Lines>(
+        texts.map((element) => [element, createLines(element)]),
       );
-      const faders = targets.filter((block) => !markers.has(block));
       const opacity = new Map<Element, string>(
         faders.map((block) => [block, getComputedStyle(block).opacity]),
       );
-
       const settle = "opacity,visibility";
+      gsap.set(faders, { autoAlpha: 0 });
+
+      const fadeIn = (targets: Element[], stagger: number, delay = 0) =>
+        gsap.to(targets, {
+          autoAlpha: (_: number, block: Element) => Number(opacity.get(block)),
+          stagger,
+          delay,
+          clearProps: settle,
+        });
+
+      /* What is on screen at load comes in as one sequence in reading order,
+         the nav first, once the first-load curtain is up far enough. */
+      const first = [...texts, ...faders]
+        .filter((element) => ScrollTrigger.isInViewport(element))
+        .sort(byReadingOrder);
+      const playFirst = () => {
+        document.removeEventListener("page-intro:content", playFirst);
+        first.forEach((element, index) => {
+          const reveal = lines.get(element);
+          if (reveal) reveal.play(index * STEP);
+          else fadeIn([element], 0, index * STEP);
+        });
+      };
+      if (document.documentElement.classList.contains("page-intro")) {
+        document.addEventListener("page-intro:content", playFirst);
+      } else {
+        playFirst();
+      }
+
+      /* The rest comes in as it scrolls into view: text once its first line
+         is fully on screen, blocks in batches. */
+      lines.forEach((reveal, element) => {
+        if (first.includes(element as HTMLElement)) return;
+        ScrollTrigger.create({
+          trigger: element,
+          start: () => firstLine(element),
+          end: "max",
+          once: true,
+          onEnter: () => reveal.play(),
+        });
+      });
 
       const reveal = context.add("reveal", (batch: Element[]) => {
         const passed = batch.filter(
           (block) => block.getBoundingClientRect().bottom <= 0,
         );
         const entering = batch.filter((block) => !passed.includes(block));
-
         if (passed.length > 0) gsap.set(passed, { clearProps: settle });
-        if (entering.length > 0) {
-          gsap.to(entering, {
-            autoAlpha: (_: number, block: Element) =>
-              Number(opacity.get(block)),
-            stagger: 0.08,
-            clearProps: settle,
-          });
-        }
+        if (entering.length > 0) fadeIn(entering.sort(byReadingOrder), 0.08);
       });
-
-      gsap.set(faders, { autoAlpha: 0 });
-      ScrollTrigger.batch(faders, {
-        start: "top 90%",
-        once: true,
-        onEnter: (batch) => reveal(batch),
-      });
-
-      /* Text starts as soon as its first line is fully on screen. Ending at
-         the page's end means a block already scrolled past plays at once. */
-      const firstLine = (block: Element) => {
-        const style = getComputedStyle(block);
-        const height = parseFloat(style.lineHeight);
-        return Number.isNaN(height) ? parseFloat(style.fontSize) * 1.2 : height;
-      };
-      markers.forEach((marker, block) => {
-        ScrollTrigger.create({
-          trigger: block,
-          start: () => `top+=${firstLine(block)} bottom`,
-          end: "max",
+      const later = faders.filter((block) => !first.includes(block));
+      if (later.length > 0) {
+        ScrollTrigger.batch(later, {
+          start: "top 90%",
           once: true,
-          onEnter: () => marker.play(),
+          onEnter: (batch) => reveal(batch),
         });
-      });
+      }
 
-      return () => markers.forEach((marker) => marker.revert());
+      return () => {
+        document.removeEventListener("page-intro:content", playFirst);
+        lines.forEach((lines) => lines.revert());
+        gsap.set(faders, { clearProps: settle });
+      };
     });
 
     return () => mm.revert();

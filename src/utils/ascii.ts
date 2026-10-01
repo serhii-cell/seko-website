@@ -20,13 +20,13 @@ export type Look = {
   font: string;
 };
 
-/* 10px glyphs from a 720px model up, where a bigger model gets more glyphs
+/* 8px glyphs from a 440px model up, where a bigger model gets more glyphs
    rather than bigger ones, and scaled down below that, never under 6px.
    Cells keep the 8 × 14 proportion of the original 12px grid. */
 export const GLYPH = {
-  max: 10,
+  max: 8,
   min: 6,
-  fullAt: 720,
+  fullAt: 440,
   cellW: 8 / 12,
   cellH: 14 / 12,
 };
@@ -231,104 +231,88 @@ export function createController(element: HTMLElement): Controller {
 }
 
 /**
- * Drag to orbit a model while it keeps animating. It spins slowly on its own;
- * a horizontal drag turns it and the turn is kept on release, folded into the
- * spin; a vertical drag tilts it and the tilt eases back to the resting angle,
- * taking longer the further it went. `redraw` runs on every drag move so a
- * still model follows the pointer too.
+ * Models turn a little either way of their resting angle and back, so their
+ * face is always toward the viewer: a sway of this many radians each side,
+ * one full swing every ~12s.
  */
-export function createOrbit(
+export const SWAY = 0.3;
+export const sway = (time: number) => SWAY * Math.sin(time * 0.52);
+
+/** The tint the torch pushes lit glyphs toward. */
+const TORCH_LIGHT: Rgb = [255, 255, 240];
+
+/**
+ * The cursor as a torch over `area`: glyphs near it on `canvas` get denser and
+ * brighter, fading out smoothly with distance. Its position and strength ease
+ * toward the pointer, so the light glides and fades rather than snapping.
+ * Only for a mouse; does nothing without motion.
+ */
+export function createTorch(
+  area: HTMLElement,
   canvas: HTMLCanvasElement,
   motion: boolean,
-  restingTilt: number,
-  redraw: () => void,
 ) {
-  const drag = {
-    yaw: 0,
-    pitch: 0,
-    active: false,
-    lastX: 0,
-    lastY: 0,
-    sensitivity: 0.006,
+  const torch = {
+    x: 0,
+    y: 0,
+    targetX: 0,
+    targetY: 0,
+    strength: 0,
+    on: false,
+    /* Spread of the light, in px: most of it falls within 2.5× this. */
+    spread: 72,
   };
-  const spin = { yaw: 0, speed: motion ? -0.24 : 0 };
-  const settle = { minDuration: 0.6, perRadian: 0.35, maxDuration: 1.6 };
-  let tiltReturn: { from: number; t: number; duration: number } | null = null;
-  const easeInOutCubic = (u: number) =>
-    u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
-
-  function onPointerDown(event: PointerEvent) {
-    drag.active = true;
-    tiltReturn = null;
-    drag.lastX = event.clientX;
-    drag.lastY = event.clientY;
-    try {
-      canvas.setPointerCapture(event.pointerId);
-    } catch {
-      /* A pointer that can't be captured still drags while over the canvas. */
-    }
-    canvas.classList.add("dragging");
-  }
+  const fine = matchMedia("(hover: hover) and (pointer: fine)");
   function onPointerMove(event: PointerEvent) {
-    if (!drag.active) return;
-    drag.yaw += (event.clientX - drag.lastX) * drag.sensitivity;
-    drag.pitch = clamp(
-      drag.pitch + (event.clientY - drag.lastY) * drag.sensitivity,
-      -1.35 - restingTilt,
-      1.35 - restingTilt,
-    );
-    drag.lastX = event.clientX;
-    drag.lastY = event.clientY;
-    redraw();
-  }
-  function onPointerUp() {
-    if (!drag.active) return;
-    drag.active = false;
-    canvas.classList.remove("dragging");
-    spin.yaw += drag.yaw;
-    drag.yaw = 0;
-    const from = drag.pitch;
-    if (!motion || Math.abs(from) < 1e-3) {
-      drag.pitch = 0;
-      tiltReturn = null;
-    } else {
-      tiltReturn = {
-        from,
-        t: 0,
-        duration: Math.min(
-          settle.maxDuration,
-          settle.minDuration + settle.perRadian * Math.abs(from),
-        ),
-      };
+    if (!fine.matches || event.pointerType !== "mouse") return;
+    const rect = canvas.getBoundingClientRect();
+    torch.targetX = event.clientX - rect.left;
+    torch.targetY = event.clientY - rect.top;
+    if (!torch.on && torch.strength < 0.01) {
+      torch.x = torch.targetX;
+      torch.y = torch.targetY;
     }
-    redraw();
+    torch.on = true;
   }
-  canvas.addEventListener("pointerdown", onPointerDown);
-  canvas.addEventListener("pointermove", onPointerMove);
-  canvas.addEventListener("pointerup", onPointerUp);
-  canvas.addEventListener("pointercancel", onPointerUp);
+  function onPointerLeave() {
+    torch.on = false;
+  }
+  if (motion) {
+    area.addEventListener("pointermove", onPointerMove);
+    area.addEventListener("pointerleave", onPointerLeave);
+  }
+  const reach = () => 2 * torch.spread * torch.spread;
 
   return {
-    /** Turn added to the model's own yaw, in radians. */
-    yaw: () => spin.yaw + drag.yaw,
-    /** Tilt added to the resting tilt, in radians. */
-    pitch: () => drag.pitch,
     step(dt: number) {
-      if (!drag.active) spin.yaw += spin.speed * dt;
-      if (drag.active || !tiltReturn) return;
-      tiltReturn.t += dt;
-      const u = Math.min(1, tiltReturn.t / tiltReturn.duration);
-      drag.pitch = tiltReturn.from * (1 - easeInOutCubic(u));
-      if (u >= 1) {
-        drag.pitch = 0;
-        tiltReturn = null;
-      }
+      const follow = 1 - Math.exp(-dt * 10);
+      torch.x += (torch.targetX - torch.x) * follow;
+      torch.y += (torch.targetY - torch.y) * follow;
+      const fade = 1 - Math.exp(-dt * (torch.on ? 6 : 3));
+      torch.strength += ((torch.on ? 1 : 0) - torch.strength) * fade;
+      if (torch.strength < 0.002) torch.strength = 0;
+    },
+    /** Whether any light is falling at all, to skip the work when not. */
+    lit: () => torch.strength > 0,
+    /**
+     * A glyph of brightness `b` and colour `color` centred at (x, y) on the
+     * canvas, lit by the torch: returns its brightness, colour and the extra
+     * luminance to draw it with.
+     */
+    light(x: number, y: number, b: number, color: Rgb) {
+      const dx = x - torch.x;
+      const dy = y - torch.y;
+      const glow = torch.strength * Math.exp(-(dx * dx + dy * dy) / reach());
+      if (glow <= 0.004) return { b, color, boost: 0 };
+      return {
+        b: Math.min(1, b + 0.4 * glow),
+        color: mix(color, TORCH_LIGHT, 0.55 * glow),
+        boost: 0.3 * glow,
+      };
     },
     destroy() {
-      canvas.removeEventListener("pointerdown", onPointerDown);
-      canvas.removeEventListener("pointermove", onPointerMove);
-      canvas.removeEventListener("pointerup", onPointerUp);
-      canvas.removeEventListener("pointercancel", onPointerUp);
+      area.removeEventListener("pointermove", onPointerMove);
+      area.removeEventListener("pointerleave", onPointerLeave);
     },
   };
 }

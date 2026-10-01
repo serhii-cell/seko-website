@@ -17,111 +17,198 @@ const { render = true, text, logos = [] } = Astro.props;
 
 {
   render && logos.length > 0 && (
-    <div class="logos-main_wrap">
-      <Paragraph
-        variant="main"
-        class="logos-main_text color-faded"
-        data-marker="off"
-        render={!!text}
-      >
-        {text}
-      </Paragraph>
-      <ul class="logos-main_list">
-        {logos.map((logo) => (
-          <li class="logos-main_item">
-            <span class="logos-main_logo">
-              <Icon
-                src={logo.src}
-                variant="full-width"
-                role="img"
-                aria-label={logo.name}
-              />
-            </span>
-          </li>
-        ))}
-      </ul>
+    <div class="logos-main_wrap" data-reveal="own">
+      <div class="logos-main_head">
+        <span class="logos-main_guide" aria-hidden="true" />
+        <Paragraph
+          variant="mono"
+          class="logos-main_text color-faded"
+          render={!!text}
+        >
+          {text}
+        </Paragraph>
+      </div>
+      <div class="logos-main_band">
+        <ul class="logos-main_list">
+          {logos.map((logo) => (
+            <li class="logos-main_item">
+              <span class="logos-main_logo">
+                <Icon
+                  src={logo.src}
+                  variant="full-width"
+                  role="img"
+                  aria-label={logo.name}
+                />
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   )
 }
 
+<script>
+  import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+  import { onIntroOpen } from "@/utils/intro.ts";
+  import { createLines } from "@/utils/lines.ts";
+
+  /* The line rises in over a single rule; the rule opens downward into the
+     cells while the hatch inside drifts left to right, then the logos fade
+     in one after another. On the first screen it starts as the hero's ASCII
+     container opens; further down, when the strip scrolls into view. */
+  function setUp(wrap: HTMLElement) {
+    const text = wrap.querySelector<HTMLElement>(".logos-main_text");
+    const band = wrap.querySelector<HTMLElement>(".logos-main_band");
+    const list = wrap.querySelector<HTMLElement>(".logos-main_list");
+    const logos = gsap.utils.toArray<HTMLElement>(".logos-main_logo", wrap);
+    if (!band || !list) return () => {};
+
+    const lines = text ? createLines(text) : null;
+    gsap.set(band, { borderBottomColor: "transparent" });
+    gsap.set(list, { height: 0, overflow: "hidden", "--_hatch": "0rem" });
+    gsap.set(logos, { autoAlpha: 0 });
+
+    let timeline: gsap.core.Timeline | undefined;
+    const play = () => {
+      lines?.play();
+      timeline = gsap
+        .timeline({ delay: 0.15 })
+        .set(band, { clearProps: "borderBottomColor" })
+        .to(list, { height: "auto", duration: 0.9, ease: "power3.inOut" })
+        .to(list, { "--_hatch": "3rem", duration: 0.9, ease: "power2.out" }, "<")
+        .set(list, { clearProps: "height,overflow" })
+        .to(logos, {
+          autoAlpha: 1,
+          duration: 0.5,
+          stagger: 0.1,
+          clearProps: "opacity,visibility",
+        });
+    };
+
+    let trigger: ScrollTrigger | undefined;
+    let stopWaiting = () => {};
+    if (ScrollTrigger.isInViewport(band)) {
+      stopWaiting = onIntroOpen(play);
+    } else {
+      trigger = ScrollTrigger.create({
+        trigger: wrap,
+        start: "top 85%",
+        once: true,
+        onEnter: play,
+      });
+    }
+
+    return () => {
+      stopWaiting();
+      trigger?.kill();
+      timeline?.kill();
+      lines?.revert();
+      gsap.set([band, list, ...logos], { clearProps: "all" });
+    };
+  }
+
+  onPage(() => {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const cleanups = [
+      ...document.querySelectorAll<HTMLElement>(".logos-main_wrap"),
+    ].map(setUp);
+    return () => cleanups.forEach((cleanup) => cleanup());
+  });
+</script>
+
 <style is:global>
   @layer components {
     .logos-main_wrap {
-      --_line-x: repeating-linear-gradient(
-        to right,
-        var(--border) 0 var(--dash),
-        transparent 0 calc(var(--dash) * 2)
-      );
-      --_line-y: repeating-linear-gradient(
-        to bottom,
-        var(--border) 0 var(--dash),
-        transparent 0 calc(var(--dash) * 2)
-      );
       display: flex;
       flex-direction: column;
-      gap: 2rem;
+      gap: var(--space-5);
       width: 100%;
     }
 
-    /* Out to the page frame's lines, dashed above and below. */
-    .logos-main_list {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      margin-inline: calc(var(--content-inset) * -1);
-      padding-block: var(--border-width);
-      background:
-        var(--_line-x) top / 100% var(--border-width) no-repeat,
-        var(--_line-x) bottom / 100% var(--border-width) no-repeat;
-      @media (width >= 48rem) {
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-      }
+    /* Carries the hero's vertical guide on from the top of this section to
+       the strip: on the working area it runs through the middle of the
+       hero's ASCII container, 1303px in from the left at 1640px wide. */
+    .logos-main_head {
+      position: relative;
     }
 
-    /* Cells are split by dashed lines; the outer edges are the frame's. */
-    .logos-main_item {
-      --_left: none;
-      --_top: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-6) var(--space-5);
-      background:
-        var(--_left) left / var(--border-width) 100% no-repeat,
-        var(--_top) top / 100% var(--border-width) no-repeat,
-        color-mix(in lab, var(--background-2) 45%, var(--background));
-      &:nth-child(even) {
-        --_left: var(--_line-y);
-      }
-      &:nth-child(n + 3) {
-        --_top: var(--_line-x);
-      }
-      /* An odd one out on phones takes the whole last row. */
-      &:last-child:nth-child(odd) {
-        grid-column: 1 / -1;
-      }
-      @media (width >= 48rem) {
-        &:nth-child(n) {
-          --_left: var(--_line-y);
-          --_top: none;
-        }
-        &:first-child {
-          --_left: none;
-        }
-        &:last-child:nth-child(odd) {
-          grid-column: auto;
-        }
+    .logos-main_guide {
+      display: none;
+      @media (width >= 64rem) {
+        display: block;
+        position: absolute;
+        top: 0;
+        bottom: calc(var(--space-5) * -1);
+        clip-path: inset(0 0 calc((1 - var(--_draw-y, 1)) * 100%) 0);
+        left: calc(1303 / 1640 * 100%);
+        width: var(--border-width);
+        background: repeating-linear-gradient(
+          to bottom,
+          var(--stroke) 0 var(--dash),
+          transparent 0 calc(var(--dash) * 2)
+        );
       }
     }
 
     .logos-main_text {
-      align-self: center;
-      text-align: center;
+      margin: 0;
+    }
+
+    /* A full-width band, ruled above and below; the cells sit in the
+       working area under a faint diagonal hatch. */
+    .logos-main_band {
+      position: relative;
+      width: 100vw;
+      margin-inline: calc(50% - 50vw);
+      border-block: var(--border-width) solid var(--stroke);
+    }
+
+    .logos-main_list {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      width: min(var(--site-width), var(--max-width-main));
+      margin-inline: auto;
+      border-right: var(--border-width) solid var(--stroke);
+      @media (width >= 48rem) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      @media (width >= 64rem) {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+      }
+      &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+          -60deg,
+          color-mix(in lab, var(--light-100) 2%, transparent) 0 1px,
+          transparent 1px 0.5rem
+        );
+        background-position: var(--_hatch, 0rem) 0;
+      }
+    }
+
+    .logos-main_item {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-5);
+      background-color: var(--background-2);
+      border-left: var(--border-width) solid var(--stroke);
+      border-bottom: var(--border-width) solid var(--stroke);
+      @media (width >= 64rem) {
+        border-bottom: 0;
+      }
     }
 
     /* Grey, so the logos read without pulling focus. */
     .logos-main_logo {
       flex: 0 1 9.125rem;
-      color: color-mix(in lab, var(--text) 40%, transparent);
+      color: color-mix(in lab, var(--light-100) 40%, transparent);
     }
   }
 </style>

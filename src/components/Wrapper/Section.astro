@@ -3,7 +3,7 @@ import type { HTMLAttributes } from "astro/types";
 import { slotContent } from "@/utils/slots.ts";
 
 type SectionSpace =
-  "none" | "even" | "small" | "medium" | "large" | "navoverlap";
+  "none" | "even" | "small" | "medium" | "large" | "xlarge" | "navoverlap";
 
 type ContainerGap =
   | "0"
@@ -32,7 +32,7 @@ interface Props extends HTMLAttributes<"section"> {
    * - `medium` — the section gap's size, inside the section, for one with
    *   its own background
    * - `even` — the site margin, matching the space at the sides
-   * - `small`, `large` — tighter or looser than usual
+   * - `small`, `large`, `xlarge` — tighter or looser than usual
    * - `navoverlap` — clears a nav sitting over the page
    */
   paddingTop?: SectionSpace;

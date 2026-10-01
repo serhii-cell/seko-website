@@ -22,7 +22,6 @@ import logo from "@/assets/logo/logo.svg";
 <script>
   import { gsap } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
-  import { createMarker, isMarkerText, type Marker } from "@/utils/marker.ts";
 
   const root = document.documentElement;
   const curtainDuration = 1;
@@ -70,10 +69,8 @@ import logo from "@/assets/logo/logo.svg";
       ".page-transition_curtain",
     );
     const bar = curtain?.querySelector<HTMLElement>(".page-transition_bar");
-    const targets = gsap.utils.toArray<HTMLElement>("[data-intro]");
     const started = performance.now();
     let timeline: gsap.core.Timeline | undefined;
-    let markers: Marker[] = [];
     let cancelled = false;
 
     /* While the page loads, the logo fills and the bar grows most of the way,
@@ -86,21 +83,26 @@ import logo from "@/assets/logo/logo.svg";
         })
       : undefined;
 
-    /* The hero cube waits for this to grow in: sent once the curtain is half
-       way up, or when the intro ends early. */
-    let revealed = false;
-    const reveal = () => {
-      if (revealed) return;
-      revealed = true;
-      document.dispatchEvent(new Event("page-intro:done"));
+    /* Two signals, each sent once and at the latest when the intro ends:
+       `page-intro:done` as the curtain is half way up (the hero's ASCII
+       container opens), and `page-intro:content` as its edge reaches the
+       first heading (the page's first screen of content starts to appear,
+       see ScrollReveal). */
+    const sent = new Set<string>();
+    const signal = (name: string) => {
+      if (sent.has(name)) return;
+      sent.add(name);
+      document.dispatchEvent(new Event(name));
     };
+    const reveal = () => signal("page-intro:done");
+    const content = () => signal("page-intro:content");
 
     const finish = () => {
       root.classList.remove("page-intro", "page-intro-playing");
       if (curtain) gsap.set(curtain, { clearProps: "all" });
       if (bar) gsap.set(bar, { clearProps: "opacity" });
-      gsap.set(targets, { clearProps: "opacity" });
       reveal();
+      content();
     };
 
     const play = () => {
@@ -109,12 +111,6 @@ import logo from "@/assets/logo/logo.svg";
       loading?.kill();
       root.classList.add("page-intro-playing");
       const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      /* Headings and body text wait under their marker bars; the rest fades. */
-      const marked = reduced ? [] : targets.filter(isMarkerText);
-      const faders = targets.filter((target) => !marked.includes(target));
-      markers = marked.map(createMarker);
-      const opacity = faders.map((target) => getComputedStyle(target).opacity);
-      gsap.set(faders, { opacity: 0 });
 
       const elapsed = (performance.now() - started) / 1000;
       const fill = Math.max(0.35, minimumLoad - elapsed);
@@ -147,21 +143,9 @@ import logo from "@/assets/logo/logo.svg";
       const enter = curtain
         ? fill +
           0.15 +
-          (reduced
-            ? 0.25
-            : edgeTime(document.querySelector("main [data-intro]")))
+          (reduced ? 0.25 : edgeTime(document.querySelector("main .heading")))
         : 0;
-      timeline
-        .to(
-          faders,
-          { opacity: (index: number) => Number(opacity[index]) },
-          enter,
-        )
-        .call(
-          () => markers.forEach((marker, index) => marker.play(index * 0.15)),
-          undefined,
-          enter,
-        );
+      timeline.call(content, undefined, enter);
     };
 
     /* Waits until the page is loaded, on screen and painting, so a page
@@ -193,7 +177,6 @@ import logo from "@/assets/logo/logo.svg";
       document.removeEventListener("visibilitychange", onScreen);
       loading?.kill();
       timeline?.kill();
-      markers.forEach((marker) => marker.revert());
       finish();
     };
   });
@@ -215,10 +198,6 @@ import logo from "@/assets/logo/logo.svg";
         z-index: 101;
         background-color: black;
         pointer-events: none;
-      }
-
-      &:not(.page-intro-playing) [data-intro] {
-        opacity: 0;
       }
     }
 

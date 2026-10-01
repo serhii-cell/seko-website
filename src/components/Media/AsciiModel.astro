@@ -7,17 +7,16 @@ interface Props extends HTMLAttributes<"div"> {
   /**
    * Which model it draws.
    *
-   * - `monitor` — a 90s CRT with a BIOS-style screen of live charts (default)
-   * - `gear` — a spinning gear, with speech bubbles asking "Are you sure?"
-   * - `tractor` — a tractor with an open cab, its wheels turning
-   * - `controls` — a cockpit-style control deck of gauges, switches and levers
+   * - `smiley` — a smiling ball, a placeholder for now (default)
+   * - `gear` — a gear with one hole through the middle, turning
+   * - `tractor` — a red tractor with an open cab
    */
-  variant?: "monitor" | "gear" | "tractor" | "controls";
+  variant?: "smiley" | "gear" | "tractor";
 }
 
 const {
   render = true,
-  variant = "monitor",
+  variant = "smiley",
   class: className,
   ...rest
 } = Astro.props;
@@ -37,139 +36,39 @@ const {
 }
 
 <script>
-  import {
-    clamp,
-    mix,
-    pickGlyph,
-    toRgb,
-    type Rgb,
-    type Look,
-  } from "@/utils/ascii.ts";
+  import { clamp, toRgb, type Rgb, type Look } from "@/utils/ascii.ts";
   import {
     mountModels,
     roundBox,
     extrude,
-    type Grid,
     type ModelSpec,
-    type Paint,
   } from "@/utils/ascii-model.ts";
 
-  const WHITE: Rgb = [242, 242, 242];
+  /* Drawn at the page's 8px glyph in boxes a few hundred pixels across, so
+     every model is a few large, simple shapes. */
 
-  /* ---------- Monitor ---------- */
+  /* ---------- Smiley ---------- */
 
-  /* The glass: a shallow dome cut to the screen opening, so it bulges like a
-     tube's face. Its own shape, so only its surface is ever the screen. */
-  const glass = (x: number, y: number, z: number) =>
-    Math.max(
-      Math.hypot(x, y - 0.14, z + 1.9) - 2.19,
-      roundBox(x, y - 0.14, z - 0.25, 0.47, 0.37, 0.06, 0.05),
-    );
-
-  /* A 90s CRT, facing +z: a deep bezel with a stepped inner frame and a domed
-     screen, a button panel on its bottom edge, a housing that tapers and
-     slopes down to the back, the electronics box under it, and a swivel base.
-     Distances in model units. */
-  function monitor(x: number, y: number, z: number) {
-    let d = roundBox(x, y - 0.1, z - 0.25, 0.62, 0.52, 0.1, 0.045);
-    d = Math.max(d, -roundBox(x, y - 0.13, z - 0.35, 0.545, 0.44, 0.022, 0.03));
-    d = Math.max(d, -roundBox(x, y - 0.14, z - 0.3, 0.47, 0.37, 0.09, 0.05));
-    d = Math.max(
-      d,
-      -roundBox(x - 0.4, y + 0.365, z - 0.35, 0.005, 0.045, 0.02, 0.002),
-    );
-    const toFront = clamp((z + 0.75) / 0.9, 0, 1);
-    const top = 0.22 + 0.34 * toFront;
-    const bottom = -0.08;
-    const housing = roundBox(
-      x,
-      y - (top + bottom) / 2,
-      z + 0.3,
-      0.44 + 0.13 * toFront,
-      (top - bottom) / 2,
-      0.45,
-      0.05,
-    );
-    d = Math.min(d, housing * 0.8);
-    d = Math.min(d, roundBox(x, y + 0.22, z + 0.28, 0.36, 0.14, 0.3, 0.02));
-    d = Math.min(d, roundBox(x, y + 0.41, z - 0.03, 0.26, 0.05, 0.2, 0.02));
-    d = Math.min(d, roundBox(x, y + 0.48, z - 0.05, 0.42, 0.03, 0.33, 0.025));
-    return Math.min(d, glass(x, y, z));
-  }
-
-  const BARS = [
-    [1.1, 0.2],
-    [0.7, 1.9],
-    [1.5, 3.1],
-    [0.9, 4.4],
-  ];
-  const PROGRESS = [
-    [0.21, 0.1],
-    [0.13, 0.55],
-  ];
-
-  /* A line of "text": dashes with word gaps, like a BIOS label. */
-  const words = (u: number, from: number, to: number) =>
-    u > from && u < to && (u - from) * 14 - Math.floor((u - from) * 14) < 0.75;
-
-  /* A 90s BIOS-style screen at (u, v), 0–1 from its top left, kept coarse
-     enough to read at a few dozen glyphs across: a header line, a white
-     frame split in two, rising and falling bars on the left and progress bars
-     that fill and start again on the right, all white on blue. Returns glyph
-     brightness, negative for blue and positive for white; -1 is the paler
-     blue of an empty progress track. */
-  function screen(u: number, v: number, t: number) {
-    const blue = -0.6;
-    const track = -1;
-    if (v > 0.06 && v < 0.15) return words(u, 0.2, 0.8) ? 0.9 : blue;
-    const inFrame = u > 0.05 && u < 0.95 && v > 0.2 && v < 0.94;
-    if (!inFrame) return blue;
-    const border = u < 0.085 || u > 0.915 || v < 0.26 || v > 0.88;
-    if (border || (u > 0.49 && u < 0.525)) return 0.8;
-    if (u < 0.49) {
-      if (v > 0.76) return 0.7;
-      const slot = (u - 0.12) / (0.34 / BARS.length);
-      const i = Math.floor(slot);
-      const within = slot - i;
-      if (slot > 0 && i < BARS.length && within > 0.15 && within < 0.75) {
-        const [speed, phase] = BARS[i];
-        const height =
-          0.2 +
-          0.8 *
-            (0.5 + 0.5 * Math.sin(t * speed + phase)) *
-            (0.75 + 0.25 * Math.sin(t * 0.37 + i));
-        if (v > 0.76 - height * 0.44) return 0.95;
-      }
-      return blue;
-    }
-    for (let i = 0; i < PROGRESS.length; i++) {
-      const row = 0.33 + i * 0.27;
-      if (v > row && v < row + 0.07)
-        return words(u, 0.58, 0.74 + i * 0.06) ? 0.75 : blue;
-      if (v > row + 0.1 && v < row + 0.19 && u > 0.58 && u < 0.87) {
-        const [speed, offset] = PROGRESS[i];
-        const filled = clamp(((t * speed + offset) % 1) * 1.25, 0, 1);
-        return u < 0.58 + 0.29 * filled ? 0.95 : track;
-      }
-    }
-    return blue;
-  }
-
-  function monitorSpec(look: Look): ModelSpec {
-    const blue = toRgb(look.screen);
-    const pale = mix(blue, WHITE, 0.35);
+  /* A ball whose face, toward +z, has two round eyes and a smile cut out of
+     it as dark glyph-free marks. */
+  function smileySpec(look: Look): ModelSpec {
+    const body = toRgb(look.body);
     return {
-      /* The bezel's front corners, from the middle it turns about. */
-      radius: 1.0,
-      pivot: [0, 0.06, -0.2],
-      restYaw: 0.55,
-      restTilt: 0.28,
-      field: monitor,
-      glow(x, y, z, time, paint) {
-        if (glass(x, y, z) >= 0.01) return false;
-        const b = screen((x + 0.47) / 0.94, (0.51 - y) / 0.74, time);
-        paint.color = b === -1 ? pale : b < 0 ? blue : WHITE;
-        paint.brightness = Math.abs(b);
+      radius: 1.02,
+      restYaw: 0,
+      restTilt: 0.15,
+      field: (x, y, z) => Math.hypot(x, y, z) - 1,
+      glow(x, y, z, _time, paint) {
+        if (z < 0.2) return false;
+        const eye = Math.min(
+          Math.hypot(x - 0.34, y - 0.3),
+          Math.hypot(x + 0.34, y - 0.3),
+        );
+        const smile =
+          y < -0.05 && Math.abs(Math.hypot(x, y - 0.12) - 0.56) < 0.09;
+        if (eye > 0.15 && !smile) return false;
+        paint.color = body;
+        paint.brightness = 0;
         return true;
       },
     };
@@ -178,192 +77,51 @@ const {
   /* ---------- Gear ---------- */
 
   const GEAR = {
-    radius: 1.0,
-    tooth: 0.24,
+    radius: 0.82,
+    tooth: 0.26,
     teeth: 8,
-    hole: 0.16,
-    thickness: 0.15,
-    hubRadius: 0.42,
-    hubThickness: 0.3,
-    cutoutRing: 0.66,
-    cutoutRadius: 0.19,
-    cutouts: 5,
+    hole: 0.3,
+    thickness: 0.22,
   };
   const TOOTH_ANGLE = (Math.PI * 2) / GEAR.teeth;
-  const CUTOUT_ANGLE = (Math.PI * 2) / GEAR.cutouts;
 
-  /* A gear on its axle, facing +z: a toothed ring with round cutouts, a
-     raised hub and a hole through the middle. Distances in model units. */
+  /* A gear on its axle, facing +z: a ring of broad square teeth around one
+     round hole. Distances in model units. */
   function gear(x: number, y: number, z: number) {
     const r = Math.hypot(x, y);
-    const a = Math.atan2(y, x);
-    let u = (a / TOOTH_ANGLE) % 1;
+    let u = (Math.atan2(y, x) / TOOTH_ANGLE) % 1;
     if (u < 0) u += 1;
-    const tooth = clamp((0.31 - Math.abs(u - 0.5)) / 0.1, 0, 1);
-    let ring = Math.max(r - (GEAR.radius + GEAR.tooth * tooth), GEAR.hole - r);
-    const k = Math.round(a / CUTOUT_ANGLE) * CUTOUT_ANGLE;
-    const cutout =
-      Math.hypot(
-        x - GEAR.cutoutRing * Math.cos(k),
-        y - GEAR.cutoutRing * Math.sin(k),
-      ) - GEAR.cutoutRadius;
-    ring = Math.max(ring, -cutout);
-    const hub = Math.max(r - GEAR.hubRadius, GEAR.hole - r);
-    return Math.min(
-      extrude(ring, z, GEAR.thickness),
-      extrude(hub, z, GEAR.hubThickness),
-    );
+    const tooth = clamp((0.27 - Math.abs(u - 0.5)) / 0.06, 0, 1);
+    const ring = Math.max(r - (GEAR.radius + GEAR.tooth * tooth), GEAR.hole - r);
+    return extrude(ring, z, GEAR.thickness);
   }
 
-  /* One speech bubble on the glyph grid: its cells are cleared so it sits in
-     front of the gear, its outline materialises out of dithered glyphs, then
-     `typed` characters of `text` appear with a blinking cursor. */
-  function bubble(
-    grid: Grid,
-    x0: number,
-    y0: number,
-    appear: number,
-    text: string,
-    typed: number,
-    tailUp: boolean,
-    time: number,
-    line: Rgb,
-  ) {
-    if (appear <= 0) return;
-    const { context, cw, ch, ox, oy, ramp, coverage } = grid;
-    const x1 = x0 + 16;
-    const y1 = y0 + 2;
-    const tailX = x0 + 1;
-    const tailY = tailUp ? y0 - 1 : y1 + 1;
-    const at = (x: number, y: number, glyph: string, color: Rgb, alpha = 1) => {
-      context.fillStyle = `rgb(${(color[0] * alpha) | 0},${(color[1] * alpha) | 0},${(color[2] * alpha) | 0})`;
-      context.fillText(glyph, ox + x * cw, oy + y * ch);
-    };
-    context.clearRect(
-      ox + x0 * cw,
-      oy + y0 * ch,
-      (x1 - x0 + 1) * cw,
-      (y1 - y0 + 1) * ch,
-    );
-    context.clearRect(ox + tailX * cw, oy + tailY * ch, cw, ch);
-    const edge: [number, number][] = [[tailX, tailY]];
-    for (let x = x0; x <= x1; x++) edge.push([x, y0], [x, y1]);
-    edge.push([x0, y0 + 1], [x1, y0 + 1]);
-    if (appear < 1) {
-      for (const [x, y] of edge) {
-        const glyph = pickGlyph(ramp, coverage, appear * 0.9, x, y);
-        if (glyph !== " ") at(x, y, glyph, line, 0.85 + 0.15 * appear);
-      }
-      return;
-    }
-    at(x0, y0, ".", line);
-    at(x1, y0, ".", line);
-    at(x0, y1, "'", line);
-    at(x1, y1, "'", line);
-    for (let x = x0 + 1; x < x1; x++) {
-      at(x, y0, "-", line);
-      at(x, y1, "-", line);
-    }
-    at(x0, y0 + 1, "|", line);
-    at(x1, y0 + 1, "|", line);
-    at(tailX, tailY, tailUp ? "/" : "\\", line);
-    const start = x0 + 1 + Math.floor((15 - text.length) / 2);
-    for (let i = 0; i < typed; i++) at(start + i, y0 + 1, text[i], WHITE);
-    if (typed < text.length && Math.floor(time * 6) % 2 === 0) {
-      at(start + typed, y0 + 1, "_", WHITE);
-    }
-  }
-
-  function gearSpec(look: Look): ModelSpec {
-    const green = toRgb(look.accent);
-    const body = toRgb(look.body);
-    let spin = 0;
+  function gearSpec(): ModelSpec {
     let cos = 1;
     let sin = 0;
-    /* The gear turns on its own axle; the view turns around it too. */
-    const turned = (x: number, y: number): [number, number] => [
-      x * cos + y * sin,
-      -x * sin + y * cos,
-    ];
     return {
-      /* A tooth tip's outer corner is 1.25 from the axle; the room past it
-         draws the gear smaller, level with the other models. */
-      radius: 1.5,
+      /* A tooth tip's outer corner, from the axle. */
+      radius: 1.1,
       restYaw: 0.5,
       restTilt: 0.45,
-      /* Still frames land on "Are you sure?", fully typed. */
-      stillTime: 5000,
       frame(time) {
-        spin = time * 0.8;
-        cos = Math.cos(spin);
-        sin = Math.sin(spin);
+        cos = Math.cos(time * 0.8);
+        sin = Math.sin(time * 0.8);
       },
-      field(x, y, z) {
-        const [gx, gy] = turned(x, y);
-        /* The teeth bend the distance, so steps are shortened to stay safe. */
-        return gear(gx, gy, z) * 0.8;
-      },
-      tint(x, y, z) {
-        const onHub =
-          Math.hypot(x, y) < GEAR.hubRadius + 0.02 &&
-          Math.abs(z) > GEAR.thickness - 0.01;
-        return onHub ? green : body;
-      },
-      /* A 6.2s cycle: "? ? ?" above the gear, then "Are you sure?" below. */
-      overlay(grid, time) {
-        const T = time % 6.2;
-        const cx = (grid.centerX - grid.ox) / grid.cw;
-        const cy = (grid.centerY - grid.oy) / grid.ch;
-        const reachX = (1.25 * grid.scale) / grid.cw;
-        const reachY = (1.25 * grid.scale) / grid.ch;
-        const x0 = Math.max(
-          0,
-          Math.min(grid.cols - 17, Math.round(cx + 0.35 * reachX)),
-        );
-        const topY = Math.max(0, Math.round(cy - 0.9 * reachY));
-        const lowY = Math.min(grid.rows - 3, Math.round(cy + 0.55 * reachY));
-        const fade = (from: number, to: number, out: number, end: number) =>
-          T < from
-            ? 0
-            : T < to
-              ? (T - from) / (to - from)
-              : T < out
-                ? 1
-                : T < end
-                  ? 1 - (T - out) / (end - out)
-                  : 0;
-        const askA = fade(0.4, 0.8, 2.7, 3.1);
-        const typedA =
-          T < 0.9 ? 0 : Math.min(5, Math.floor((T - 0.9) / 0.35) * 2 + 1);
-        bubble(grid, x0, topY, askA, "? ? ?", typedA, false, time, green);
-        const askB = fade(3.1, 3.5, 5.7, 6.1);
-        const typedB = T < 3.6 ? 0 : Math.min(13, Math.floor((T - 3.6) / 0.07));
-        bubble(
-          grid,
-          x0,
-          lowY,
-          askB,
-          "Are you sure?",
-          typedB,
-          true,
-          time,
-          green,
-        );
-      },
+      /* The teeth bend the distance, so steps are shortened to stay safe. */
+      field: (x, y, z) => gear(x * cos + y * sin, -x * sin + y * cos, z) * 0.8,
     };
   }
 
   /* ---------- Tractor ---------- */
 
   const TYRE = 0;
-  const RIM = 1;
-  const PANEL = 2;
-  const DARK = 3;
-  const LAMP = 4;
-  const LAMP_LIGHT: Rgb = [255, 246, 205];
+  const HUB = 1;
+  const PAINT = 2;
+  const METAL = 3;
 
-  /* A box centred on (cx, cy, cz), half-extents (hx, hy, hz) plus a rounding
-     of r added all round. */
+  /* A box centred on (cx, cy, cz), half-extents (hx, hy, hz), corners
+     rounded by r. */
   const box = (
     x: number,
     y: number,
@@ -375,9 +133,12 @@ const {
     hy: number,
     hz: number,
     r: number,
-  ) => roundBox(x - cx, y - cy, z - cz, hx + r, hy + r, hz + r, r);
+  ) => roundBox(x - cx, y - cy, z - cz, hx, hy, hz, r);
 
-  const ball = (
+  /* A wheel with its axle along z: a plain tyre with a hub disc standing
+     out of its face. Sets `wheelPart` to the tyre or the hub. */
+  let wheelPart = TYRE;
+  function wheel(
     x: number,
     y: number,
     z: number,
@@ -385,47 +146,20 @@ const {
     cy: number,
     cz: number,
     r: number,
-  ) => Math.hypot(x - cx, y - cy, z - cz) - r;
-
-  /* A wheel on an axle along z at (u, v, w) from its centre: a treaded tyre
-     of radius R around a dished rim with three spokes and a domed hub,
-     turned by `turn`. Sets `wheelPart` to the tyre or the rim. */
-  let wheelPart = TYRE;
-  function wheel(
-    u: number,
-    v: number,
-    w: number,
-    R: number,
-    halfWidth: number,
-    turn: number,
+    half: number,
   ) {
-    const bound = Math.hypot(u, v, w) - (R + 0.1);
-    wheelPart = TYRE;
-    if (bound > 0.22) return bound;
-    const r = Math.hypot(u, v);
-    const a = Math.atan2(v, u) + turn;
-    const tread = Math.cos(14 * a) > 0.1 ? 0.04 : 0;
-    const tyre = extrude(r - (R + tread), w, halfWidth);
-    const dish = extrude(
-      Math.max(r - 0.8 * R, 0.36 * R - r),
-      w,
-      halfWidth + 0.2,
-    );
-    const face = halfWidth - 0.07 - Math.abs(w);
-    const spokes = r * Math.abs(Math.sin(3 * a)) * 0.6 - 0.07;
-    let d = Math.max(tyre, -Math.max(dish, Math.max(face, -spokes)));
-    d = Math.min(d, Math.hypot(u, v, w) - 0.2 * R);
-    if (r <= 0.83 * R) wheelPart = RIM;
-    return d;
+    const radial = Math.hypot(x - cx, y - cy);
+    const tyre = extrude(radial - r, z - cz, half);
+    const hub = extrude(radial - r * 0.5, z - cz, half + 0.03);
+    wheelPart = hub < tyre - 0.005 || radial < r * 0.5 ? HUB : TYRE;
+    return Math.min(tyre, hub);
   }
 
-  /* A tractor facing +x with its wheels on y = 0: chassis, rounded hood,
-     grille and headlights, fenders over the big rear wheels, an open cab of
-     four pillars and a roof round a seat and a tilted steering wheel, and an
-     exhaust stack. `turn` spins the wheels, the small front ones faster.
-     Sets `part` to what the nearest surface is. Distances in model units. */
-  let part = PANEL;
-  function tractor(x: number, y: number, z: number, turn: number) {
+  /* A tractor facing +x, centred on its own middle: a long hood, a cab with
+     its sides open under a roof, big rear wheels and small front ones, and
+     an exhaust stack. Sets `part` to what the nearest surface is. */
+  let part = PAINT;
+  function tractor(x: number, y: number, z: number) {
     let best = Infinity;
     const add = (d: number, kind: number) => {
       if (d < best) {
@@ -433,437 +167,60 @@ const {
         part = kind;
       }
     };
-    add(box(x, y, z, 0.15, 0.68, 0, 1.35, 0.12, 0.33, 0.03), DARK);
-    add(box(x, y, z, 0.85, 1.06, 0, 0.62, 0.28, 0.36, 0.09), PANEL);
-    add(box(x, y, z, 1.5, 1.0, 0, 0.04, 0.2, 0.28, 0.02), DARK);
-    add(ball(x, y, z, 1.53, 1.22, 0.22, 0.07), LAMP);
-    add(ball(x, y, z, 1.53, 1.22, -0.22, 0.07), LAMP);
-    add(box(x, y, z, -0.55, 1.06, 0, 0.62, 0.22, 0.42, 0.05), PANEL);
-    for (const [px, pz] of [
-      [-1.13, 0.4],
-      [-1.13, -0.4],
-      [0.03, 0.4],
-      [0.03, -0.4],
-    ]) {
-      add(box(x, y, z, px, 1.7, pz, 0.035, 0.42, 0.035, 0.01), PANEL);
-    }
-    add(box(x, y, z, -0.55, 2.15, 0, 0.72, 0.045, 0.5, 0.03), PANEL);
-    add(box(x, y, z, -0.75, 1.45, 0, 0.16, 0.17, 0.2, 0.04), DARK);
-    add(box(x, y, z, -0.93, 1.72, 0, 0.04, 0.22, 0.2, 0.03), DARK);
-    const sx = x + 0.2;
-    const sy = y - 1.62;
-    const along = 0.62 * sx + 0.78 * sy;
-    const across = -0.78 * sx + 0.62 * sy;
-    add(Math.hypot(Math.hypot(across, z) - 0.17, along) - 0.025, DARK);
-    add(extrude(Math.hypot(x - 0.72, z - 0.16) - 0.055, y - 1.83, 0.52), DARK);
-    add(ball(x, y, z, 0.72, 2.36, 0.16, 0.08), DARK);
-    add(box(x, y, z, -0.85, 1.52, 0.62, 0.45, 0.035, 0.2, 0.02), PANEL);
-    add(box(x, y, z, -0.85, 1.52, -0.62, 0.45, 0.035, 0.2, 0.02), PANEL);
-    const front = (turn * 0.75) / 0.42;
+    add(box(x, y, z, 0.15, -0.2, 0, 1.0, 0.12, 0.32, 0.03), METAL);
+    add(box(x, y, z, 0.55, 0.12, 0, 0.55, 0.24, 0.3, 0.08), PAINT);
+    let cab = box(x, y, z, -0.48, 0.32, 0, 0.36, 0.42, 0.36, 0.05);
+    cab = Math.max(cab, -box(x, y, z, -0.48, 0.42, 0, 0.27, 0.24, 0.5, 0.02));
+    add(cab, PAINT);
+    add(box(x, y, z, -0.48, 0.78, 0, 0.44, 0.05, 0.42, 0.03), PAINT);
+    add(extrude(Math.hypot(x - 0.6, z - 0.12) - 0.05, y - 0.55, 0.22), METAL);
     for (const side of [1, -1]) {
-      add(
-        wheel(x + 0.85, y - 0.75, z - side * 0.62, 0.75, 0.16, turn),
-        wheelPart,
-      );
-      add(
-        wheel(x - 1.15, y - 0.42, z - side * 0.5, 0.42, 0.11, front),
-        wheelPart,
-      );
+      add(wheel(x, y, z, -0.6, -0.42, side * 0.5, 0.48, 0.15), wheelPart);
+      add(wheel(x, y, z, 0.78, -0.58, side * 0.42, 0.3, 0.11), wheelPart);
     }
     return best;
   }
 
-  /* Red paint, grey metal and rubber, as in the original tractor. */
+  /* Red paint matched to the brand green's strength, dark rubber, light
+     grey hubs and metal. */
   function tractorSpec(look: Look): ModelSpec {
     const colors: Rgb[] = [
       [82, 82, 90],
       [208, 208, 215],
       toRgb(look.accent),
-      [125, 125, 134],
+      [150, 150, 158],
     ];
-    let turn = 0;
     return {
       /* The rear tyres' outer edges, from the middle it turns about. */
-      radius: 1.92,
-      pivot: [0, 1.1, 0],
-      restYaw: -0.9,
-      restTilt: 0.34,
-      frame(time) {
-        turn = time * 3;
-      },
-      field(x, y, z) {
-        /* The treads bend the distance, so steps are shortened to stay safe. */
-        return tractor(x, y, z, turn) * 0.8;
-      },
-      glow(x, y, z, _time, paint) {
-        tractor(x, y, z, turn);
-        if (part !== LAMP) return false;
-        paint.color = LAMP_LIGHT;
-        paint.brightness = 0.9;
-        return true;
-      },
+      radius: 1.4,
+      restYaw: -0.6,
+      restTilt: 0.32,
+      field: (x, y, z) => tractor(x, y, z),
       tint(x, y, z) {
-        tractor(x, y, z, turn);
+        tractor(x, y, z);
         return colors[part];
-      },
-    };
-  }
-
-  /* ---------- Controls ---------- */
-
-  /* A control deck in the cockpit style, meant to look hard to use: a brown
-     case whose recessed face is split into six cells by raised ribs, holding
-     gauges, lamps, toggle switches, throttle levers and lit push buttons,
-     nearly all of them moving. Few, large parts, so each still reads at the
-     page's glyph size, and the face is on top, so it stays in view as the
-     model turns. Distances in model units; the face is at y = FACE. */
-  const FACE = -0.02;
-  const D_CASE = 0;
-  const D_METAL = 1;
-  const D_DARK = 2;
-  const D_BUTTON = 3;
-  const D_LAMP = 4;
-  const RED: Rgb = [209, 64, 45];
-  const AMBER: Rgb = [242, 170, 58];
-
-  /* Gauges as [x, z, radius, speed, phase]. */
-  const GAUGES = [
-    [-0.55, -0.32, 0.25, 0.8, 0],
-    [0.55, -0.32, 0.25, 0.55, 2.1],
-    [-0.13, -0.42, 0.12, 1.6, 1.2],
-    [0.13, -0.42, 0.12, 1.2, 4],
-  ];
-  const LAMPS = [
-    [-0.15, -0.16],
-    [0, -0.16],
-    [0.15, -0.16],
-  ];
-  const TOGGLES = [-0.72, -0.55, -0.38];
-  const THROTTLES = [-0.11, 0.11];
-  const BUTTONS = [0.18, 0.42].flatMap((bz) =>
-    [0.44, 0.66].map((bx) => [bx, bz]),
-  );
-  const ROW = 0.3;
-
-  /* Distance to a rod from a to b of radius r. */
-  function capsule(
-    x: number,
-    y: number,
-    z: number,
-    a: [number, number, number],
-    b: [number, number, number],
-    r: number,
-  ) {
-    const px = x - a[0];
-    const py = y - a[1];
-    const pz = z - a[2];
-    const dx = b[0] - a[0];
-    const dy = b[1] - a[1];
-    const dz = b[2] - a[2];
-    const h = clamp(
-      (px * dx + py * dy + pz * dz) / (dx * dx + dy * dy + dz * dz),
-      0,
-      1,
-    );
-    return Math.hypot(px - dx * h, py - dy * h, pz - dz * h) - r;
-  }
-
-  /* Distance to a box, for skipping a cell's detail while far from it. */
-  const bounds = (
-    x: number,
-    y: number,
-    z: number,
-    cx: number,
-    cy: number,
-    cz: number,
-    hx: number,
-    hy: number,
-    hz: number,
-  ) => roundBox(x - cx, y - cy, z - cz, hx, hy, hz, 0);
-
-  /* Moving parts, set once per frame. */
-  const deck = {
-    needles: GAUGES.map(() => 0.5),
-    toggles: TOGGLES.map(() => 0.5),
-    throttles: THROTTLES.map(() => 0),
-    buttons: BUTTONS.map(() => false),
-    lamps: LAMPS.map(() => false),
-  };
-
-  /* A switch that flips every `period` seconds, snapping over 0.12s. */
-  function flip(t: number, period: number, phase: number) {
-    const u = (t + phase) / period;
-    const side = Math.floor(u) % 2 === 0 ? 1 : -1;
-    const snap = clamp(((u - Math.floor(u)) * period) / 0.12, 0, 1);
-    return 0.5 * side * (2 * snap - 1);
-  }
-
-  function deckFrame(t: number) {
-    GAUGES.forEach(([, , , speed, phase], i) => {
-      deck.needles[i] = clamp(
-        0.5 +
-          0.3 * Math.sin(t * speed + phase) +
-          0.08 * Math.sin(t * speed * 3.7 + phase * 2),
-        0.03,
-        0.97,
-      );
-    });
-    deck.toggles = TOGGLES.map((_, i) => flip(t, 2.1 + i * 0.9, i * 1.7));
-    deck.throttles = THROTTLES.map(
-      (_, i) => 0.3 * Math.sin(t * (0.55 + i * 0.3) + i * 2),
-    );
-    deck.buttons = BUTTONS.map(
-      (_, i) => Math.floor(t * (0.8 + i * 0.35) + i * 1.9) % 3 !== 0,
-    );
-    deck.lamps = LAMPS.map(
-      (_, i) => Math.floor(t * (1.8 + i * 0.7) + i) % 2 === 0,
-    );
-  }
-
-  /* A toggle switch at (cx, cz): a round nut and a lever leaning `angle`
-     toward +z, with a ball on its tip. */
-  function toggleSwitch(
-    x: number,
-    y: number,
-    z: number,
-    cx: number,
-    cz: number,
-    angle: number,
-  ) {
-    const nut = extrude(
-      Math.hypot(x - cx, z - cz) - 0.065,
-      y - (FACE + 0.02),
-      0.02,
-    );
-    const tip: [number, number, number] = [
-      cx,
-      FACE + 0.04 + 0.24 * Math.cos(angle),
-      cz + 0.24 * Math.sin(angle),
-    ];
-    const lever = capsule(x, y, z, [cx, FACE + 0.04, cz], tip, 0.035);
-    const ball = Math.hypot(x - tip[0], y - tip[1], z - tip[2]) - 0.05;
-    return Math.min(nut, lever, ball);
-  }
-
-  /* Sets `deckPart` to what the nearest surface is, and `deckIndex` to
-     which one for buttons and lamps. */
-  let deckPart = D_CASE;
-  let deckIndex = 0;
-  function controls(x: number, y: number, z: number) {
-    let best = Infinity;
-    const add = (d: number, kind: number, index = 0) => {
-      if (d < best) {
-        best = d;
-        deckPart = kind;
-        deckIndex = index;
-      }
-    };
-
-    /* The case, its face sunk inside a rim and cut with slots for the
-       levers; ribs split the face into cells; a screw in each corner. */
-    let body = roundBox(x, y + 0.21, z, 0.85, 0.21, 0.65, 0.04);
-    body = Math.max(body, -roundBox(x, y, z, 0.815, 0.02, 0.615, 0.01));
-    for (const lx of THROTTLES) {
-      body = Math.max(
-        body,
-        -roundBox(x - lx, y - FACE, z - ROW, 0.045, 0.06, 0.2, 0.012),
-      );
-    }
-    add(body, D_CASE);
-    for (const rx of [-0.275, 0.275]) {
-      add(
-        roundBox(x - rx, y - FACE - 0.01, z, 0.014, 0.01, 0.615, 0.005),
-        D_CASE,
-      );
-    }
-    add(
-      roundBox(x, y - FACE - 0.01, z + 0.02, 0.815, 0.01, 0.014, 0.005),
-      D_CASE,
-    );
-    for (const sx of [-0.79, 0.79]) {
-      for (const sz of [-0.59, 0.59]) {
-        add(Math.hypot(x - sx, y - FACE, z - sz) - 0.03, D_METAL);
-      }
-    }
-
-    /* Everything else stands on the face. */
-    if (y > 0.45 || y < FACE - 0.2) return best;
-
-    if (bounds(x, y, z, 0, FACE + 0.04, -0.32, 0.82, 0.06, 0.3) < 0.05) {
-      for (const [gx, gz, r] of GAUGES) {
-        const ring = Math.abs(Math.hypot(x - gx, z - gz) - r) - r * 0.1;
-        add(extrude(ring, y - (FACE + 0.025), 0.025), D_METAL);
-      }
-      LAMPS.forEach(([lx, lz], i) =>
-        add(Math.hypot(x - lx, y - FACE, z - lz) - 0.05, D_LAMP, i),
-      );
-    }
-
-    if (bounds(x, y, z, -0.55, FACE + 0.15, ROW, 0.26, 0.22, 0.3) < 0.05) {
-      TOGGLES.forEach((tx, i) =>
-        add(toggleSwitch(x, y, z, tx, ROW, deck.toggles[i]), D_METAL),
-      );
-    }
-
-    if (bounds(x, y, z, 0, FACE + 0.15, ROW, 0.24, 0.4, 0.34) < 0.05) {
-      THROTTLES.forEach((lx, i) => {
-        const a = deck.throttles[i];
-        const pivot = FACE - 0.15;
-        const top: [number, number, number] = [
-          lx,
-          pivot + 0.44 * Math.cos(a),
-          ROW + 0.44 * Math.sin(a),
-        ];
-        add(capsule(x, y, z, [lx, pivot, ROW], top, 0.035), D_DARK);
-        add(
-          roundBox(x - top[0], y - top[1], z - top[2], 0.1, 0.055, 0.07, 0.022),
-          D_METAL,
-        );
-      });
-    }
-
-    if (bounds(x, y, z, 0.55, FACE + 0.04, ROW, 0.24, 0.06, 0.26) < 0.05) {
-      BUTTONS.forEach(([bx, bz], i) =>
-        add(
-          roundBox(x - bx, y - FACE - 0.04, z - bz, 0.09, 0.04, 0.09, 0.02),
-          D_BUTTON,
-          i,
-        ),
-      );
-    }
-    return best;
-  }
-
-  /* A gauge face at (dx, dz) from its centre, as a share of its radius:
-     ticks and a green, amber, red band round a 270° sweep, the needle at
-     `value`, and a hub. Returns false for the black face between them. */
-  function gaugeFace(
-    dx: number,
-    dz: number,
-    value: number,
-    paint: Paint,
-    band: Rgb[],
-    hub: Rgb,
-  ) {
-    const rho = Math.hypot(dx, dz);
-    const angle = (Math.atan2(dx, -dz) * 180) / Math.PI;
-    const needle = ((-135 + value * 270) * Math.PI) / 180;
-    const nx = Math.sin(needle);
-    const nz = -Math.cos(needle);
-    const along = clamp(dx * nx + dz * nz, -0.15, 0.85);
-    if (rho < 0.16) {
-      paint.color = hub;
-      paint.brightness = 0.7;
-      return true;
-    }
-    if (Math.hypot(dx - nx * along, dz - nz * along) < 0.09) {
-      paint.color = WHITE;
-      paint.brightness = 1;
-      return true;
-    }
-    if (Math.abs(angle) > 135) return false;
-    const u = (angle + 135) / 270;
-    const tick = u * 8;
-    if (rho > 0.72 && rho < 0.93 && Math.abs(tick - Math.round(tick)) < 0.2) {
-      paint.color = WHITE;
-      paint.brightness = 0.85;
-      return true;
-    }
-    if (rho > 0.52 && rho < 0.68) {
-      paint.color = u < 0.6 ? band[0] : u < 0.82 ? band[1] : band[2];
-      paint.brightness = 0.85;
-      return true;
-    }
-    return false;
-  }
-
-  /* Brown case, a faint flat face, silver metal, dark lever shafts, and
-     buttons and lamps that light green, amber or red. */
-  function controlsSpec(look: Look): ModelSpec {
-    const green = toRgb(look.accent);
-    const metal: Rgb = [210, 210, 216];
-    const plate: Rgb = [168, 120, 84];
-    const shades: Rgb[] = [
-      [170, 118, 80],
-      metal,
-      [58, 48, 42],
-      [80, 66, 56],
-      [80, 66, 56],
-    ];
-    const band = [green, AMBER, RED];
-    return {
-      /* The case's bottom corners, from the middle it turns about. */
-      radius: 1.12,
-      pivot: [0, -0.08, 0],
-      restYaw: 0.45,
-      restTilt: 0.95,
-      frame: deckFrame,
-      field: (x, y, z) => controls(x, y, z),
-      glow(x, y, z, _time, paint) {
-        controls(x, y, z);
-        if (deckPart === D_CASE && y < FACE + 0.006) {
-          for (let i = 0; i < GAUGES.length; i++) {
-            const [gx, gz, r] = GAUGES[i];
-            if (Math.hypot(x - gx, z - gz) >= r * 0.9) continue;
-            const dx = (x - gx) / r;
-            const dz = (z - gz) / r;
-            if (!gaugeFace(dx, dz, deck.needles[i], paint, band, metal)) {
-              paint.color = WHITE;
-              paint.brightness = 0;
-            }
-            return true;
-          }
-          /* The bare face is drawn flat and faint, so the controls stand out. */
-          if (Math.abs(x) < 0.815 && Math.abs(z) < 0.615) {
-            paint.color = plate;
-            paint.brightness = 0.2;
-            return true;
-          }
-          return false;
-        }
-        if (
-          deckPart === D_BUTTON &&
-          y > FACE + 0.07 &&
-          deck.buttons[deckIndex]
-        ) {
-          paint.color = deckIndex === 1 ? green : deckIndex === 2 ? RED : AMBER;
-          paint.brightness = 0.95;
-          return true;
-        }
-        if (deckPart === D_LAMP && deck.lamps[deckIndex]) {
-          paint.color = band[deckIndex];
-          paint.brightness = 1;
-          return true;
-        }
-        return false;
-      },
-      tint(x, y, z) {
-        controls(x, y, z);
-        return shades[deckPart];
       },
     };
   }
 
   mountModels(".ascii-model_wrap", ".ascii-model_canvas", (look, wrap) =>
     wrap.dataset.model === "gear"
-      ? gearSpec(look)
+      ? gearSpec()
       : wrap.dataset.model === "tractor"
         ? tractorSpec(look)
-        : wrap.dataset.model === "controls"
-          ? controlsSpec(look)
-          : monitorSpec(look),
+        : smileySpec(look),
   );
 </script>
 
 <style is:global>
   @layer components {
+    /* Fills the box it is given; the model fits inside from every angle. */
     .ascii-model_wrap {
       --_body: var(--light-200);
       --_accent: var(--brand-500);
-      --_screen: var(--blue-500);
       --_glyph-font: var(--font-jetbrains-mono, monospace);
       width: 100%;
-      height: 35rem;
+      height: 100%;
 
       &[data-model="tractor"] {
         --_accent: var(--red-500);
@@ -874,12 +231,6 @@ const {
       display: block;
       width: 100%;
       height: 100%;
-      cursor: grab;
-      touch-action: pan-y;
-
-      &.dragging {
-        cursor: grabbing;
-      }
     }
   }
 </style>

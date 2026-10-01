@@ -226,6 +226,10 @@
   padding-top: var(--section-space-large);
 }
 
+.padding-top-xlarge {
+  padding-top: var(--section-space-xlarge);
+}
+
 .padding-top-navoverlap {
   padding-top: var(--section-space-nav-overlap);
 }
@@ -285,6 +289,10 @@
 
 .padding-bottom-large {
   padding-bottom: var(--section-space-large);
+}
+
+.padding-bottom-xlarge {
+  padding-bottom: var(--section-space-xlarge);
 }
 
 .padding-bottom-navoverlap {
@@ -909,7 +917,11 @@
 }
 
 .color-faded {
-  color: color-mix(in srgb, currentColor 70%, transparent);
+  color: color-mix(in srgb, currentColor 60%, transparent);
+}
+
+.color-muted {
+  color: color-mix(in srgb, currentColor 30%, transparent);
 }
 
 /* Background & radius */
@@ -985,6 +997,10 @@
 
 .overflow-clip {
   overflow: clip;
+}
+
+.overflow-x-clip {
+  overflow-x: clip;
 }
 
 .overflow-x-auto {

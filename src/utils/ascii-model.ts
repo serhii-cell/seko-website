@@ -1,10 +1,10 @@
 /**
  * Renders a 3D model as glyphs: rays marched through a signed-distance field,
  * lit, dithered onto the page's one glyph grid, and fitted so the whole model
- * stays inside its canvas from every angle it can be turned to. Each ASCII
- * model component describes only its shape, colours and extras in a
- * `ModelSpec`; drag-to-rotate, the idle spin, pausing off screen and sizing
- * all happen here.
+ * stays inside its canvas from every angle it sways to. Each ASCII model
+ * component describes only its shape, colours and extras in a `ModelSpec`;
+ * the sway, the cursor's torch, pausing off screen and sizing all happen
+ * here.
  */
 import { onPage } from "@/utils/lifecycle.ts";
 import {
@@ -16,8 +16,9 @@ import {
   measureRamp,
   pickGlyph,
   createController,
-  createOrbit,
+  createTorch,
   rotation,
+  sway,
   LIGHT,
   HALF,
   KEY,
@@ -148,7 +149,7 @@ export function createModelView(
     if (!grid) return;
     const { cols, rows, cw, ch, ox, oy, scale, centerX, centerY } = grid;
     spec.frame?.(time);
-    R = rotation(spec.restYaw + orbit.yaw(), spec.restTilt + orbit.pitch());
+    R = rotation(spec.restYaw + sway(time), spec.restTilt);
     kind.fill(0);
     const e = 0.004;
     for (let gy = 0; gy < rows; gy++) {
@@ -249,7 +250,8 @@ export function createModelView(
         const i = gy * cols + gx;
         const k = kind[i];
         if (!k) continue;
-        const b = brightness[i];
+        let b = brightness[i];
+        if (b <= 0.003) continue;
         let color = colors[i];
         if (k === LIT && specular[i] > 0.3) {
           color = mix(
@@ -258,11 +260,20 @@ export function createModelView(
             Math.min(1, (specular[i] - 0.3) * 1.3) * 0.7,
           );
         }
+        let boost = 0;
+        if (torch.lit()) {
+          ({ b, color, boost } = torch.light(
+            ox + gx * cw + cw / 2,
+            oy + gy * ch + ch / 2,
+            b,
+            color,
+          ));
+        }
         const glyphChar = pickGlyph(ramp, coverage, b, gx, gy);
         if (glyphChar === " ") continue;
         /* Glowing surfaces keep their full colour; lit ones are shaded. */
-        const lum = k === GLOWING ? 1 : 0.55 + 0.45 * b;
-        context.fillStyle = `rgb(${(color[0] * lum) | 0},${(color[1] * lum) | 0},${(color[2] * lum) | 0})`;
+        const lum = Math.min(1.25, (k === GLOWING ? 1 : 0.55 + 0.45 * b) + boost);
+        context.fillStyle = `rgb(${Math.min(255, color[0] * lum) | 0},${Math.min(255, color[1] * lum) | 0},${Math.min(255, color[2] * lum) | 0})`;
         context.fillText(glyphChar, ox + gx * cw, oy + gy * ch);
       }
     }
@@ -349,7 +360,7 @@ export function createModelView(
     if (simTime - lastStep < 42) return;
     const dt = Math.min(0.1, (simTime - lastStep) / 1000);
     lastStep = simTime;
-    orbit.step(dt);
+    torch.step(dt);
     render();
   }
   function play() {
@@ -365,7 +376,13 @@ export function createModelView(
     if (frame || !grid) return;
     render();
   }
-  const orbit = createOrbit(canvas, motion, spec.restTilt, () => still());
+  /* The light follows the cursor over the nearest `data-torch` area, such as
+     the card the model sits in, or over the model's own box. */
+  const torch = createTorch(
+    canvas.closest<HTMLElement>("[data-torch]") ?? canvas.parentElement ?? canvas,
+    canvas,
+    motion,
+  );
 
   watchSize();
   const observer = new ResizeObserver(() => {
@@ -380,7 +397,7 @@ export function createModelView(
   return () => {
     pause();
     observer.disconnect();
-    orbit.destroy();
+    torch.destroy();
     controller.destroy();
     pageGlyph.listeners.delete(onGlyph);
   };

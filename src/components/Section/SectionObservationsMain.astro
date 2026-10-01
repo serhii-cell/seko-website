@@ -1,0 +1,375 @@
+---
+import Section from "@/components/Wrapper/Section.astro";
+import Heading from "@/components/Typography/Heading.astro";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+import Chart from "@/assets/charts/product-complexity.svg";
+import Point from "@/assets/charts/point.svg";
+
+interface Props {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** The small label beside the statement. */
+  label?: string;
+  /** The statement. Nothing is output without it. */
+  heading?: string;
+  /** The label beside the chart. The chart is left out without it. */
+  chartLabel?: string;
+}
+
+const { render = true, label, heading, chartLabel } = Astro.props;
+
+/* Positions on the 950 × 200 chart, as drawn: the time axis along the top
+   40px, and below it a 950 × 160 plot with a divider at each period, an
+   issue tag over a point on the curve in each, and the curve itself. */
+const ticks = [
+  { text: "Product launch", x: 0 },
+  { text: "6 months", x: 204 },
+  { text: "12 months", x: 438 },
+  { text: "18 months", x: 691 },
+  { text: "24 months", x: 874 },
+];
+const dividers = [0, 238, 475, 728, 949];
+const issues = [
+  { text: "Incoherent design system", x: 39, y: 82, px: 118, py: 125 },
+  { text: "UI errors", x: 323, y: 65, px: 357, py: 108 },
+  { text: "Different UX patterns", x: 535, y: 49, px: 602, py: 92 },
+  { text: "Growing design debt", x: 773, y: 28, px: 839, py: 71 },
+];
+const at = (x: number, y: number) =>
+  `left: ${(x / 950) * 100}%; top: ${(y / 160) * 100}%`;
+---
+
+{
+  render && heading && (
+    <Section class="observations-main_wrap">
+      <div class="observations-main_content">
+        <div class="observations-main_row">
+          <Paragraph
+            variant="mono"
+            class="observations-main_label color-faded"
+            render={!!label}
+          >
+            {label}
+          </Paragraph>
+          <Heading tag="h2" class="observations-main_heading">
+            {heading}
+          </Heading>
+        </div>
+        {chartLabel && (
+          <div class="observations-main_row">
+            <Paragraph
+              variant="mono"
+              class="observations-main_label observations-main_chart-label"
+            >
+              {chartLabel}
+            </Paragraph>
+            <div class="observations-main_scroll">
+              <div class="observations-main_chart">
+                <div class="observations-main_ticks">
+                  {ticks.map((tick) => (
+                    <span
+                      class="observations-main_tick color-muted"
+                      style={`left: ${(tick.x / 950) * 100}%`}
+                    >
+                      {tick.text}
+                    </span>
+                  ))}
+                </div>
+                <div class="observations-main_plot">
+                  <Chart class="observations-main_graph" />
+                  {dividers.map((x) => (
+                    <span class="observations-main_divider" style={at(x, 0)} />
+                  ))}
+                  {issues.map((issue) => (
+                    <>
+                      <Point
+                        class="observations-main_point"
+                        style={at(issue.px, issue.py)}
+                      />
+                      <span
+                        class="observations-main_issue"
+                        style={at(issue.x, issue.y)}
+                      >
+                        {issue.text}
+                      </span>
+                    </>
+                  ))}
+                  <span class="observations-main_runner" aria-hidden="true" />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </Section>
+  )
+}
+
+<script>
+  import { gsap } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  /* The curve, in the plot's 950 × 160 coordinates, left to right. */
+  const CURVE: [number, number][] = [
+    [1, 129],
+    [239, 120],
+    [476.5, 96.33],
+    [729.5, 88.33],
+    [950, 53],
+  ];
+  /* The runner goes on past the right edge, where the plot clips it. */
+  const END = 990;
+
+  const curveY = (x: number) => {
+    for (let i = 1; i < CURVE.length; i++) {
+      const [x1, y1] = CURVE[i];
+      if (x <= x1 || i === CURVE.length - 1) {
+        const [x0, y0] = CURVE[i - 1];
+        return y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
+      }
+    }
+    return CURVE[0][1];
+  };
+
+  /* A glowing dot runs along the curve from left to right, drawing it as it
+     goes; each issue's point pops in as the dot passes it, then its tag. The
+     dot leaves through the right edge, and what remains is the chart as
+     drawn. */
+  function buildTimeline(chart: HTMLElement) {
+    const plot = chart.querySelector<HTMLElement>(".observations-main_plot");
+    const runner = chart.querySelector<HTMLElement>(".observations-main_runner");
+    const points = gsap.utils.toArray<HTMLElement>(".observations-main_point", chart);
+    const issues = gsap.utils.toArray<HTMLElement>(".observations-main_issue", chart);
+    if (!plot || !runner) return null;
+
+    const travel = { x: 0 };
+    const place = () => {
+      runner.style.left = `${(travel.x / 950) * 100}%`;
+      runner.style.top = `${(curveY(travel.x) / 160) * 100}%`;
+      plot.style.setProperty("--_drawn", String(Math.min(1, travel.x / 950)));
+    };
+
+    const timeline = gsap.timeline({ paused: true });
+    timeline
+      .fromTo(runner, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.03 }, 0)
+      .fromTo(
+        travel,
+        { x: 0 },
+        { x: END, duration: 1, ease: "none", onUpdate: place },
+        0,
+      );
+    points.forEach((point, index) => {
+      const x = Number(point.dataset.x) || 0;
+      const time = x / END;
+      timeline
+        .fromTo(
+          point,
+          { scale: 0, autoAlpha: 0 },
+          { scale: 1, autoAlpha: 1, duration: 0.05, ease: "back.out(3)" },
+          time,
+        )
+        .fromTo(
+          issues[index],
+          { autoAlpha: 0, y: 6 },
+          { autoAlpha: 1, y: 0, duration: 0.06, ease: "power2.out" },
+          time + 0.015,
+        );
+    });
+    place();
+    return timeline;
+  }
+
+  function setUp(section: HTMLElement) {
+    const chart = section.querySelector<HTMLElement>(".observations-main_chart");
+    if (!chart) return () => {};
+    chart
+      .querySelectorAll<SVGElement>(".observations-main_point")
+      .forEach((point) => {
+        point.dataset.x = String(
+          (parseFloat(point.style.left) / 100) * 950,
+        );
+      });
+
+    const mm = gsap.matchMedia();
+    mm.add(
+      {
+        wide: "(width >= 64rem)",
+        motion: "(prefers-reduced-motion: no-preference)",
+      },
+      (context) => {
+        const { wide, motion } = context.conditions as {
+          wide: boolean;
+          motion: boolean;
+        };
+        if (!motion) return;
+        const timeline = buildTimeline(chart);
+        if (!timeline) return;
+        if (wide) {
+          /* The section fills the screen and holds while the dot runs, so
+             it is the only thing in view; scrolling drives the dot. */
+          const scrubbed = gsap.timeline({
+            scrollTrigger: {
+              trigger: section,
+              start: "top top",
+              end: () => `+=${innerHeight * 1.6}`,
+              pin: true,
+              /* Off by default inside a flex parent like <main>. */
+              pinSpacing: true,
+              scrub: 0.5,
+              invalidateOnRefresh: true,
+            },
+          });
+          scrubbed.to(timeline, { progress: 1, ease: "none", duration: 1 });
+          return () => {
+            scrubbed.scrollTrigger?.kill();
+            scrubbed.kill();
+            timeline.progress(1).kill();
+          };
+        }
+        /* Narrower, the dot runs once by itself when the chart comes in. */
+        const play = gsap.to(timeline, {
+          progress: 1,
+          duration: 2.6,
+          ease: "power1.inOut",
+          paused: true,
+          scrollTrigger: { trigger: chart, start: "top 80%", once: true },
+        });
+        return () => {
+          play.kill();
+          timeline.progress(1).kill();
+        };
+      },
+    );
+    return () => mm.revert();
+  }
+
+  onPage(() => {
+    const cleanups = [
+      ...document.querySelectorAll<HTMLElement>(".observations-main_wrap"),
+    ].map(setUp);
+    return () => cleanups.forEach((cleanup) => cleanup());
+  });
+</script>
+
+<style is:global>
+  @layer components {
+    /* A screen tall, its content in the middle, so while it holds nothing
+       else is in view. */
+    .observations-main_wrap {
+      min-height: 100svh;
+      padding-block: var(--section-space-medium);
+    }
+
+    .observations-main_content {
+      display: flex;
+      flex-direction: column;
+      gap: calc(var(--section-space-xlarge) / 2);
+      width: 100%;
+    }
+
+    /* A label in a narrow column, the content in a wide one, as drawn on
+       the 1640px working area: 260, a 154 gap, 950, then free space. */
+    .observations-main_row {
+      display: grid;
+      gap: var(--space-4);
+      @media (width >= 64rem) {
+        grid-template-columns:
+          minmax(0, 260fr) minmax(0, 154fr) minmax(0, 950fr)
+          minmax(0, 276fr);
+        & > :nth-child(2) {
+          grid-column: 3;
+        }
+      }
+    }
+
+    .observations-main_label,
+    .observations-main_heading {
+      margin: 0;
+    }
+
+    .observations-main_chart-label {
+      color: var(--brand-500);
+    }
+
+    /* Narrow screens scroll the chart sideways rather than squash it. */
+    .observations-main_scroll {
+      @media (width < 64rem) {
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+      }
+    }
+
+    .observations-main_chart {
+      min-width: 37.5rem;
+      font-size: 1rem;
+      line-height: var(--line-height-huge);
+    }
+
+    .observations-main_ticks {
+      position: relative;
+      height: 2.5rem;
+    }
+
+    .observations-main_tick {
+      position: absolute;
+      top: 0;
+      white-space: nowrap;
+    }
+
+    /* The plot clips the dot as it runs out past the right edge. */
+    .observations-main_plot {
+      --_drawn: 1;
+      position: relative;
+      aspect-ratio: 950 / 160;
+      overflow: hidden;
+    }
+
+    .observations-main_graph {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      /* The curve is drawn up to the running dot. */
+      & path {
+        clip-path: inset(0 calc((1 - var(--_drawn)) * 100%) 0 0);
+      }
+    }
+
+    .observations-main_divider {
+      position: absolute;
+      width: var(--border-width);
+      height: 100%;
+      background-color: var(--stroke);
+    }
+
+    .observations-main_point {
+      position: absolute;
+      translate: -50% -50%;
+    }
+
+    .observations-main_issue {
+      position: absolute;
+      padding: 0.25rem 0.625rem;
+      background-color: var(--background);
+      border: var(--border-width) solid var(--stroke);
+      border-radius: 0.125rem;
+      font-size: 0.75rem;
+      white-space: nowrap;
+    }
+
+    .observations-main_runner {
+      position: absolute;
+      left: 0;
+      top: 80%;
+      width: 0.75rem;
+      height: 0.75rem;
+      translate: -50% -50%;
+      border-radius: 50%;
+      background-color: var(--brand-500);
+      box-shadow:
+        0 0 0.5rem 0.125rem color-mix(in lab, var(--brand-500) 70%, transparent),
+        0 0 1.5rem 0.375rem color-mix(in lab, var(--brand-500) 35%, transparent);
+      visibility: hidden;
+    }
+  }
+</style>

@@ -1,11 +1,14 @@
 ---
 import Layout from "@/layouts/BaseLayout.astro";
-import SectionHeroMain from "@/components/Section/SectionHeroMain.astro";
 import Section from "@/components/Wrapper/Section.astro";
-import SectionProblemsMain from "@/components/Section/SectionProblemsMain.astro";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+import SectionHeroMain from "@/components/Section/SectionHeroMain.astro";
 import ContentLogosMain from "@/components/Content/ContentLogosMain.astro";
-import ContentStatementMain from "@/components/Content/ContentStatementMain.astro";
+import SectionObservationsMain from "@/components/Section/SectionObservationsMain.astro";
+import SectionHelpMain from "@/components/Section/SectionHelpMain.astro";
 import adaptive from "@/assets/clients/adaptive.svg";
+
+const logo = { src: adaptive, name: "Adaptive & Co" };
 ---
 
 <Layout
@@ -17,58 +20,52 @@ import adaptive from "@/assets/clients/adaptive.svg";
   <SectionHeroMain
     heading="Design agency that scales products to your ambitions."
     text="Seko is a strategic design partner for small teams. We learn your business and product, design solutions around its needs using a structure, that your team can keep building on."
-    buttonText="Book a Call"
+    facts={[
+      { label: "Areas", value: "SaaS, B2C, B2B" },
+      { label: "Happy clients", value: "50+" },
+    ]}
   />
 
   {/* Clients */}
-  <Section>
+  <Section class="overflow-x-clip">
     <ContentLogosMain
       text="Trusted by teams around the world"
-      logos={[
-        { src: adaptive, name: "Adaptive & Co" },
-        { src: adaptive, name: "Adaptive & Co" },
-        { src: adaptive, name: "Adaptive & Co" },
-        { src: adaptive, name: "Adaptive & Co" },
-        { src: adaptive, name: "Adaptive & Co" },
-      ]}
+      logos={[logo, logo, logo, logo, logo, logo]}
     />
   </Section>
 
-  {/* Statement */}
-  <Section>
-    <ContentStatementMain
-      heading="Every product carries the decisions of the team that builds it. Without consistent UX, those decisions drift apart, and after a year or two the product needs a redesign to feel whole again."
-    />
-  </Section>
+  {/* Observations */}
+  <SectionObservationsMain
+    label="Our observations"
+    heading="Every product carries the decisions of the team that builds it. Without consistency, those decisions drift apart, and after a year or two the product needs a redesign to feel whole again."
+    chartLabel="Product complexity"
+  />
 
-  {/* Problems */}
-  <SectionProblemsMain
-    problems={[
+  {/* Help */}
+  <SectionHelpMain
+    label="Common client issues"
+    heading="Where we can help your business"
+    issues={[
       {
         heading: "You have an advanced product behind a confusing interface",
-        text: [
-          "Your engineers built infrastructure that handles complexity and holds up under load. Interface clarity never got the same attention. So the product still needs explaining every time it meets someone new — in demos, support tickets, and the same questions your team answers every week.",
-          "We take on the UX/UI and make the product explain itself.",
-        ],
-        model: "controls",
+        text: "Your infrastructure handles complexity and holds up under load, but the interface never got the same attention. Now every new user means another demo, another support ticket, another round of last week's questions",
+        model: "smiley",
       },
       {
-        heading: "Every new feature you build restarts the same argument",
-        text: [
-          "The work was deliberate. The standard behind it was never set, so patterns contradict each other, developers make interface calls mid-sprint, and anyone joining the team spends their first months learning what isn't written anywhere.",
-          "We define the system: components, patterns, and the rules for using them, so the product stays consistent as it grows.",
-        ],
+        heading: "Every new feature you build restarts the same conversations",
+        text: "The work was deliberate. No standard held it together, so patterns contradict each other, developers make interface calls mid-sprint, and new hires spend a lot of time learning unwritten rules.",
         model: "gear",
       },
       {
-        heading:
-          "The product works. It doesn't look like it's worth what you charge",
-        text: [
-          "The functionality is solid. The interface still looks like a tool your team built for itself, and that's what buyers price against. Decisions take longer, more proof gets asked for, and prospects lean toward products that do less but feel finished.",
-          "We bring the interface up to the level the product is already at, so the value is visible without explaining it.",
-        ],
+        heading: "The product works. It doesn't look like it's worth what you charge",
+        text: "The interface still looks like an internal tool, and that's what buyers price against. Decisions take longer, prospects ask for more proof and lean toward products that do less but feel finished.",
         model: "tractor",
       },
     ]}
   />
+
+  {/* Placeholder: the next section, still to be designed */}
+  <Section fullHeight={true} align="center">
+    <Paragraph variant="mono" class="color-muted">Next section</Paragraph>
+  </Section>
 </Layout>

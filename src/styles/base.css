@@ -5,7 +5,9 @@
   --light-200: #ebebeb;
   --light-300: #d9d9d9;
   --dark-700: #2a2a2a;
+  --dark-750: #303030;
   --dark-800: #1f1f1f;
+  --dark-850: #141414;
   --dark-900: #101010;
   --brand-500: #79d12d;
   --brand-text: #000000;
@@ -14,14 +16,17 @@
 
   /* Typography primitives */
   --primary-family: var(--font-archivo, "Helvetica Neue", Arial, sans-serif);
+  --mono-family: var(--font-ibm-plex-mono, "IBM Plex Mono", ui-monospace, monospace);
   --primary-regular: 400;
   --primary-medium: 500;
+  --primary-semibold: 600;
   --primary-bold: 700;
   --primary-trim-top: 0.4em;
   --primary-trim-bottom: 0.38em;
 
   /* Letter spacing */
   --letter-spacing-tight: -0.02em;
+  --letter-spacing-snug: -0.01em;
   --letter-spacing-normal: 0em;
 
   /* Line height */
@@ -58,11 +63,11 @@
 
   /* Max width */
   --max-width-small: 70rem;
-  --max-width-main: 100rem;
+  --max-width-main: 102.5rem;
   --max-width-full: 100%;
 
   /* Nav */
-  --nav-height: 5rem;
+  --nav-height: 6.5rem;
 
   /* Typography styles */
   --display: clamp(var(--display-min) / 16 * 1rem, ((var(--display-min) - ((var(--display-max) - var(--display-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--display-max) - var(--display-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--display-max) / 16 * 1rem);
@@ -82,58 +87,58 @@
   --h1: clamp(var(--h1-min) / 16 * 1rem, ((var(--h1-min) - ((var(--h1-max) - var(--h1-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--h1-max) - var(--h1-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--h1-max) / 16 * 1rem);
   --h1-min: 34;
   --h1-max: 64;
-  --h1-line-height: 1.2;
-  --h1-letter-spacing: var(--letter-spacing-tight);
+  --h1-line-height: 1.1;
+  --h1-letter-spacing: var(--letter-spacing-snug);
   --h1-text-transform: none;
   --h1-margin-top: var(--space-7);
   --h1-margin-bottom: var(--space-6);
   --h1-font-family: var(--primary-family);
-  --h1-font-weight: var(--primary-regular);
+  --h1-font-weight: var(--primary-medium);
   --h1-trim-top: var(--primary-trim-top);
   --h1-trim-bottom: var(--primary-trim-bottom);
-  --h1-text-wrap: balance;
+  --h1-text-wrap: wrap;
 
   --h2: clamp(var(--h2-min) / 16 * 1rem, ((var(--h2-min) - ((var(--h2-max) - var(--h2-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--h2-max) - var(--h2-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--h2-max) / 16 * 1rem);
   --h2-min: 28;
-  --h2-max: 40;
-  --h2-line-height: 1.2;
-  --h2-letter-spacing: var(--letter-spacing-tight);
+  --h2-max: 44;
+  --h2-line-height: 1.3;
+  --h2-letter-spacing: var(--letter-spacing-snug);
   --h2-text-transform: none;
   --h2-margin-top: var(--space-7);
   --h2-margin-bottom: var(--space-7);
   --h2-font-family: var(--primary-family);
-  --h2-font-weight: var(--primary-regular);
+  --h2-font-weight: var(--primary-medium);
   --h2-trim-top: var(--primary-trim-top);
   --h2-trim-bottom: var(--primary-trim-bottom);
-  --h2-text-wrap: balance;
+  --h2-text-wrap: wrap;
 
   --h3: clamp(var(--h3-min) / 16 * 1rem, ((var(--h3-min) - ((var(--h3-max) - var(--h3-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--h3-max) - var(--h3-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--h3-max) / 16 * 1rem);
-  --h3-min: 36;
-  --h3-max: 48;
-  --h3-line-height: var(--line-height-medium);
-  --h3-letter-spacing: var(--letter-spacing-tight);
+  --h3-min: 24;
+  --h3-max: 32;
+  --h3-line-height: 1.2;
+  --h3-letter-spacing: var(--letter-spacing-normal);
   --h3-text-transform: none;
   --h3-margin-top: var(--space-6);
   --h3-margin-bottom: var(--space-5);
   --h3-font-family: var(--primary-family);
-  --h3-font-weight: var(--primary-medium);
+  --h3-font-weight: var(--primary-regular);
   --h3-trim-top: var(--primary-trim-top);
   --h3-trim-bottom: var(--primary-trim-bottom);
-  --h3-text-wrap: balance;
+  --h3-text-wrap: wrap;
 
   --h4: clamp(var(--h4-min) / 16 * 1rem, ((var(--h4-min) - ((var(--h4-max) - var(--h4-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--h4-max) - var(--h4-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--h4-max) / 16 * 1rem);
-  --h4-min: 28;
-  --h4-max: 32;
-  --h4-line-height: var(--line-height-medium);
-  --h4-letter-spacing: var(--letter-spacing-tight);
+  --h4-min: 20;
+  --h4-max: 24;
+  --h4-line-height: 1.3;
+  --h4-letter-spacing: var(--letter-spacing-normal);
   --h4-text-transform: none;
   --h4-margin-top: var(--space-6);
   --h4-margin-bottom: var(--space-4);
   --h4-font-family: var(--primary-family);
-  --h4-font-weight: var(--primary-medium);
+  --h4-font-weight: var(--primary-regular);
   --h4-trim-top: var(--primary-trim-top);
   --h4-trim-bottom: var(--primary-trim-bottom);
-  --h4-text-wrap: balance;
+  --h4-text-wrap: wrap;
 
   --h5: clamp(var(--h5-min) / 16 * 1rem, ((var(--h5-min) - ((var(--h5-max) - var(--h5-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--h5-max) - var(--h5-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--h5-max) / 16 * 1rem);
   --h5-min: 22;
@@ -179,7 +184,7 @@
 
   --text-main: clamp(var(--text-main-min) / 16 * 1rem, ((var(--text-main-min) - ((var(--text-main-max) - var(--text-main-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--text-main-max) - var(--text-main-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--text-main-max) / 16 * 1rem);
   --text-main-min: 16;
-  --text-main-max: 18;
+  --text-main-max: 16;
   --text-main-line-height: var(--line-height-huge);
   --text-main-letter-spacing: var(--letter-spacing-normal);
   --text-main-text-transform: none;
@@ -214,9 +219,6 @@
   --site-gutter-min: 16;
   --site-gutter-max: 32;
 
-  --content-inset: clamp(var(--content-inset-min) / 16 * 1rem, ((var(--content-inset-min) - ((var(--content-inset-max) - var(--content-inset-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--content-inset-max) - var(--content-inset-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--content-inset-max) / 16 * 1rem);
-  --content-inset-min: 20;
-  --content-inset-max: 64;
 
   --site-width: calc(100% - var(--site-margin) * 2);
   --layout-split: minmax(0, 11fr) minmax(0, 8fr);
@@ -247,6 +249,15 @@
   --space-8: clamp(var(--space-8-min) / 16 * 1rem, ((var(--space-8-min) - ((var(--space-8-max) - var(--space-8-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--space-8-max) - var(--space-8-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--space-8-max) / 16 * 1rem);
   --space-8-min: 40;
   --space-8-max: 64;
+  --space-9: clamp(var(--space-9-min) / 16 * 1rem, ((var(--space-9-min) - ((var(--space-9-max) - var(--space-9-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--space-9-max) - var(--space-9-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--space-9-max) / 16 * 1rem);
+  --space-9-min: 44;
+  --space-9-max: 56;
+  --space-10: clamp(var(--space-10-min) / 16 * 1rem, ((var(--space-10-min) - ((var(--space-10-max) - var(--space-10-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--space-10-max) - var(--space-10-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--space-10-max) / 16 * 1rem);
+  --space-10-min: 48;
+  --space-10-max: 72;
+  --space-11: clamp(var(--space-11-min) / 16 * 1rem, ((var(--space-11-min) - ((var(--space-11-max) - var(--space-11-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--space-11-max) - var(--space-11-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--space-11-max) / 16 * 1rem);
+  --space-11-min: 56;
+  --space-11-max: 96;
 
   --section-space-small: clamp(var(--section-space-small-min) / 16 * 1rem, ((var(--section-space-small-min) - ((var(--section-space-small-max) - var(--section-space-small-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--section-space-small-max) - var(--section-space-small-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--section-space-small-max) / 16 * 1rem);
   --section-space-small-min: 48;
@@ -257,6 +268,9 @@
   --section-space-large: clamp(var(--section-space-large-min) / 16 * 1rem, ((var(--section-space-large-min) - ((var(--section-space-large-max) - var(--section-space-large-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--section-space-large-max) - var(--section-space-large-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--section-space-large-max) / 16 * 1rem);
   --section-space-large-min: 88;
   --section-space-large-max: 160;
+  --section-space-xlarge: clamp(var(--section-space-xlarge-min) / 16 * 1rem, ((var(--section-space-xlarge-min) - ((var(--section-space-xlarge-max) - var(--section-space-xlarge-min)) / (var(--section-viewport-max) - var(--section-viewport-min)) * var(--section-viewport-min))) / 16 * 1rem + ((var(--section-space-xlarge-max) - var(--section-space-xlarge-min)) / (var(--section-viewport-max) - var(--section-viewport-min))) * 100vw), var(--section-space-xlarge-max) / 16 * 1rem);
+  --section-space-xlarge-min: 120;
+  --section-space-xlarge-max: 240;
   --section-space-nav-overlap: clamp(var(--section-space-nav-overlap-min) / 16 * 1rem, ((var(--section-space-nav-overlap-min) - ((var(--section-space-nav-overlap-max) - var(--section-space-nav-overlap-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--section-space-nav-overlap-max) - var(--section-space-nav-overlap-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--section-space-nav-overlap-max) / 16 * 1rem);
   --section-space-nav-overlap-min: 160;
   --section-space-nav-overlap-max: 224;
@@ -271,6 +285,7 @@
 
   --background: var(--light-300);
   --background-2: var(--light-200);
+  --stroke: var(--light-300);
   --background-3: var(--light-100);
   --background-skeleton: color-mix(in lab, currentcolor 10%, transparent);
   --text: var(--dark-900);
@@ -306,7 +321,8 @@
   color-scheme: dark;
 
   --background: var(--dark-900);
-  --background-2: var(--dark-800);
+  --background-2: var(--dark-850);
+  --stroke: var(--dark-750);
   --background-3: var(--dark-700);
   --background-skeleton: color-mix(in lab, currentcolor 10%, transparent);
   --text: var(--light-100);
@@ -342,6 +358,7 @@
 
   --background: var(--brand-500);
   --background-2: color-mix(in lab, var(--background) 90%, var(--text));
+  --stroke: color-mix(in lab, var(--background) 75%, var(--text));
   --background-3: color-mix(in lab, var(--background) 80%, var(--text));
   --background-skeleton: color-mix(in lab, currentcolor 10%, transparent);
   --text: var(--brand-text);
@@ -400,7 +417,9 @@ body {
     display: flex;
     flex-direction: column;
     flex-grow: 1;
-    row-gap: var(--section-space-medium);
+    row-gap: 0;
+    /* Clears the nav, which sits fixed over the top of the page. */
+    padding-top: var(--nav-height);
   }
 }
 
@@ -515,6 +534,20 @@ body,
   line-height: var(--text-main-line-height);
   letter-spacing: var(--text-main-letter-spacing);
   text-transform: var(--text-main-text-transform);
+  text-wrap: var(--text-main-text-wrap);
+  --_trim-top: var(--text-main-trim-top);
+  --_trim-bottom: var(--text-main-trim-bottom);
+  --_margin-top: var(--text-main-margin-top);
+  --_margin-bottom: var(--text-main-margin-bottom);
+}
+
+/* Body copy and labels set in the mono face, at the main body size. */
+.text-style-mono {
+  font-family: var(--mono-family);
+  font-size: var(--text-main);
+  font-weight: var(--primary-regular);
+  line-height: var(--line-height-huge);
+  letter-spacing: var(--letter-spacing-normal);
   text-wrap: var(--text-main-text-wrap);
   --_trim-top: var(--text-main-trim-top);
   --_trim-bottom: var(--text-main-trim-bottom);

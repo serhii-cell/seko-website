@@ -1,10 +1,7 @@
 ---
 import Section from "@/components/Wrapper/Section.astro";
-import ContentWrapper from "@/components/Wrapper/ContentWrapper.astro";
 import Heading from "@/components/Typography/Heading.astro";
 import Paragraph from "@/components/Typography/Paragraph.astro";
-import ButtonWrapper from "@/components/Wrapper/ButtonWrapper.astro";
-import Button from "@/components/Button.astro";
 import AsciiStage from "@/components/Media/AsciiStage.astro";
 
 interface Props {
@@ -12,111 +9,225 @@ interface Props {
   render?: boolean;
   /** The page's main heading. Nothing is output without it. */
   heading?: string;
-  /** The paragraph beside the heading. */
+  /** The paragraph under the heading. */
   text?: string;
-  /** The button's label. The button is left out without it. */
-  buttonText?: string;
-  /** Where the button goes. */
-  buttonHref?: string;
+  /** Short facts beside the paragraph, each a label and its value. */
+  facts?: { label: string; value: string }[];
 }
 
-const {
-  render = true,
-  heading,
-  text,
-  buttonText,
-  buttonHref = "#",
-} = Astro.props;
+const { render = true, heading, text, facts = [] } = Astro.props;
 ---
 
 {
   render && heading && (
-    <Section
-      class="hero-main_wrap"
-      containerClass="hero-main_container"
-    >
-      <div class="hero-main_stage">
-        <AsciiStage />
+    <Section class="hero-main_wrap" containerClass="hero-main_container">
+      <div class="hero-main_layout">
+        <div class="hero-main_content">
+          <Heading tag="h1" class="hero-main_title">
+            {heading}
+          </Heading>
+          <div class="hero-main_details">
+            <Paragraph
+              variant="mono"
+              class="hero-main_text color-faded"
+              render={!!text}
+            >
+              {text}
+            </Paragraph>
+            {facts.length > 0 && (
+              <dl class="hero-main_facts">
+                {facts.map((fact) => (
+                  <div class="hero-main_fact">
+                    <dt class="color-muted" data-lines>
+                      {fact.label}
+                    </dt>
+                    <dd class="text-style-mono color-faded" data-lines>
+                      {fact.value}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </div>
+        </div>
+        <div class="hero-main_visual">
+          <AsciiStage />
+        </div>
       </div>
-      <ContentWrapper
-        variant="columns"
-        class="hero-main_intro"
-        column1Class="align-self-start"
-      >
-        <Heading tag="h1" variant="h1" class="hero-main_title" data-intro>
-          {heading}
-        </Heading>
-        <Fragment slot="column2">
-          <Paragraph
-            variant="large"
-            class="hero-main_text color-faded"
-            data-intro
-            render={!!text}
-          >
-            {text}
-          </Paragraph>
-          <ButtonWrapper data-intro render={!!buttonText}>
-            <Button element="link" href={buttonHref} class="hero-main_button">
-              {buttonText}
-            </Button>
-          </ButtonWrapper>
-        </Fragment>
-      </ContentWrapper>
     </Section>
   )
 }
 
+<script>
+  import { gsap } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+  import { onIntroOpen } from "@/utils/intro.ts";
+
+  /* As the ASCII container opens, the guides are uncovered: the horizontal
+     one left to right, the vertical one top to bottom, on past the hero down
+     to the logo strip (the logos' own piece of it). A mask uncovers them, so
+     the dashes never stretch. */
+  onPage(() => {
+    const hero = document.querySelector<HTMLElement>(".hero-main_wrap");
+    const visual = hero?.querySelector<HTMLElement>(".hero-main_visual");
+    if (!hero || !visual) return;
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const guide = document.querySelector<HTMLElement>(".logos-main_guide");
+    const details = hero.querySelector<HTMLElement>(".hero-main_details");
+
+    /* The horizontal guide spans exactly the viewport, so it draws from the
+       left edge to the right one. */
+    const span = () => {
+      if (!details) return;
+      const { left, right } = details.getBoundingClientRect();
+      const width = document.documentElement.clientWidth;
+      hero.style.setProperty("--_guide-left", `${-left}px`);
+      hero.style.setProperty("--_guide-right", `${right - width}px`);
+    };
+    span();
+    addEventListener("resize", span);
+
+    const draw = { x: 0, y: 0 };
+    let split = 1;
+    const apply = () => {
+      hero.style.setProperty("--_draw-x", String(draw.x));
+      hero.style.setProperty("--_draw-y", String(Math.min(1, draw.y / split)));
+      guide?.style.setProperty(
+        "--_draw-y",
+        String(Math.max(0, (draw.y - split) / (1 - split || 1))),
+      );
+    };
+    apply();
+
+    let tween: gsap.core.Tween | undefined;
+    const stop = onIntroOpen(() => {
+      const above = parseFloat(getComputedStyle(visual, "::before").height) || 0;
+      const below = guide?.offsetHeight ?? 0;
+      split = above + below > 0 ? above / (above + below) : 1;
+      tween = gsap.to(draw, {
+        x: 1,
+        y: 1,
+        duration: 1.4,
+        ease: "power2.inOut",
+        onUpdate: apply,
+      });
+    });
+
+    return () => {
+      stop();
+      tween?.kill();
+      removeEventListener("resize", span);
+      hero.style.removeProperty("--_guide-left");
+      hero.style.removeProperty("--_guide-right");
+      hero.style.removeProperty("--_draw-x");
+      hero.style.removeProperty("--_draw-y");
+      guide?.style.removeProperty("--_draw-y");
+    };
+  });
+</script>
+
 <style is:global>
   @layer components {
-    /* One screen tall, less the site margin left free under the button; the
-       section gap follows it. */
+    /* Dashed guides run behind the hero: one down the middle of the ASCII
+       container from the top of the page to the hero's end (the logos carry
+       it on to their strip), one across the page between the heading and the
+       paragraph. */
     .hero-main_wrap {
-      height: calc(100svh - var(--nav-height) - var(--site-margin));
-      min-height: 30rem;
+      --_guide: var(--stroke);
+      z-index: 1;
+      isolation: isolate;
+      overflow-x: clip;
+      padding-top: var(--space-10);
+      padding-bottom: var(--section-space-xlarge);
     }
 
-    .hero-main_container {
-      flex: 1 1 auto;
-      min-height: 0;
-      align-items: stretch;
-    }
-
-    /* Out to the page frame's lines, dashed below; the nav's line is above. */
-    .hero-main_stage {
-      flex: 1 1 auto;
-      min-height: 7.5rem;
-      margin-inline: calc(var(--content-inset) * -1);
-      --_line: repeating-linear-gradient(
-        to right,
-        var(--border) 0 var(--dash),
-        transparent 0 calc(var(--dash) * 2)
-      );
-      padding-bottom: var(--border-width);
-      background: var(--_line) bottom / 100% var(--border-width) no-repeat;
-    }
-
-    .hero-main_intro {
-      flex: none;
-      row-gap: var(--space-4);
+    .hero-main_layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-8);
+      width: 100%;
       @media (width >= 64rem) {
-        &.columns {
-          grid-template-columns: var(--layout-split);
+        grid-template-columns: minmax(0, 812fr) minmax(0, 674fr);
+        column-gap: calc(154 / 1640 * 100%);
+        align-items: start;
+      }
+    }
+
+    .hero-main_content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-11);
+    }
+
+    .hero-main_title {
+      max-width: 42.125rem;
+      margin: 0;
+    }
+
+    .hero-main_details {
+      position: relative;
+      display: grid;
+      gap: var(--space-6);
+      @media (width >= 48rem) {
+        grid-template-columns: minmax(0, 398fr) minmax(0, 260fr);
+        column-gap: calc(154 / 812 * 100%);
+      }
+      &::before {
+        content: "";
+        position: absolute;
+        z-index: -1;
+        top: calc(var(--space-11) / -2);
+        left: var(--_guide-left, -100vw);
+        right: var(--_guide-right, -100vw);
+        height: var(--border-width);
+        clip-path: inset(0 calc((1 - var(--_draw-x, 1)) * 100%) 0 0);
+        background: repeating-linear-gradient(
+          to right,
+          var(--_guide) 0 var(--dash),
+          transparent 0 calc(var(--dash) * 2)
+        );
+      }
+    }
+
+    .hero-main_text {
+      margin: 0;
+    }
+
+    .hero-main_facts {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-5);
+      margin: 0;
+    }
+
+    .hero-main_fact {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      line-height: var(--line-height-huge);
+      & dd {
+        margin: 0;
+      }
+    }
+
+    .hero-main_visual {
+      position: relative;
+      @media (width >= 64rem) {
+        &::before {
+          content: "";
+          position: absolute;
+          z-index: -1;
+          left: 50%;
+          top: calc((var(--nav-height) + var(--space-10)) * -1);
+          bottom: calc(var(--section-space-xlarge) * -1);
+          width: var(--border-width);
+          clip-path: inset(0 0 calc((1 - var(--_draw-y, 1)) * 100%) 0);
+          background: repeating-linear-gradient(
+            to bottom,
+            var(--_guide) 0 var(--dash),
+            transparent 0 calc(var(--dash) * 2)
+          );
         }
-      }
-    }
-
-    .hero-main_button {
-      min-height: calc(var(--space-6) + var(--space-4));
-    }
-
-    /* Short screens: the type gives way so the hero still fits one screen. */
-    @media (width >= 48rem) and (height <= 51.25rem) {
-      .hero-main_title {
-        font-size: min(var(--h1), 6.2svh);
-      }
-
-      .hero-main_text {
-        font-size: max(1rem, min(var(--text-large), 2.5svh));
       }
     }
   }

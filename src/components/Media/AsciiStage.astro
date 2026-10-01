@@ -1,5 +1,6 @@
 ---
 import type { HTMLAttributes } from "astro/types";
+import Corner from "@/assets/ascii/corner.svg";
 
 interface Props extends HTMLAttributes<"div"> {
   /** Set to `false` to skip rendering this component and its children. */
@@ -16,20 +17,24 @@ const { render = true, class: className, ...rest } = Astro.props;
       aria-hidden="true"
       {...rest}
     >
-      <canvas class="ascii-stage_background" />
+      <div class="ascii-stage_lines" />
       <div class="ascii-stage_visual">
         <canvas class="ascii-stage_cubes" />
       </div>
+      <Corner class="ascii-stage_corner top-left" />
+      <Corner class="ascii-stage_corner top-right" />
+      <Corner class="ascii-stage_corner bottom-left" />
+      <Corner class="ascii-stage_corner bottom-right" />
     </div>
   )
 }
 
 <script>
+  import { gsap } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
+  import { onIntroOpen } from "@/utils/intro.ts";
   import {
     GLYPH,
-    GLYPHS,
-    clamp,
     smoothstep,
     mix,
     toRgb,
@@ -40,13 +45,13 @@ const { render = true, class: className, ...rest } = Astro.props;
     measureRamp,
     pickGlyph,
     createController,
-    createOrbit,
+    createTorch,
     rotation,
+    sway,
     LIGHT,
     HALF,
     KEY,
     type Rgb,
-    type Engine,
     type Controller,
     type Look,
   } from "@/utils/ascii.ts";
@@ -54,577 +59,29 @@ const { render = true, class: className, ...rest } = Astro.props;
   /* Still frames for reduced motion: the eight cubes joined into one. */
   const STILL_TIME = 4300;
 
-  /* On the first load the stage waits unseen under the curtain, which sends
-     `page-intro:done` as it rises. */
-  type Gate = { waiting: () => boolean; destroy: () => void };
-  function createGate(motion: boolean): Gate {
-    let waiting =
-      motion && document.documentElement.classList.contains("page-intro");
-    const open = () => {
-      waiting = false;
-    };
-    if (waiting) document.addEventListener("page-intro:done", open);
-    return {
-      waiting: () => waiting,
-      destroy: () => document.removeEventListener("page-intro:done", open),
-    };
-  }
-
-  /* ---------- Background: glyphs spiralling into a hole behind the cube ---------- */
-  function createBackground(
-    canvas: HTMLCanvasElement,
-    controller: Controller,
-    look: Look,
-    motion: boolean,
-    gate: Gate,
-  ): Engine {
-    const context = canvas.getContext("2d");
-    const stage = canvas.parentElement;
-    if (!context || !stage) return { play() {}, pause() {}, destroy() {} };
-
-    const config = {
-      cellW: 8,
-      cellH: 14,
-      fontSize: 12,
-      /* Cap so the spiral never becomes a solid fill. */
-      maxDensity: 0.8,
-      /* How fast the cursor's glow fades: higher is quicker. */
-      glowFade: 1.6,
-      hole: {
-        /* 1 is a circle as tall as the stage. */
-        radius: 1.0,
-        arms: 4,
-        twist: 3.6,
-        spin: 0.55,
-        inflow: 0.22,
-        /* Distance over which glyphs grow from dots to full weight. */
-        falloff: 0.38,
-      },
-      speed: 0.3,
-      fps: 24,
-    };
-
-    function hash(x: number, y: number, z: number) {
-      let h =
-        (Math.imul(x, 374761393) +
-          Math.imul(y, 668265263) +
-          Math.imul(z, 1274126177)) |
-        0;
-      h = Math.imul(h ^ (h >>> 13), 1103515245);
-      h ^= h >>> 16;
-      return (h >>> 0) / 4294967296;
-    }
-    const fade = (t: number) => t * t * (3 - 2 * t);
-    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-    function valueNoise(x: number, y: number, z: number) {
-      const xi = Math.floor(x);
-      const yi = Math.floor(y);
-      const zi = Math.floor(z);
-      const xf = fade(x - xi);
-      const yf = fade(y - yi);
-      const zf = fade(z - zi);
-      return lerp(
-        lerp(
-          lerp(hash(xi, yi, zi), hash(xi + 1, yi, zi), xf),
-          lerp(hash(xi, yi + 1, zi), hash(xi + 1, yi + 1, zi), xf),
-          yf,
-        ),
-        lerp(
-          lerp(hash(xi, yi, zi + 1), hash(xi + 1, yi, zi + 1), xf),
-          lerp(hash(xi, yi + 1, zi + 1), hash(xi + 1, yi + 1, zi + 1), xf),
-          yf,
-        ),
-        zf,
-      );
-    }
-    const fbm = (x: number, y: number, z: number) =>
-      valueNoise(x, y, z) * 0.57 +
-      valueNoise(x * 2.03, y * 2.03, z * 1.3) * 0.29 +
-      valueNoise(x * 4.1, y * 4.1, z * 1.7) * 0.14;
-
-    /* Density from 0 (empty) to 1. Glyphs swirl round a hole in the middle of
-       the stage in spiral arms and drift inward, thinning to dots as they fall
-       in. Positions are in units of the stage's shorter side. */
-    function field(
-      px: number,
-      py: number,
-      t: number,
-      wU: number,
-      hU: number,
-      radius: number,
-    ) {
-      const hole = config.hole;
-      const dx = px - wU / 2;
-      const dy = py - hU / 2;
-      const r = Math.hypot(dx, dy);
-      const r0 = (Math.min(wU, hU) / 2) * radius;
-      if (r <= r0) return 0;
-
-      const lr = Math.log(r / r0 + 1e-6);
-      const u = Math.atan2(dy, dx) + hole.twist * lr + hole.spin * t;
-      const v = lr + hole.inflow * t;
-
-      const wobble =
-        (fbm(Math.cos(u) * 1.2 + 3.1, Math.sin(u) * 1.2, v * 1.3) - 0.5) * 2.2;
-      const arms = Math.pow(0.5 + 0.5 * Math.cos(hole.arms * u + wobble), 2.2);
-      const streak = smoothstep(
-        0.3,
-        0.75,
-        fbm(Math.cos(u) * 5.5, Math.sin(u) * 5.5, v * 1.1 + 7.7),
-      );
-      const radial = Math.pow(smoothstep(0, hole.falloff, r - r0), 1.3);
-      const rim = smoothstep(0, 0.025, r - r0);
-
-      const density =
-        (0.08 + 0.92 * (0.4 * arms + 0.6 * arms * streak + 0.12 * streak)) *
-        radial *
-        rim;
-      return Math.min(config.maxDensity, density * config.maxDensity * 1.15);
-    }
-
-    const bayer = (() => {
-      const base = [
-        [0, 2],
-        [3, 1],
-      ];
-      let matrix = base;
-      for (let n = 2; n < 8; n *= 2) {
-        const next: number[][] = [];
-        for (let y = 0; y < n * 2; y++) {
-          next.push([]);
-          for (let x = 0; x < n * 2; x++) {
-            next[y].push(
-              4 * matrix[y % n][x % n] +
-                base[Math.floor(y / n)][Math.floor(x / n)],
-            );
-          }
-        }
-        matrix = next;
-      }
-      return matrix.map((row) => row.map((value) => (value + 0.5) / 64));
-    })();
-
-    /* Glyphs ordered by the ink each one measures, never by a fixed list. */
-    let ramp: { ch: string; cov: number }[] = [];
-    let atlas = document.createElement("canvas");
-    let glowAtlas = document.createElement("canvas");
-    let dpr = 1;
-
-    function buildRamp() {
-      const w = 32;
-      const h = 56;
-      const probe = document.createElement("canvas");
-      probe.width = w;
-      probe.height = h;
-      const g = probe.getContext("2d", { willReadFrequently: true });
-      if (!g) return;
-      g.font = `${config.fontSize * 4}px ${look.font}`;
-      g.textAlign = "center";
-      g.textBaseline = "middle";
-      const measured = [...new Set(GLYPHS)]
-        .map((ch) => {
-          g.clearRect(0, 0, w, h);
-          g.fillStyle = "#fff";
-          g.fillText(ch, w / 2, h / 2);
-          const data = g.getImageData(0, 0, w, h).data;
-          let sum = 0;
-          for (let i = 3; i < data.length; i += 4) sum += data[i];
-          return { ch, cov: sum };
-        })
-        .sort((a, b) => a.cov - b.cov);
-      const max = measured[measured.length - 1].cov || 1;
-      ramp = [];
-      for (const entry of measured) {
-        const cov = entry.cov / max;
-        if (!ramp.length || cov - ramp[ramp.length - 1].cov > 0.025) {
-          ramp.push({ ch: entry.ch, cov });
-        }
-      }
-    }
-
-    function paintAtlas(color: string) {
-      const cw = config.cellW * dpr;
-      const ch = config.cellH * dpr;
-      const sheet = document.createElement("canvas");
-      sheet.width = cw * ramp.length;
-      sheet.height = ch;
-      const g = sheet.getContext("2d");
-      if (g) {
-        g.font = `${config.fontSize * dpr}px ${look.font}`;
-        g.textAlign = "center";
-        g.textBaseline = "middle";
-        g.fillStyle = color;
-        ramp.forEach((entry, i) =>
-          g.fillText(entry.ch, i * cw + cw / 2, ch / 2),
-        );
-      }
-      return sheet;
-    }
-
-    let cols = 0;
-    let rows = 0;
-    let width = 0;
-    let height = 0;
-    let glyphIndex = new Uint8Array(0);
-
-    /* The cursor pushes glyphs along its path like a finger through water; a
-       spring pulls them back, and the ones it touched glow in the accent. */
-    const scatter = {
-      radius: 42,
-      gain: 1.0,
-      spread: 0.5,
-      spring: 36,
-      damping: 5.5,
-      maxDisp: 180,
-      wake: 0.6,
-    };
-    let sdx = new Float32Array(0);
-    let sdy = new Float32Array(0);
-    let svx = new Float32Array(0);
-    let svy = new Float32Array(0);
-    let active = new Float32Array(0);
-    let glow = new Float32Array(0);
-    const pointer = {
-      x: -1e9,
-      y: -1e9,
-      px: -1e9,
-      py: -1e9,
-      vx: 0,
-      vy: 0,
-      t: 0,
-      inside: false,
-    };
-    const noHover = matchMedia(
-      "(hover: none), (pointer: coarse), (width < 48rem)",
-    );
-
-    function onPointerMove(event: PointerEvent) {
-      if (noHover.matches) {
-        pointer.inside = false;
-        return;
-      }
-      const rect = canvas.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      const now = performance.now();
-      if (pointer.inside && now > pointer.t) {
-        const dt = Math.min(0.1, (now - pointer.t) / 1000);
-        pointer.vx = pointer.vx * 0.5 + ((x - pointer.x) / dt) * 0.5;
-        pointer.vy = pointer.vy * 0.5 + ((y - pointer.y) / dt) * 0.5;
-      }
-      if (!pointer.inside) {
-        pointer.px = x;
-        pointer.py = y;
-      }
-      pointer.x = x;
-      pointer.y = y;
-      pointer.t = now;
-      pointer.inside = true;
-    }
-    function onPointerLeave() {
-      pointer.inside = false;
-      pointer.vx = pointer.vy = 0;
-    }
-    if (motion) {
-      stage.addEventListener("pointermove", onPointerMove);
-      stage.addEventListener("pointerleave", onPointerLeave);
-    }
-
-    const jitter = () => Math.random() * 2 - 1;
-    function scatterStep(dt: number) {
-      const speed = Math.hypot(pointer.vx, pointer.vy);
-      const kick =
-        pointer.inside && speed > 40 && performance.now() - pointer.t < 120;
-      const radius = scatter.radius;
-      const r2 = radius * radius;
-      const ux = speed ? pointer.vx / speed : 0;
-      const uy = speed ? pointer.vy / speed : 0;
-      const impulse = Math.min(1600, speed) * scatter.gain;
-      const glowDecay = Math.exp(-config.glowFade * dt);
-      const subSteps = Math.max(1, Math.ceil(dt * 240));
-      const h = dt / subSteps;
-      const ax = pointer.px;
-      const ay = pointer.py;
-      const abx = pointer.x - ax;
-      const aby = pointer.y - ay;
-      const ab2 = abx * abx + aby * aby;
-      const minX = Math.min(ax, pointer.x) - radius;
-      const maxX = Math.max(ax, pointer.x) + radius;
-      const minY = Math.min(ay, pointer.y) - radius;
-      const maxY = Math.max(ay, pointer.y) + radius;
-      pointer.px = pointer.x;
-      pointer.py = pointer.y;
-
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          const i = y * cols + x;
-          if (kick && glyphIndex[i]) {
-            const px = (x + 0.5) * config.cellW + sdx[i];
-            const py = (y + 0.5) * config.cellH + sdy[i];
-            if (px > minX && px < maxX && py > minY && py < maxY) {
-              const along =
-                ab2 > 0
-                  ? clamp(((px - ax) * abx + (py - ay) * aby) / ab2, 0, 1)
-                  : 1;
-              const ex = px - (ax + abx * along);
-              const ey = py - (ay + aby * along);
-              const d2 = ex * ex + ey * ey;
-              if (d2 < r2) {
-                const d = Math.sqrt(d2);
-                let f = 1 - d / radius;
-                f = f * f * (3 - 2 * f);
-                const nx = d > 0.001 ? ex / d : 0;
-                const ny = d > 0.001 ? ey / d : 0;
-                const vary = 1 + jitter() * 0.15;
-                const dirX =
-                  ux + nx * scatter.wake + jitter() * scatter.spread * 0.3;
-                const dirY =
-                  uy + ny * scatter.wake + jitter() * scatter.spread * 0.3;
-                svx[i] += dirX * impulse * f * vary * dt * 30;
-                svy[i] += dirY * impulse * f * vary * dt * 30;
-                active[i] = 1;
-                glow[i] = Math.max(glow[i], Math.sqrt(f));
-              }
-            }
-          }
-          if (glow[i] > 0) {
-            glow[i] *= glowDecay;
-            if (glow[i] < 0.02) glow[i] = 0;
-          }
-          if (active[i] <= 0) continue;
-          /* Small fixed sub-steps keep a stiff spring stable on a slow frame. */
-          for (let k = 0; k < subSteps; k++) {
-            svx[i] += (-sdx[i] * scatter.spring - svx[i] * scatter.damping) * h;
-            svy[i] += (-sdy[i] * scatter.spring - svy[i] * scatter.damping) * h;
-            sdx[i] += svx[i] * h;
-            sdy[i] += svy[i] * h;
-          }
-          const m = Math.hypot(sdx[i], sdy[i]);
-          if (m > scatter.maxDisp) {
-            sdx[i] *= scatter.maxDisp / m;
-            sdy[i] *= scatter.maxDisp / m;
-          }
-          if (m < 0.6 && Math.hypot(svx[i], svy[i]) < 4) {
-            sdx[i] = sdy[i] = svx[i] = svy[i] = 0;
-            active[i] = 0;
-          } else {
-            active[i] = 1;
-          }
-        }
-      }
-    }
-
-    function resize() {
-      const rect = canvas.getBoundingClientRect();
-      dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = rect.width;
-      height = rect.height;
-      canvas.width = Math.round(width * dpr);
-      canvas.height = Math.round(height * dpr);
-      cols = Math.ceil(width / config.cellW);
-      rows = Math.ceil(height / config.cellH);
-      const n = cols * rows;
-      sdx = new Float32Array(n);
-      sdy = new Float32Array(n);
-      svx = new Float32Array(n);
-      svy = new Float32Array(n);
-      active = new Float32Array(n);
-      glow = new Float32Array(n);
-      glyphIndex = new Uint8Array(n);
-      atlas = paintAtlas(look.glyph);
-      glowAtlas = paintAtlas(look.accent);
-    }
-
-    /* On the first load the hole opens past the stage's corners, then closes
-       in on the cube with the glyphs following it in from every side, over
-       this many milliseconds. */
-    const ENTER = 1500;
-    let entered = gate.waiting() ? 0 : ENTER;
-    function holeRadius(wU: number, hU: number) {
-      if (entered >= ENTER) return config.hole.radius;
-      const eased = 1 - Math.pow(1 - entered / ENTER, 3);
-      const outside = Math.hypot(wU, hU) + 0.05;
-      return outside + (config.hole.radius - outside) * eased;
-    }
-
-    let previous = 0;
-    function draw(time: number) {
-      if (!context || !cols || !rows) return;
-      const dt = Math.min(0.1, (time - previous) / 1000) || 0.05;
-      previous = time;
-      const t = time * 0.001 * config.speed;
-      const unit = Math.min(width, height);
-      const wU = width / unit;
-      const hU = height / unit;
-      const cw = config.cellW * dpr;
-      const ch = config.cellH * dpr;
-      const last = ramp.length - 1;
-      const radius = holeRadius(wU, hU);
-
-      for (let y = 0; y < rows; y++) {
-        const py = ((y + 0.5) * config.cellH) / unit;
-        const row = bayer[y & 7];
-        for (let x = 0; x < cols; x++) {
-          const i = y * cols + x;
-          const b = field(
-            ((x + 0.5) * config.cellW) / unit,
-            py,
-            t,
-            wU,
-            hU,
-            radius,
-          );
-          if (b <= 0.01) {
-            glyphIndex[i] = 0;
-            continue;
-          }
-          let k = 0;
-          while (k < last && ramp[k + 1].cov < b) k++;
-          let index = k;
-          if (k < last) {
-            const f = (b - ramp[k].cov) / (ramp[k + 1].cov - ramp[k].cov);
-            if (f > row[x & 7]) index = k + 1;
-          }
-          glyphIndex[i] = index;
-        }
-      }
-
-      if (motion) scatterStep(dt);
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          const i = y * cols + x;
-          const index = glyphIndex[i];
-          if (!index) continue;
-          let gx = x;
-          let gy = y;
-          /* Displaced glyphs snap back to the grid, so the effect stays pixel. */
-          if (active[i] > 0) {
-            gx = Math.round((x * config.cellW + sdx[i]) / config.cellW);
-            gy = Math.round((y * config.cellH + sdy[i]) / config.cellH);
-            if (gx < 0 || gy < 0 || gx >= cols || gy >= rows) continue;
-          }
-          context.drawImage(
-            atlas,
-            index * cw,
-            0,
-            cw,
-            ch,
-            gx * cw,
-            gy * ch,
-            cw,
-            ch,
-          );
-          if (glow[i] > 0) {
-            context.globalAlpha = glow[i];
-            context.drawImage(
-              glowAtlas,
-              index * cw,
-              0,
-              cw,
-              ch,
-              gx * cw,
-              gy * ch,
-              cw,
-              ch,
-            );
-            context.globalAlpha = 1;
-          }
-        }
-      }
-    }
-
-    /* Its own clock, advancing only while running, so a pause doesn't make
-       the swirl jump ahead. */
-    let frame = 0;
-    let clock = 0;
-    let lastNow = 0;
-    let lastFrame = -1e9;
-    function loop(now: number) {
-      frame = requestAnimationFrame(loop);
-      const delta = Math.min(100, now - lastNow);
-      clock += delta;
-      lastNow = now;
-      if (!gate.waiting() && entered < ENTER)
-        entered = Math.min(ENTER, entered + delta);
-      if (clock - lastFrame < 1000 / config.fps) return;
-      lastFrame = clock;
-      draw(clock);
-    }
-    function play() {
-      if (!motion || frame || !controller.running()) return;
-      lastNow = performance.now();
-      frame = requestAnimationFrame(loop);
-    }
-    function pause() {
-      cancelAnimationFrame(frame);
-      frame = 0;
-      /* Settle anything scattered, so nothing is half-displaced on return. */
-      [sdx, sdy, svx, svy, active, glow].forEach((values) => values.fill(0));
-      pointer.inside = false;
-    }
-    const still = () => {
-      if (!frame) draw(clock);
-    };
-
-    function applyGlyph(size: number) {
-      config.fontSize = size;
-      config.cellW = size * GLYPH.cellW;
-      config.cellH = size * GLYPH.cellH;
-    }
-    const onGlyph = (size: number) => {
-      if (Math.abs(size - config.fontSize) < 0.05) return;
-      applyGlyph(size);
-      buildRamp();
-      resize();
-      still();
-    };
-
-    applyGlyph(pageGlyph.size);
-    buildRamp();
-    resize();
-    pageGlyph.listeners.add(onGlyph);
-    const observer = new ResizeObserver(() => {
-      resize();
-      still();
-    });
-    observer.observe(canvas);
-    draw(clock);
-    controller.onChange((running) => (running ? play() : pause()));
-    play();
-
-    return {
-      play,
-      pause,
-      destroy() {
-        pause();
-        observer.disconnect();
-        pageGlyph.listeners.delete(onGlyph);
-        stage.removeEventListener("pointermove", onPointerMove);
-        stage.removeEventListener("pointerleave", onPointerLeave);
-      },
-    };
-  }
+  type Cubes = {
+    /** Shows the cubes after `delay` seconds, flickering on like an old
+        screen, and starts their loop. */
+    reveal: (delay: number) => void;
+    destroy: () => void;
+  };
 
   /* ---------- Cubes: eight cubes slide together, merge, and zoom out to one ---------- */
   function createCubes(
     canvas: HTMLCanvasElement,
+    stage: HTMLElement,
     controller: Controller,
     look: Look,
     motion: boolean,
-    gate: Gate,
-  ): Engine {
+  ): Cubes {
     const context = canvas.getContext("2d");
-    if (!context) return { play() {}, pause() {}, destroy() {} };
+    if (!context) return { reveal() {}, destroy() {} };
 
     const green = toRgb(look.accent);
     const HIGHLIGHT: Rgb = [255, 255, 250];
     /* Camera distance, for a real perspective, and the loop length in seconds. */
     const CAM = 9;
     const LOOP = 5.5;
-    /* On the first load the cube grows in place from nothing once the curtain
-       is up, over this many milliseconds, before the loop starts. */
-    const GROW = 1000;
     const SLOTS = [
       [-0.5, -0.5, 0.5],
       [0.5, -0.5, 0.5],
@@ -637,7 +94,8 @@ const { render = true, class: className, ...rest } = Astro.props;
     ];
     const first = SLOTS[0];
 
-    let size = 720;
+    let width = 674;
+    let height = 442;
     let cw = 8;
     let ch = 14;
     let cols = 0;
@@ -715,7 +173,7 @@ const { render = true, class: className, ...rest } = Astro.props;
     const FL = KEY;
     const ss = (u: number) => smoothstep(0, 1, u);
 
-    const orbit = createOrbit(canvas, motion, 0.44, () => still());
+    const torch = createTorch(stage, canvas, motion);
 
     let seamFill = 0;
     const SEAM_ORDER = (() => {
@@ -730,14 +188,11 @@ const { render = true, class: className, ...rest } = Astro.props;
 
     /* The 5.5s loop: seven cubes slide in (0.4–3.8s), the seams between them
        fill glyph by glyph (3.8–4.4s), the block shrinks to a single cube
-       (4.4–5.5s), and the next cube shows 0.2s later. `grow` scales the cube
-       about its own centre for the first-load intro. */
-    function scene(time: number, grow = 1) {
+       (4.4–5.5s), and the next cube shows 0.2s later. The view sways a little
+       either side of its resting angle, never turning the block away. */
+    function scene(time: number) {
       const T = time % LOOP;
-      R = rotation(
-        0.66 + 0.07 * Math.sin((T / LOOP) * Math.PI * 2) + orbit.yaw(),
-        0.44 + orbit.pitch(),
-      );
+      R = rotation(0.66 + sway(time), 0.44);
       const T0 = 0.4,
         STEP = 0.49,
         SLIDE = 0.45,
@@ -771,13 +226,6 @@ const { render = true, class: className, ...rest } = Astro.props;
         offsetY = -2 * first[1] * (1 - uz);
         offsetZ = -2 * first[2] * (1 - uz);
         cubes.push([first[0], first[1], first[2], 1, 0]);
-      }
-      if (grow < 1) {
-        const g = Math.max(0.001, grow);
-        offsetX += zoom * first[0] * (1 - g);
-        offsetY += zoom * first[1] * (1 - g);
-        offsetZ += zoom * first[2] * (1 - g);
-        zoom *= g;
       }
 
       brightness.fill(0);
@@ -869,13 +317,12 @@ const { render = true, class: className, ...rest } = Astro.props;
       }
     }
 
-    function draw(opacity = 1) {
+    function draw() {
       if (!context) return;
-      context.clearRect(0, 0, size, size);
-      if (opacity <= 0) return;
-      context.globalAlpha = opacity;
+      context.clearRect(0, 0, width, height);
       context.font = font;
       context.textBaseline = "top";
+      const lit = torch.lit();
       for (let gy = 0; gy < rows; gy++) {
         for (let gx = 0; gx < cols; gx++) {
           const i = gy * cols + gx;
@@ -898,27 +345,39 @@ const { render = true, class: className, ...rest } = Astro.props;
                 Math.min(1, (specular[i] - 0.3) * 1.3) * 0.7,
               );
           }
+          let boost = 0;
+          if (lit) {
+            ({ b, color, boost } = torch.light(
+              ox + gx * cw + cw / 2,
+              oy + gy * ch + ch / 2,
+              b,
+              color,
+            ));
+          }
+          const lum = Math.min(1.25, 0.55 + 0.45 * b + boost);
           const glyphChar = pickGlyph(ramp, coverage, b, gx, gy);
           if (glyphChar === " ") continue;
-          const lum = 0.55 + 0.45 * b;
-          context.fillStyle = `rgb(${(color[0] * lum) | 0},${(color[1] * lum) | 0},${(color[2] * lum) | 0})`;
+          context.fillStyle = `rgb(${Math.min(255, color[0] * lum) | 0},${Math.min(255, color[1] * lum) | 0},${Math.min(255, color[2] * lum) | 0})`;
           context.fillText(glyphChar, ox + gx * cw, oy + gy * ch);
         }
       }
-      context.globalAlpha = 1;
     }
 
-    /* Sized to the cube's real size on screen, so glyphs are true pixels,
-       and the glyph size shared with the background. */
-    function configure(measured: number) {
-      size = Math.max(120, Math.round(measured));
-      const g = glyphForSize(size);
+    /* Sized to the container's real size on screen, so glyphs are true
+       pixels, with the glyph size every model on the page shares. The canvas
+       fills the whole container, so cubes sliding in from the right have
+       room; scaled to the height, everything in the loop stays in view at
+       any sway (it reaches 2.75 units right, 1.5 left, 1.66 up or down). */
+    function configure(w: number, h: number) {
+      width = Math.max(160, Math.round(w));
+      height = Math.max(120, Math.round(h));
+      const g = glyphForSize(Math.min(width, height));
       cw = g * GLYPH.cellW;
       ch = g * GLYPH.cellH;
-      cols = Math.floor(size / cw);
-      rows = Math.floor(size / ch);
-      ox = (size - cols * cw) / 2;
-      oy = (size - rows * ch) / 2;
+      cols = Math.floor(width / cw);
+      rows = Math.floor(height / ch);
+      ox = (width - cols * cw) / 2;
+      oy = (height - rows * ch) / 2;
       font = `${g}px ${look.font}`;
       const n = cols * rows;
       seam = new Uint8Array(n);
@@ -928,35 +387,31 @@ const { render = true, class: className, ...rest } = Astro.props;
       hit = new Uint8Array(n);
       alpha = new Float32Array(n);
       slot = new Int8Array(n);
-      scale = 0.175 * size;
-      cx = size / 2;
-      cy = size / 2 + 2;
+      scale = Math.min(0.21 * height, (width / 2 - 12) / 2.75);
+      cx = width / 2;
+      cy = height / 2 + 2;
       dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.round(size * dpr);
-      canvas.height = Math.round(size * dpr);
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
       context?.setTransform(dpr, 0, 0, dpr, 0, 0);
       ({ ramp, coverage } = measureRamp(font, cw, ch));
       pageGlyph.set(g);
     }
-    let measuredSize = 0;
+    let measured = { w: 0, h: 0 };
     function watchSize() {
-      const measured = canvas.getBoundingClientRect().width;
-      if (Math.abs(measured - measuredSize) < 1) return;
-      measuredSize = measured;
-      configure(measured);
+      const rect = canvas.getBoundingClientRect();
+      if (
+        Math.abs(rect.width - measured.w) < 1 &&
+        Math.abs(rect.height - measured.h) < 1
+      )
+        return;
+      measured = { w: rect.width, h: rect.height };
+      configure(rect.width, rect.height);
     }
 
-    let grown = gate.waiting() ? 0 : GROW;
-    const growth = () => {
-      const u = grown / GROW;
-      return {
-        scale: 1 - Math.pow(1 - u, 3),
-        opacity: gate.waiting() ? 0 : u,
-      };
-    };
-
-    /* Its own clock: after a pause the cubes carry on from the same moment,
-       and it holds still until the cube has grown. */
+    /* Its own clock: after a pause the cubes carry on from the same moment.
+       It holds at the start until the cubes are revealed. */
+    let revealed = false;
     let frame = 0;
     let simTime = motion ? 0 : STILL_TIME;
     let clock = 0;
@@ -966,17 +421,14 @@ const { render = true, class: className, ...rest } = Astro.props;
       frame = requestAnimationFrame(loop);
       const delta = Math.min(100, now - lastNow);
       lastNow = now;
-      if (gate.waiting()) return;
       clock += delta;
-      if (grown < GROW) grown = Math.min(GROW, grown + delta);
-      else simTime += delta;
+      if (revealed) simTime += delta;
       if (clock - lastStep < 33) return;
       const dt = Math.min(0.1, (clock - lastStep) / 1000);
       lastStep = clock;
-      orbit.step(dt);
-      const { scale, opacity } = growth();
-      scene(simTime / 1000, scale);
-      draw(opacity);
+      torch.step(dt);
+      scene(simTime / 1000);
+      draw();
     }
     function play() {
       if (!motion || frame || !controller.running()) return;
@@ -989,11 +441,11 @@ const { render = true, class: className, ...rest } = Astro.props;
     }
     function still() {
       if (frame) return;
-      const { scale, opacity } = growth();
-      scene(simTime / 1000, scale);
-      draw(opacity);
+      scene(simTime / 1000);
+      draw();
     }
 
+    canvas.style.opacity = "0";
     watchSize();
     const observer = new ResizeObserver(() => {
       watchSize();
@@ -1004,49 +456,100 @@ const { render = true, class: className, ...rest } = Astro.props;
     controller.onChange((running) => (running ? play() : pause()));
     play();
 
+    let flicker: gsap.core.Timeline | undefined;
     return {
-      play,
-      pause,
+      reveal(delay) {
+        if (!motion) {
+          revealed = true;
+          canvas.style.opacity = "1";
+          return;
+        }
+        flicker = gsap
+          .timeline({ delay, onStart: () => (revealed = true) })
+          .set(canvas, { opacity: 1 })
+          .set(canvas, { opacity: 0.12 }, 0.07)
+          .set(canvas, { opacity: 1 }, 0.12)
+          .set(canvas, { opacity: 0.35 }, 0.22)
+          .set(canvas, { opacity: 1 }, 0.27);
+      },
       destroy() {
+        flicker?.kill();
         pause();
         observer.disconnect();
-        orbit.destroy();
+        torch.destroy();
       },
     };
   }
 
+  /* The container opens from its centre like a window, from 1px and
+     transparent to full size, as the first-load curtain is half up (or at
+     once without it). Then the CRT lines start drifting and, half a second
+     later, the cubes flicker on. */
+  const OPEN = 0.7;
+  const AFTER_OPEN = 0.5;
+
   const started = new WeakMap<HTMLElement, () => void>();
 
   function start(stage: HTMLElement) {
-    const background = stage.querySelector<HTMLCanvasElement>(
-      ".ascii-stage_background",
-    );
-    const cubes = stage.querySelector<HTMLCanvasElement>(".ascii-stage_cubes");
-    if (!background || !cubes) return () => {};
+    const canvas = stage.querySelector<HTMLCanvasElement>(".ascii-stage_cubes");
+    if (!canvas) return () => {};
 
     const look = readLook(stage);
     const motion = allowsMotion();
     const controller = createController(stage);
-    const gate = createGate(motion);
-    let engines: Engine[] = [];
+    let cubes: Cubes | null = null;
+    let revealAt: number | null = null;
     let stopped = false;
+    let opening: gsap.core.Tween | undefined;
+
+    const reveal = (delay: number) => {
+      if (cubes) cubes.reveal(delay);
+      else revealAt = delay;
+    };
+
+    const open = () => {
+      if (!motion) {
+        stage.classList.add("open");
+        reveal(0);
+        return;
+      }
+      const { width, height } = stage.getBoundingClientRect();
+      opening = gsap.fromTo(
+        stage,
+        { scaleX: 1 / width, scaleY: 1 / height, opacity: 0 },
+        {
+          scaleX: 1,
+          scaleY: 1,
+          opacity: 1,
+          duration: OPEN,
+          ease: "expo.out",
+          clearProps: "transform,opacity",
+          onComplete: () => {
+            stage.classList.add("open");
+            reveal(AFTER_OPEN);
+          },
+        },
+      );
+    };
+
+    if (motion) gsap.set(stage, { opacity: 0 });
+    const stopWaiting = motion ? onIntroOpen(open) : (open(), () => {});
 
     document.fonts
       .load(`12px ${look.font}`)
       .catch(() => {})
       .then(() => {
         if (stopped) return;
-        engines = [
-          createBackground(background, controller, look, motion, gate),
-          createCubes(cubes, controller, look, motion, gate),
-        ];
+        cubes = createCubes(canvas, stage, controller, look, motion);
+        if (revealAt !== null) cubes.reveal(revealAt);
       });
 
     return () => {
       stopped = true;
-      engines.forEach((engine) => engine.destroy());
+      stopWaiting();
+      opening?.kill();
+      cubes?.destroy();
       controller.destroy();
-      gate.destroy();
     };
   }
 
@@ -1071,38 +574,76 @@ const { render = true, class: className, ...rest } = Astro.props;
       --_glyph: var(--dark-700);
       --_accent: var(--brand-500);
       --_glyph-font: var(--font-jetbrains-mono, monospace);
+      --_line: color-mix(in lab, var(--light-100) 2%, transparent);
       position: relative;
       display: grid;
       place-items: center;
       width: 100%;
-      height: 100%;
-      min-height: 7.5rem;
-      overflow: hidden;
+      aspect-ratio: 674 / 442;
+      min-height: 15rem;
       isolation: isolate;
       container-type: size;
+      background-color: var(--background-2);
+      border: var(--border-width) solid var(--stroke);
     }
 
-    .ascii-stage_background {
+    /* CRT lines: 1px every 8px, drifting down once the container is open. */
+    .ascii-stage_lines {
       position: absolute;
       inset: 0;
       z-index: -1;
-      width: 100%;
-      height: 100%;
+      overflow: hidden;
+      background: repeating-linear-gradient(
+        to bottom,
+        var(--_line) 0 1px,
+        transparent 1px 0.5rem
+      );
+      .ascii-stage_wrap.open & {
+        animation: ascii-stage-lines 1.15s linear infinite;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        animation: none !important;
+      }
+    }
+
+    @keyframes ascii-stage-lines {
+      to {
+        background-position: 0 0.5rem;
+      }
     }
 
     .ascii-stage_visual {
-      width: min(100cqh, 100cqw);
-      height: min(100cqh, 100cqw);
+      width: 100%;
+      height: 100%;
     }
 
     .ascii-stage_cubes {
+      display: block;
       width: 100%;
       height: 100%;
-      cursor: grab;
-      touch-action: none;
+    }
 
-      &.dragging {
-        cursor: grabbing;
+    .ascii-stage_corner {
+      position: absolute;
+      color: var(--light-100);
+      &.top-left {
+        top: -0.03125rem;
+        left: -0.03125rem;
+      }
+      &.top-right {
+        top: -0.03125rem;
+        right: -0.03125rem;
+        scale: -1 1;
+      }
+      &.bottom-left {
+        bottom: -0.03125rem;
+        left: -0.03125rem;
+        scale: 1 -1;
+      }
+      &.bottom-right {
+        right: -0.03125rem;
+        bottom: -0.03125rem;
+        scale: -1 -1;
       }
     }
   }
