@@ -7,8 +7,11 @@ import ContentLogosMain from "@/components/Content/ContentLogosMain.astro";
 import SectionObservationsMain from "@/components/Section/SectionObservationsMain.astro";
 import SectionHelpMain from "@/components/Section/SectionHelpMain.astro";
 import adaptive from "@/assets/clients/adaptive.svg";
-
-const logo = { src: adaptive, name: "Adaptive & Co" };
+import northwind from "@/assets/clients/northwind.svg";
+import vertex from "@/assets/clients/vertex.svg";
+import lumen from "@/assets/clients/lumen.svg";
+import meridian from "@/assets/clients/meridian.svg";
+import halcyon from "@/assets/clients/halcyon.svg";
 ---
 
 <Layout
@@ -30,7 +33,14 @@ const logo = { src: adaptive, name: "Adaptive & Co" };
   <Section class="overflow-x-clip">
     <ContentLogosMain
       text="Trusted by teams around the world"
-      logos={[logo, logo, logo, logo, logo, logo]}
+      logos={[
+        { src: adaptive, name: "Adaptive & Co", scale: 0.78 },
+        { src: northwind, name: "Northwind", scale: 1.05 },
+        { src: vertex, name: "Vertex" },
+        { src: lumen, name: "Lumen" },
+        { src: meridian, name: "Meridian", scale: 1.05 },
+        { src: halcyon, name: "Halcyon" },
+      ]}
     />
   </Section>
 
@@ -57,7 +67,8 @@ const logo = { src: adaptive, name: "Adaptive & Co" };
         model: "gear",
       },
       {
-        heading: "The product works. It doesn't look like it's worth what you charge",
+        heading:
+          "The product works. It doesn't look like it's worth what you charge",
         text: "The interface still looks like an internal tool, and that's what buyers price against. Decisions take longer, prospects ask for more proof and lean toward products that do less but feel finished.",
         model: "tractor",
       },

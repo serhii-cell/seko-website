@@ -6,6 +6,10 @@
     document.documentElement.classList.contains("stacki-designer");
 
   if (!designing) {
+    /* Pages open at the top, a reload included, unless the address points
+       at a part of the page. */
+    if (!location.hash) scrollTo(0, 0);
+
     const lenis = new Lenis({
       autoToggle: true,
       allowNestedScroll: true,

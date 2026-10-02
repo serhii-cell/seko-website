@@ -83,25 +83,20 @@ import logo from "@/assets/logo/logo.svg";
         })
       : undefined;
 
-    /* Two signals, each sent once and at the latest when the intro ends:
-       `page-intro:done` as the curtain is half way up (the hero's ASCII
-       container opens), and `page-intro:content` as its edge reaches the
-       first heading (the page's first screen of content starts to appear,
-       see ScrollReveal). */
-    const sent = new Set<string>();
-    const signal = (name: string) => {
-      if (sent.has(name)) return;
-      sent.add(name);
-      document.dispatchEvent(new Event(name));
+    /* Sent once, as the curtain's edge reaches the first heading, or at the
+       latest when the intro ends: the first screen starts to appear, step
+       by step (src/utils/intro.ts). */
+    let sent = false;
+    const content = () => {
+      if (sent) return;
+      sent = true;
+      document.dispatchEvent(new Event("page-intro:content"));
     };
-    const reveal = () => signal("page-intro:done");
-    const content = () => signal("page-intro:content");
 
     const finish = () => {
       root.classList.remove("page-intro", "page-intro-playing");
       if (curtain) gsap.set(curtain, { clearProps: "all" });
       if (bar) gsap.set(bar, { clearProps: "opacity" });
-      reveal();
       content();
     };
 
@@ -129,8 +124,7 @@ import logo from "@/assets/logo/logo.svg";
               : { yPercent: -100, duration: curtainDuration, ease: "curtain" },
             "+=0.15",
           )
-          .addLabel("rise", "<")
-          .call(reveal, undefined, `rise+=${reduced ? 0.35 : riseTime(0.5)}`);
+          .addLabel("rise", "<");
         /* The bar is gone by the time the curtain is halfway up. */
         if (bar) {
           timeline.to(

@@ -73,9 +73,9 @@ const number = (index: number) => String(index + 1).padStart(2, "0");
   import { gsap } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
 
-  /* From 64rem up the section fills the screen with its content centred and
-     holds there, and scrolling slides each card up from below into its
-     column in turn. */
+  /* From 64rem up the section holds with its middle in the middle of the
+     screen (from its top, if it is taller than the screen), and scrolling
+     slides each card up from below into its column in turn. */
   function setUp(section: HTMLElement) {
     const cards = gsap.utils.toArray<HTMLElement>(".help-main_card", section);
     const mm = gsap.matchMedia();
@@ -86,7 +86,8 @@ const number = (index: number) => String(index + 1).padStart(2, "0");
           defaults: { ease: "power2.out" },
           scrollTrigger: {
             trigger: section,
-            start: "top top",
+            start: () =>
+              section.offsetHeight > innerHeight ? "top top" : "center center",
             end: () => `+=${innerHeight * 1.8}`,
             pin: true,
             /* Off by default inside a flex parent like <main>. */
@@ -120,17 +121,10 @@ const number = (index: number) => String(index + 1).padStart(2, "0");
 
 <style is:global>
   @layer components {
-    /* A screen tall, its content in the middle, so while it holds nothing
-       else is in view. */
+    /* No space of its own above: it follows the section before by that
+       section's padding. */
     .help-main_wrap {
       overflow-x: clip;
-      @media (width >= 64rem) {
-        min-height: 100svh;
-        padding-block: var(--space-8);
-      }
-      @media (width < 64rem) {
-        padding-top: calc(var(--section-space-xlarge) / 2);
-      }
     }
 
     .help-main_container {

@@ -21,7 +21,7 @@ const { render = true, heading, text, facts = [] } = Astro.props;
 {
   render && heading && (
     <Section class="hero-main_wrap" containerClass="hero-main_container">
-      <div class="hero-main_layout">
+      <div class="hero-main_layout" data-step="4">
         <div class="hero-main_content">
           <Heading tag="h1" class="hero-main_title">
             {heading}
@@ -61,7 +61,7 @@ const { render = true, heading, text, facts = [] } = Astro.props;
 <script>
   import { gsap } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
-  import { onIntroOpen } from "@/utils/intro.ts";
+  import { onIntroStep, stepOf } from "@/utils/intro.ts";
 
   /* As the ASCII container opens, the guides are uncovered: the horizontal
      one left to right, the vertical one top to bottom, on past the hero down
@@ -100,7 +100,7 @@ const { render = true, heading, text, facts = [] } = Astro.props;
     apply();
 
     let tween: gsap.core.Tween | undefined;
-    const stop = onIntroOpen(() => {
+    const stop = onIntroStep(stepOf(visual), () => {
       const above = parseFloat(getComputedStyle(visual, "::before").height) || 0;
       const below = guide?.offsetHeight ?? 0;
       split = above + below > 0 ? above / (above + below) : 1;

@@ -32,7 +32,7 @@ const { render = true, class: className, ...rest } = Astro.props;
 <script>
   import { gsap } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
-  import { onIntroOpen } from "@/utils/intro.ts";
+  import { onIntroStep, stepOf } from "@/utils/intro.ts";
   import {
     GLYPH,
     smoothstep,
@@ -482,9 +482,9 @@ const { render = true, class: className, ...rest } = Astro.props;
   }
 
   /* The container opens from its centre like a window, from 1px and
-     transparent to full size, as the first-load curtain is half up (or at
-     once without it). Then the CRT lines start drifting and, half a second
-     later, the cubes flicker on. */
+     transparent to full size, on its step of the first-screen sequence
+     (src/utils/intro.ts). Then the CRT lines start drifting and, half a
+     second later, the cubes flicker on. */
   const OPEN = 0.7;
   const AFTER_OPEN = 0.5;
 
@@ -533,7 +533,9 @@ const { render = true, class: className, ...rest } = Astro.props;
     };
 
     if (motion) gsap.set(stage, { opacity: 0 });
-    const stopWaiting = motion ? onIntroOpen(open) : (open(), () => {});
+    const stopWaiting = motion
+      ? onIntroStep(stepOf(stage), open)
+      : (open(), () => {});
 
     document.fonts
       .load(`12px ${look.font}`)
