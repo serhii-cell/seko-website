@@ -1,0 +1,104 @@
+---
+import Section from "@/components/Wrapper/Section.astro";
+import Heading from "@/components/Typography/Heading.astro";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+import Accordion from "@/components/Interactive/Accordion.astro";
+import AccordionItem from "@/components/Interactive/AccordionItem.astro";
+
+interface Props {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** The small label above the heading. */
+  label?: string;
+  /** The heading. Nothing is output without it. */
+  heading?: string;
+  /** The questions, each with its answer. The first starts open. */
+  items?: { question: string; answer: string }[];
+}
+
+const { render = true, label, heading, items = [] } = Astro.props;
+---
+
+{
+  render && heading && items.length > 0 && (
+    <Section id="faq" frame={true} gap="0" class="faq-main_wrap">
+      <div class="faq-main_header">
+        <Paragraph variant="label" class="faq-main_label" render={!!label}>
+          {label}
+        </Paragraph>
+        <Heading tag="h2" class="faq-main_heading">
+          {heading}
+        </Heading>
+      </div>
+      <Accordion class="faq-main_list" openFirst={true}>
+        {items.map((item) => (
+          <AccordionItem heading={item.question}>
+            <Paragraph>{item.answer}</Paragraph>
+          </AccordionItem>
+        ))}
+      </Accordion>
+      <div class="faq-main_end" />
+    </Section>
+  )
+}
+
+<style is:global>
+  @layer components {
+    .faq-main_wrap {
+      --_rule: repeating-linear-gradient(
+        to right,
+        var(--stroke) 0 var(--dash),
+        transparent 0 calc(var(--dash) * 2)
+      );
+      overflow-x: clip;
+    }
+
+    .faq-main_header,
+    .faq-main_list,
+    .faq-main_end {
+      position: relative;
+      &::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        inset-inline: calc(50% - 50vw);
+        height: var(--border-width);
+        background-image: var(--_rule);
+        pointer-events: none;
+      }
+    }
+
+    .faq-main_header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-5);
+      align-self: stretch;
+      padding-block: var(--section-space-xlarge) var(--section-space-small);
+      text-align: center;
+      & > * {
+        margin: 0;
+      }
+    }
+
+    .faq-main_label {
+      --_trim-top: 0.5lh;
+      --_trim-bottom: 0.5lh;
+      color: color-mix(in srgb, var(--text) 40%, transparent);
+    }
+
+    .faq-main_list {
+      isolation: isolate;
+      max-width: 53.75rem;
+      margin-inline: auto;
+      &::after {
+        z-index: -1;
+      }
+    }
+
+    .faq-main_end {
+      align-self: stretch;
+      height: var(--section-space-xlarge);
+    }
+  }
+</style>

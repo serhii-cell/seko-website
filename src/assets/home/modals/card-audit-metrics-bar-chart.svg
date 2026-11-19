@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="175" height="171" viewBox="0 0 175 171" fill="none"><g id="Bar chart">
+<g id="Base">
+<path id="Side" d="M173.701 116.034L46.699 170L0.5 147.627V140.677L46.699 163.05L173.701 109.084V116.034Z" fill="#F0F0F0" />
+<path id="Side outline" d="M173.701 109.084V116.034L46.699 170L0.5 147.627V140.677" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Corner" d="M46.6987 170V163.05" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Face" d="M0.5 140.677L127.502 86.7109L173.701 109.084L46.699 163.05L0.5 140.677Z" fill="white" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<g id="Bar (accent)">
+<path id="Side_2" d="M145.394 107.747L127.251 115.457L110.451 107.321V7.70898L127.251 15.845L145.394 8.13598V107.747Z" fill="#7BD52D" />
+<path id="Face_2" opacity="0.55" d="M110.451 7.709L128.594 0L145.394 8.136L127.251 15.845L110.451 7.709Z" fill="#7BD52D" />
+</g>
+<g id="Bar">
+<path id="Side_3" d="M118.179 119.312L100.036 127.021L83.2358 118.885V70.2379L100.036 78.3739L118.179 70.6639V119.312Z" fill="#F0F0F0" />
+<path id="Side outline_2" d="M118.179 70.6639V119.312L100.036 127.021L83.2358 118.885V70.2379" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Corner_2" d="M100.036 127.021V78.3739" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Face_3" d="M83.2358 70.238L101.38 62.528L118.179 70.664L100.036 78.374L83.2358 70.238Z" fill="white" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<g id="Bar_2">
+<path id="Side_4" d="M90.964 130.876L72.821 138.585L56.022 130.45V65.5859L72.821 73.7219L90.964 66.0119V130.876Z" fill="#F0F0F0" />
+<path id="Side outline_3" d="M90.964 66.0119V130.876L72.821 138.585L56.022 130.45V65.5859" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Corner_3" d="M72.8208 138.585V73.7219" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Face_4" d="M56.022 65.586L74.165 57.877L90.964 66.012L72.821 73.722L56.022 65.586Z" fill="white" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<g id="Bar_3">
+<path id="Side_5" d="M63.7501 142.44L45.6061 150.149L28.8071 142.014V107.266L45.6061 115.401L63.7501 107.692V142.44Z" fill="#F0F0F0" />
+<path id="Side outline_4" d="M63.7501 107.692V142.44L45.6061 150.149L28.8071 142.014V107.266" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Corner_4" d="M45.606 150.149V115.401" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Face_5" d="M28.8071 107.266L46.9501 99.556L63.7501 107.692L45.6061 115.401L28.8071 107.266Z" fill="white" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+</g>
+</svg>

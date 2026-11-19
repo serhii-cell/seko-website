@@ -6,9 +6,8 @@
  * follows `STEP_GAP` seconds later. A component marks its parts with
  * `data-step` and starts each part's animation here.
  *
- * On the home page: 1 the menus, 2 the logo, 3 the clock and button, 4 the
- * hero's text, its ASCII container and its guides together, 5 the line
- * above the logos, 6 the logo strip.
+ * On the home page: 1 the logo, 2 the menus, 3 the clock and button, 4 the
+ * hero's text and its ASCII panel together, 5 the stat tiles.
  */
 export const STEP_GAP = 0.1;
 

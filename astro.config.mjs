@@ -16,7 +16,7 @@ export default defineConfig({
       name: "Archivo",
       cssVariable: "--font-archivo",
       provider: fontProviders.google(),
-      weights: [400, 500, 700],
+      weights: [400, 500, 600, 700],
       styles: ["normal"],
       subsets: ["latin"],
     },

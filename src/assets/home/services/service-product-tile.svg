@@ -1,0 +1,49 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="icon container" clip-path="url(#clip0_0_1)">
+<rect width="120" height="120" fill="#FAFAFA"/>
+<g id="Bg lines" opacity="0.02">
+<line id="Line 109" x1="-53.5404" y1="94.6068" x2="32.9554" y2="-55.2085" stroke="#121212"/>
+<line id="Line 162" x1="-46.6122" y1="98.6068" x2="39.8836" y2="-51.2085" stroke="#121212"/>
+<line id="Line 215" x1="-39.6845" y1="102.607" x2="46.8114" y2="-47.2085" stroke="#121212"/>
+<line id="Line 110" x1="-32.7563" y1="106.607" x2="53.7396" y2="-43.2084" stroke="#121212"/>
+<line id="Line 163" x1="-25.828" y1="110.607" x2="60.6678" y2="-39.2084" stroke="#121212"/>
+<line id="Line 216" x1="-18.8998" y1="114.607" x2="67.596" y2="-35.2084" stroke="#121212"/>
+<line id="Line 111" x1="-11.9716" y1="118.607" x2="74.5242" y2="-31.2084" stroke="#121212"/>
+<line id="Line 164" x1="-5.04336" y1="122.607" x2="81.4525" y2="-27.2084" stroke="#121212"/>
+<line id="Line 217" x1="1.88486" y1="126.607" x2="88.3807" y2="-23.2084" stroke="#121212"/>
+<line id="Line 112" x1="8.81308" y1="130.607" x2="95.3089" y2="-19.2084" stroke="#121212"/>
+<line id="Line 165" x1="15.7413" y1="134.607" x2="102.237" y2="-15.2084" stroke="#121212"/>
+<line id="Line 218" x1="22.6695" y1="138.607" x2="109.165" y2="-11.2084" stroke="#121212"/>
+<line id="Line 113" x1="29.5977" y1="142.607" x2="116.094" y2="-7.20837" stroke="#121212"/>
+<line id="Line 166" x1="36.526" y1="146.607" x2="123.022" y2="-3.20837" stroke="#121212"/>
+<line id="Line 219" x1="43.4542" y1="150.607" x2="129.95" y2="0.791659" stroke="#121212"/>
+<line id="Line 114" x1="50.3824" y1="154.607" x2="136.878" y2="4.79166" stroke="#121212"/>
+<line id="Line 167" x1="57.3106" y1="158.607" x2="143.806" y2="8.79166" stroke="#121212"/>
+<line id="Line 220" x1="64.2389" y1="162.607" x2="150.735" y2="12.7917" stroke="#121212"/>
+<line id="Line 115" x1="71.1671" y1="166.607" x2="157.663" y2="16.7917" stroke="#121212"/>
+<line id="Line 168" x1="78.0953" y1="170.607" x2="164.591" y2="20.7917" stroke="#121212"/>
+<line id="Line 221" x1="85.0235" y1="174.607" x2="171.519" y2="24.7917" stroke="#121212"/>
+</g>
+<g id="Open box">
+<path id="Flap back-left" d="M27.1266 52.7704L61.2642 38.265L49.1102 28.5337L14.9727 43.04L27.1266 52.7704Z" fill="white" stroke="#E0E0E0" stroke-linejoin="round"/>
+<path id="Flap back-right" d="M61.2637 38.2651L92.8739 53.5733L106 44.1504L74.39 28.8423L61.2637 38.2651Z" fill="white" stroke="#E0E0E0" stroke-linejoin="round"/>
+<path id="Inside wall back" d="M27.125 64.394L61.2626 49.8877V38.265L27.125 52.7704V64.394Z" fill="#F0F0F0" stroke="#E0E0E0" stroke-width="0.901965" stroke-linejoin="round"/>
+<path id="Inside wall right" d="M61.2637 49.8879L92.8739 65.196V53.5733L61.2637 38.2651V49.8879Z" fill="#F0F0F0" stroke="#E0E0E0" stroke-width="0.901965" stroke-linejoin="round"/>
+<path id="Green surface" d="M27.125 64.3943L61.2626 49.888L92.8728 65.1961L58.7353 79.7024L27.125 64.3943Z" fill="#7BD52D"/>
+<path id="Glow" d="M27.125 41.1478L61.2626 26.6415L92.8728 41.9497V65.196L58.7353 79.7024L27.125 64.3942V41.1478Z" fill="url(#paint0_linear_0_1)"/>
+<path id="Wall front-left" d="M27.125 78.3421L58.7353 93.6502V68.0786L27.125 52.7704V78.3421Z" fill="#F0F0F0" stroke="#E0E0E0" stroke-linejoin="round"/>
+<path id="Wall front-right" d="M58.7363 93.6503L92.8739 79.144V53.5732L58.7363 68.0786V93.6503Z" fill="#F0F0F0" stroke="#E0E0E0" stroke-linejoin="round"/>
+<path id="Flap front-left" d="M27.1263 52.7705L58.7366 68.0787L45.6103 69.8122L14 54.5041L27.1263 52.7705Z" fill="white" stroke="#E0E0E0" stroke-linejoin="round"/>
+<path id="Flap front-right" d="M58.7363 68.0786L92.8739 53.5732L105.028 55.6144L70.8903 70.1207L58.7363 68.0786Z" fill="white" stroke="#E0E0E0" stroke-linejoin="round"/>
+</g>
+</g>
+<defs>
+<linearGradient id="paint0_linear_0_1" x1="59.9989" y1="79.7024" x2="59.9989" y2="26.6415" gradientUnits="userSpaceOnUse">
+<stop stop-color="#7BD52D" stop-opacity="0.55"/>
+<stop offset="1" stop-color="#7BD52D" stop-opacity="0"/>
+</linearGradient>
+<clipPath id="clip0_0_1">
+<rect width="120" height="120" fill="white"/>
+</clipPath>
+</defs>
+</svg>

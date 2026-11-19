@@ -1,8 +1,9 @@
 ---
 import type { HTMLAttributes } from "astro/types";
 import { slug } from "@/utils/text.ts";
+import { uid } from "@/utils/uid.ts";
 import Icon from "@/components/Media/Icon.astro";
-import arrow from "@/assets/icons/arrow.svg";
+import chevron from "@/assets/home/modals/icon-chevron-down.svg";
 
 type SelectOption = string | { value: string; label: string };
 
@@ -21,6 +22,8 @@ type Base = {
   required?: boolean;
   /** Keeps the label for a screen reader, and takes it off the page. */
   labelHidden?: boolean;
+  /** Shown under the field when no choice has been made. Defaults to `Please choose an option`. */
+  error?: string;
 };
 
 type Props = HTMLAttributes<"select"> &
@@ -80,6 +83,7 @@ const {
   placeholder,
   required = false,
   labelHidden = false,
+  error = "Please choose an option",
   class: className,
   ...rest
 } = Astro.props as AllProps;
@@ -169,13 +173,14 @@ const entries = choices.map((choice) =>
 
 const wording = WORDING[variant];
 const text = label ?? wording.label;
+const errorId = uid("field-error");
 ---
 
 {
   render && entries.length > 0 && (
     <label class:list={["field", "form-select", className]}>
       <span
-        class:list={["field-label text-style-main", labelHidden && "sr-only"]}
+        class:list={["field-label", labelHidden && "sr-only"]}
       >
         <span>{text}</span>
         {required && (
@@ -187,9 +192,10 @@ const text = label ?? wording.label;
 
       <span class="form-select_control">
         <select
-          class="field-control form-select_field text-style-main"
+          class="field-control form-select_field text-style-small"
           name={name ?? slug(text)}
           required={required || undefined}
+          aria-describedby={errorId}
           {...rest}
         >
           <option value="" disabled selected={value === undefined} hidden>
@@ -201,7 +207,10 @@ const text = label ?? wording.label;
             </option>
           ))}
         </select>
-        <Icon class="form-select_mark" src={arrow} variant="small" />
+        <Icon class="form-select_mark" src={chevron} />
+      </span>
+      <span class="field-error" id={errorId}>
+        {error}
       </span>
     </label>
   )
@@ -209,6 +218,41 @@ const text = label ?? wording.label;
 
 <style is:global>
   @layer components {
+    .form-select {
+      --_error: #ff6b5e;
+      gap: var(--space-1);
+
+      & .field-label {
+        color: var(--text-2);
+        font-size: 0.75rem;
+        line-height: var(--line-height-huge);
+      }
+
+      & .field-error {
+        display: none;
+        color: var(--_error);
+        font-size: 0.75rem;
+        line-height: var(--line-height-huge);
+      }
+
+      &:has(.form-select_field:disabled) {
+        & .field-label,
+        & .form-select_mark {
+          color: color-mix(in srgb, var(--text) 30%, transparent);
+        }
+      }
+
+      &:has(.form-select_field:user-invalid),
+      .form_wrap[data-checked] &:has(.form-select_field:invalid) {
+        & .field-error {
+          display: block;
+        }
+        & .form-select_field {
+          border-color: var(--_error);
+        }
+      }
+    }
+
     .form-select_control {
       position: relative;
       display: block;
@@ -216,20 +260,47 @@ const text = label ?? wording.label;
 
     .form-select_field {
       appearance: none;
-      padding-inline-end: 3em;
+      min-height: 2.5rem;
+      padding: 0 2.75rem 0 0.75rem;
+      background-color: transparent;
+      border-color: var(--stroke);
+      border-radius: 0.125rem;
+      color: var(--text);
+      cursor: pointer;
       &:has(option[value=""]:checked) {
-        color: var(--text-2);
+        color: color-mix(in srgb, var(--text) 20%, transparent);
       }
+      @media (hover: hover) {
+        &:hover:not(:disabled, :focus) {
+          background-color: transparent;
+          border-color: var(--text);
+        }
+      }
+      &:focus,
+      &:focus-visible {
+        border-color: var(--brand-500);
+        outline: 0;
+      }
+      &:disabled {
+        opacity: 1;
+        cursor: not-allowed;
+        background-color: color-mix(in srgb, var(--text) 4%, transparent);
+      }
+    }
+
+    .form-select_field option {
+      background-color: var(--background);
+      color: var(--text);
     }
 
     .form-select_mark {
       position: absolute;
-      inset-inline-end: 1em;
+      inset-inline-end: 0.75rem;
       top: 50%;
       translate: 0 -50%;
-      rotate: 90deg;
+      font-size: 1rem;
       pointer-events: none;
-      color: var(--text-2);
+      color: var(--text);
     }
 
     /* The list the browser draws itself, where it will */
@@ -252,68 +323,72 @@ const text = label ?? wording.label;
         }
       }
 
+      .form-select_field:open {
+        border-color: var(--brand-500);
+      }
+
       .form-select_mark {
         transition: rotate var(--open-duration) var(--open-ease);
       }
 
       .form-select_field:open ~ .form-select_mark {
-        rotate: -90deg;
-      }
-
-      .form-select_field:open {
-        background-color: var(--background-3);
-        border-end-start-radius: 0;
-        border-end-end-radius: 0;
+        rotate: 180deg;
       }
 
       .form-select_field::picker(select) {
-        margin-block: 0;
-        padding: var(--space-1);
+        margin-block: 0.25rem;
+        padding: 0.25rem;
         max-height: min(18rem, calc(100dvh - 6rem));
         position-try-order: normal;
         overscroll-behavior: contain;
-        background-color: var(--background-3);
-        border: 0;
-        border-radius: var(--radius-small);
-        border-start-start-radius: 0;
-        border-start-end-radius: 0;
+        background-color: var(--background);
+        border: var(--border-width) solid var(--stroke);
+        border-radius: 0.125rem;
         opacity: 0;
-        scale: 0.98;
+        translate: 0 -0.25rem;
         transition:
           opacity var(--open-duration) var(--open-ease),
-          scale var(--open-duration) var(--open-ease),
+          translate var(--open-duration) var(--open-ease),
           overlay var(--open-duration) var(--open-ease) allow-discrete,
           display var(--open-duration) var(--open-ease) allow-discrete;
       }
 
       .form-select_field:open::picker(select) {
         opacity: 1;
-        scale: 1;
+        translate: 0 0;
       }
 
       @starting-style {
         .form-select_field:open::picker(select) {
           opacity: 0;
-          scale: 0.98;
+          translate: 0 -0.25rem;
         }
       }
 
       .form-select_field option {
         display: flex;
         align-items: center;
-        gap: var(--space-2);
-        padding: var(--space-1) var(--space-2);
+        gap: var(--space-1);
+        min-height: 2.5rem;
+        padding: 0 0.75rem;
         font-size: var(--text-small);
-        line-height: var(--line-height-large);
-        color: var(--text);
+        line-height: var(--text-small-line-height);
+        color: color-mix(in srgb, var(--text) 80%, transparent);
         background-color: transparent;
-        border-radius: var(--radius-small);
+        border-radius: 0.125rem;
         cursor: pointer;
-        transition: background-color var(--hover-duration) var(--hover-ease);
+        transition:
+          background-color var(--hover-duration) var(--hover-ease),
+          color var(--hover-duration) var(--hover-ease);
         &:hover,
-        &:focus {
+        &:focus-visible {
           background-color: var(--background-2);
+          color: var(--text);
           outline: 0;
+        }
+        &:checked {
+          background-color: var(--background-2);
+          color: var(--brand-500);
         }
       }
 
@@ -324,7 +399,7 @@ const text = label ?? wording.label;
       .form-select_field option::checkmark {
         order: 1;
         margin-inline-start: auto;
-        color: var(--text-2);
+        color: var(--brand-500);
       }
     }
   }

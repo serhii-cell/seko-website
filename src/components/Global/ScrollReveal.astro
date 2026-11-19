@@ -11,6 +11,9 @@
     "[data-fade]",
   ].join(", ");
   const TEXT = ".heading, .text, [data-lines]";
+  /* The line-by-line text reveal is switched off for now: text is simply
+     there. Set to `true` to bring it back. */
+  const TEXT_REVEAL = false;
   /* Time between one item and the next within a step of the first screen. */
   const STAGGER = 0.06;
   /* First-screen items with no step of their own come after the rest. */
@@ -47,9 +50,11 @@
       /* Every heading and paragraph rises in line by line; blocks with no
          text of their own, the nav's parts and anything marked `data-fade`
          fade in instead. */
-      const texts = gsap.utils
-        .toArray<HTMLElement>(TEXT, main)
-        .filter((element) => isLineText(element) && shown(element));
+      const texts = TEXT_REVEAL
+        ? gsap.utils
+            .toArray<HTMLElement>(TEXT, main)
+            .filter((element) => isLineText(element) && shown(element))
+        : [];
       const faders = [
         ...gsap.utils.toArray<HTMLElement>("[data-intro]"),
         ...gsap.utils

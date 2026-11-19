@@ -1,6 +1,7 @@
 ---
 import type { HTMLAttributes } from "astro/types";
 import { slug } from "@/utils/text.ts";
+import { uid } from "@/utils/uid.ts";
 
 type InputVariant =
   | "text"
@@ -41,6 +42,8 @@ interface Props extends Omit<HTMLAttributes<"input">, "type"> {
   required?: boolean;
   /** Keeps the label for a screen reader, and takes it off the page. */
   labelHidden?: boolean;
+  /** Shown under the field when what it holds will not do. Defaults to `Please check this field`. */
+  error?: string;
 }
 
 const {
@@ -52,6 +55,7 @@ const {
   placeholder,
   required = false,
   labelHidden = false,
+  error = "Please check this field",
   class: className,
   ...rest
 } = Astro.props;
@@ -102,13 +106,14 @@ const KINDS: Record<
 
 const kind = KINDS[variant];
 const text = label ?? kind.label;
+const errorId = uid("field-error");
 ---
 
 {
   render && (
     <label class:list={["field", "form-input", className]}>
       <span
-        class:list={["field-label text-style-main", labelHidden && "sr-only"]}
+        class:list={["field-label", labelHidden && "sr-only"]}
       >
         <span>{text}</span>
         {required && (
@@ -118,7 +123,7 @@ const text = label ?? kind.label;
         )}
       </span>
       <input
-        class="field-control text-style-main"
+        class="field-control form-input_field text-style-small"
         type={kind.type}
         name={name ?? slug(text)}
         placeholder={placeholder ?? text}
@@ -126,8 +131,75 @@ const text = label ?? kind.label;
         autocomplete={kind.fill}
         required={required || undefined}
         value={value}
+        aria-describedby={errorId}
         {...rest}
       />
+      <span class="field-error" id={errorId}>
+        {error}
+      </span>
     </label>
   )
 }
+
+<style is:global>
+  @layer components {
+    .form-input {
+      --_error: #ff6b5e;
+      gap: var(--space-1);
+
+      & .field-label {
+        color: var(--text-2);
+        font-size: 0.75rem;
+        line-height: var(--line-height-huge);
+      }
+
+      & .field-error {
+        display: none;
+        color: var(--_error);
+        font-size: 0.75rem;
+        line-height: var(--line-height-huge);
+      }
+
+      &:has(.form-input_field:disabled) .field-label {
+        color: color-mix(in srgb, var(--text) 30%, transparent);
+      }
+
+      &:has(.form-input_field:user-invalid),
+      .form_wrap[data-checked] &:has(.form-input_field:invalid) {
+        & .field-error {
+          display: block;
+        }
+        & .form-input_field {
+          border-color: var(--_error);
+        }
+      }
+    }
+
+    .form-input_field {
+      min-height: 2.5rem;
+      padding: 0 0.75rem;
+      background-color: transparent;
+      border-color: var(--stroke);
+      border-radius: 0.125rem;
+      &::placeholder {
+        color: color-mix(in srgb, var(--text) 20%, transparent);
+      }
+      @media (hover: hover) {
+        &:hover:not(:disabled, :focus) {
+          background-color: transparent;
+          border-color: var(--text);
+        }
+      }
+      &:focus,
+      &:focus-visible {
+        border-color: var(--brand-500);
+        outline: 0;
+      }
+      &:disabled {
+        opacity: 1;
+        background-color: color-mix(in srgb, var(--text) 4%, transparent);
+        color: color-mix(in srgb, var(--text) 20%, transparent);
+      }
+    }
+  }
+</style>

@@ -1,0 +1,712 @@
+---
+import Section from "@/components/Wrapper/Section.astro";
+import Heading from "@/components/Typography/Heading.astro";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+import Button from "@/components/Button.astro";
+import largeBody from "@/assets/home/pricing/parts/box-large-body.svg";
+import largeLid from "@/assets/home/pricing/parts/box-large-lid-front.svg";
+import largeFlap from "@/assets/home/pricing/parts/box-large-lid-side.svg";
+import smallBody from "@/assets/home/pricing/parts/box-small-body.svg";
+import smallLid from "@/assets/home/pricing/parts/box-small-lid-front.svg";
+import smallFlap from "@/assets/home/pricing/parts/box-small-lid-side.svg";
+import clockLarge from "@/assets/home/pricing/parts/icon-schedule-14.svg";
+import clockSmall from "@/assets/home/pricing/parts/icon-schedule-12.svg";
+
+type Plan = {
+  /** The tab's label. */
+  tab: string;
+  /** Who the plan suits, under "Best choice for". */
+  text: string;
+  /** The small label above the price. */
+  priceLabel: string;
+  /** The price, or what stands in for it. */
+  price: string;
+  /**
+   * The picture beside the plan.
+   *
+   * - `fixed` — one big box of hours along a project timeline
+   * - `subscription` — a box of hours for each month, climbing
+   */
+  visual: "fixed" | "subscription";
+};
+
+interface Props {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** The heading beside the plans. Nothing is output without it. */
+  heading?: string;
+  /** The plans, one tab each, the first selected. Nothing is output without them. */
+  plans?: Plan[];
+}
+
+const { render = true, heading, plans = [] } = Astro.props;
+
+const uid = `pricing-${Math.random().toString(36).slice(2, 8)}`;
+
+/* Places a part on the 578 × 422 artboard, in the design's own pixels. */
+const at = (x: number, y: number, w?: number, h?: number) =>
+  [
+    `--_x: ${x}`,
+    `--_y: ${y}`,
+    w !== undefined && `--_w: ${w}`,
+    h !== undefined && `--_h: ${h}`,
+  ]
+    .filter(Boolean)
+    .join("; ");
+
+/* The big box: its three cards, back to front, inside the box's mouth. */
+const largeCards = [
+  { x: 40, y: 66, w: 114, h: 74 },
+  { x: 34, y: 74, w: 114, h: 65 },
+  { x: 24, y: 82, w: 118, h: 59, hours: "160h" },
+];
+const weeks = [
+  { text: "Start", x: 48, align: "start" },
+  { text: "Week 2", x: 208.3, align: "center" },
+  { text: "Week 3", x: 368.7, align: "center" },
+  { text: "Handoff", x: 529, align: "end" },
+];
+
+/* The subscription: a small box per month along a rising timeline. */
+const months = [
+  { text: "Month 1", hours: "80h", price: "$$", x: 48, y: 175, tick: [106, 295] },
+  { text: "Month 2", hours: "40h", price: "$", x: 231, y: 125, tick: [289, 245], faint: true },
+  { text: "Month 3", hours: "160h", price: "$$$", x: 413, y: 77, tick: [471, 197] },
+];
+---
+
+{
+  render && heading && plans.length > 0 && (
+    <Section
+      id="pricing"
+      theme="light"
+      frame
+      class="pricing-main_wrap dashed dashed-bottom"
+      containerClass="pricing-main_container"
+    >
+      <div class="pricing-main_layout">
+        <div class="pricing-main_intro">
+          <Heading tag="h2" class="pricing-main_heading">
+            {heading}
+          </Heading>
+          <Button element="link" href="#contact" data-fade>
+            Book a Call
+          </Button>
+        </div>
+        <div class="pricing-main_block">
+          <div class="pricing-main_info">
+            <div
+              class="pricing-main_tabs dashed dashed-bottom"
+              role="tablist"
+              aria-label="Payment models"
+              data-fade
+            >
+              {plans.map((plan, i) => (
+                <button
+                  class="pricing-main_tab"
+                  type="button"
+                  role="tab"
+                  id={`${uid}-tab-${i}`}
+                  aria-controls={`${uid}-panel-${i}`}
+                  aria-selected={i === 0 ? "true" : "false"}
+                  tabindex={i === 0 ? 0 : -1}
+                >
+                  {plan.tab}
+                </button>
+              ))}
+            </div>
+            <div class="pricing-main_panels">
+              {plans.map((plan, i) => (
+                <div
+                  class:list={["pricing-main_panel", i === 0 && "is-active"]}
+                  role="tabpanel"
+                  id={`${uid}-panel-${i}`}
+                  aria-labelledby={`${uid}-tab-${i}`}
+                  tabindex="0"
+                >
+                  <div class="pricing-main_group">
+                    <Paragraph variant="label">Best choice for:</Paragraph>
+                    <Paragraph class="color-faded">{plan.text}</Paragraph>
+                  </div>
+                  <div class="pricing-main_group price">
+                    <Paragraph variant="label">{plan.priceLabel}</Paragraph>
+                    <Paragraph variant="h2">{plan.price}</Paragraph>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div class="pricing-main_visual hatched dashed dashed-top" data-fade>
+            <div class="pricing-main_art" aria-hidden="true">
+              {plans.map((plan, i) => (
+                <div
+                  class:list={["pricing-main_scene", i === 0 && "is-active"]}
+                >
+                  {plan.visual === "fixed" && (
+                    <>
+                      <img
+                        class="pricing-main_part"
+                        src={largeBody.src}
+                        alt=""
+                        style={at(193.3, 113.2, 191.451, 166.591)}
+                      />
+                      <span class="pricing-main_rule" style={at(49, 340, 480)} />
+                      {weeks.map((week) => (
+                        <span class="pricing-main_tick" style={at(week.x, 336)} />
+                      ))}
+                      <div class="pricing-main_pocket" style={at(200, 0, 200, 141)}>
+                        {largeCards.map((card) => (
+                          <div
+                            class="pricing-main_card"
+                            style={at(card.x, card.y, card.w, card.h)}
+                          >
+                            {card.hours && (
+                              <span class="pricing-main_hours large">
+                                {card.hours}
+                                <img src={clockLarge.src} alt="" />
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <img
+                        class="pricing-main_part"
+                        src={largeLid.src}
+                        alt=""
+                        style={at(181.5, 138.7, 164.8, 47.3045)}
+                      />
+                      <img
+                        class="pricing-main_part"
+                        src={largeFlap.src}
+                        alt=""
+                        style={at(345.4, 113.2, 51.1107, 71.4821)}
+                      />
+                      <span class="pricing-main_caption faint" style={at(226, 216)}>
+                        Your project
+                      </span>
+                      {weeks.map((week) => (
+                        <span
+                          class:list={["pricing-main_caption", week.align]}
+                          style={at(week.x + 0.5, 361)}
+                        >
+                          {week.text}
+                        </span>
+                      ))}
+                    </>
+                  )}
+                  {plan.visual === "subscription" && (
+                    <>
+                      <span class="pricing-main_rule rising" style={at(-67, 345, 737)} />
+                      {months.map((month) => (
+                        <span
+                          class="pricing-main_tick"
+                          style={at(month.tick[0], month.tick[1])}
+                        />
+                      ))}
+                      {months.map((month) => (
+                        <div
+                          class="pricing-main_box"
+                          style={at(month.x, month.y, 117, 88)}
+                        >
+                          <img
+                            class="pricing-main_part"
+                            src={smallBody.src}
+                            alt=""
+                            style={at(5.5, -0.5, 105.302, 89)}
+                          />
+                          <div class="pricing-main_pocket" style={at(25, -34, 65, 48)}>
+                            <div class="pricing-main_card" style={at(0, 0, 65, 48)}>
+                              <span class="pricing-main_hours">
+                                {month.hours}
+                                <img src={clockSmall.src} alt="" />
+                              </span>
+                            </div>
+                          </div>
+                          <img
+                            class="pricing-main_part"
+                            src={smallLid.src}
+                            alt=""
+                            style={at(-0.5, 13, 90.8032, 25.6076)}
+                          />
+                          <img
+                            class="pricing-main_part"
+                            src={smallFlap.src}
+                            alt=""
+                            style={at(89.1, -0.5, 28.52, 38.7318)}
+                          />
+                          <span
+                            class:list={["pricing-main_price", month.faint && "faint"]}
+                            style={at(6, 53, 84, 16)}
+                          >
+                            {[...month.price].map((glyph) => (
+                              <span>{glyph}</span>
+                            ))}
+                          </span>
+                        </div>
+                      ))}
+                      {months.map((month) => (
+                        <span
+                          class="pricing-main_caption center"
+                          style={at(month.tick[0] + 0.5, month.tick[1] + 25)}
+                        >
+                          {month.text}
+                        </span>
+                      ))}
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+<style is:global>
+  @layer components {
+    /* ========== Section ========== */
+    .pricing-main_wrap {
+      --_dash-color: var(--dark-750);
+      --_ink: var(--dark-900);
+      padding-bottom: var(--border-width);
+    }
+    .pricing-main_container {
+      padding-block: var(--section-space-large);
+    }
+
+    /* ========== Layout ========== */
+    .pricing-main_layout {
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-10);
+      @media (width >= 105rem) {
+        display: grid;
+        grid-template-columns: minmax(0, 32.4375rem) 59.875rem;
+        justify-content: space-between;
+        align-items: start;
+      }
+    }
+    .pricing-main_intro {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-9);
+      & > * {
+        margin-block: 0;
+      }
+    }
+    .pricing-main_heading,
+    .pricing-main_group > .text-style-h2 {
+      --_trim-top: 0.355em;
+      --_trim-bottom: 0.322em;
+      color: var(--_ink);
+    }
+    .pricing-main_heading {
+      max-width: 32.5rem;
+    }
+    .pricing-main_block {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-7);
+      @media (width < 64rem) {
+        max-width: 36.125rem;
+      }
+      @media (width >= 64rem) {
+        display: grid;
+        grid-template-columns: minmax(18.75rem, 1fr) minmax(0, 36.125rem);
+        column-gap: calc(80 / 958 * 100%);
+        align-items: start;
+      }
+    }
+
+    /* ========== Tabs ========== */
+    .pricing-main_info {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-7);
+      @media (width >= 64rem) {
+        max-width: 30rem;
+      }
+    }
+    .pricing-main_tabs {
+      display: flex;
+      gap: var(--space-5);
+      padding-bottom: var(--border-width);
+    }
+    .pricing-main_tab {
+      --_tab-ink: var(--_ink);
+      --_tab-text: 40%;
+      --_tab-line: transparent;
+      flex: none;
+      margin: 0;
+      padding: 0 0 var(--space-4);
+      border: 0;
+      border-bottom: var(--border-width) solid var(--_tab-line);
+      border-radius: 0.125rem 0.125rem 0 0;
+      background: none;
+      color: color-mix(in lab, var(--_tab-ink) var(--_tab-text), transparent);
+      font-family: var(--primary-family);
+      font-size: var(--text-main);
+      font-weight: var(--primary-regular);
+      line-height: var(--line-height-huge);
+      cursor: pointer;
+      transition:
+        color var(--hover-duration) var(--hover-ease),
+        border-color var(--hover-duration) var(--hover-ease);
+      &[aria-selected="true"] {
+        --_tab-ink: var(--text);
+        --_tab-text: 100%;
+        --_tab-line: var(--brand-500);
+        cursor: default;
+      }
+      &:focus-visible {
+        --_tab-line: transparent;
+        outline: 0.125rem solid var(--brand-500);
+        outline-offset: 0;
+        border-radius: 0.125rem;
+      }
+      &[aria-selected="false"]:focus-visible {
+        --_tab-text: 70%;
+      }
+      @media (hover: hover) {
+        &[aria-selected="false"]:hover {
+          --_tab-text: 70%;
+          --_tab-line: var(--stroke);
+        }
+        &[aria-selected="true"]:hover {
+          --_tab-line: var(--brand-600);
+        }
+        &:hover:focus-visible {
+          --_tab-line: transparent;
+        }
+      }
+    }
+
+    /* ========== Plans ========== */
+    .pricing-main_panels {
+      display: grid;
+    }
+    .pricing-main_panel {
+      grid-area: 1 / 1;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-7);
+      &:not(.is-active) {
+        visibility: hidden;
+        opacity: 0;
+      }
+      &:focus-visible {
+        outline: 0.125rem solid var(--brand-500);
+        outline-offset: 0.5rem;
+        border-radius: 0.125rem;
+      }
+    }
+    .pricing-main_group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      & > * {
+        margin-block: 0;
+      }
+      & > :not(.text-style-h2) {
+        --_trim-top: 0.5lh;
+        --_trim-bottom: 0.5lh;
+      }
+      & > .text-style-label {
+        color: color-mix(in srgb, var(--_ink) 60%, transparent);
+      }
+      &.price {
+        gap: var(--space-4);
+      }
+    }
+
+    /* ========== Picture ========== */
+    .pricing-main_visual {
+      --_dash-bottom: 0rem;
+      overflow: clip;
+      border-radius: 0.125rem;
+      background-color: var(--background-2);
+    }
+    .pricing-main_art {
+      --_u: calc(100cqw / 578);
+      position: relative;
+      container-type: inline-size;
+      aspect-ratio: 578 / 422;
+    }
+    .pricing-main_scene {
+      position: absolute;
+      inset: 0;
+      &:not(.is-active) {
+        visibility: hidden;
+        opacity: 0;
+      }
+    }
+    .pricing-main_part,
+    .pricing-main_rule,
+    .pricing-main_tick,
+    .pricing-main_pocket,
+    .pricing-main_card,
+    .pricing-main_box,
+    .pricing-main_caption,
+    .pricing-main_price {
+      position: absolute;
+      left: calc(var(--_x) * var(--_u));
+      top: calc(var(--_y) * var(--_u));
+    }
+    .pricing-main_part,
+    .pricing-main_pocket,
+    .pricing-main_card,
+    .pricing-main_box,
+    .pricing-main_price {
+      width: calc(var(--_w) * var(--_u));
+      height: calc(var(--_h) * var(--_u));
+    }
+    .pricing-main_part {
+      display: block;
+      max-width: none;
+    }
+    .pricing-main_rule {
+      width: calc(var(--_w) * var(--_u));
+      height: var(--border-width);
+      background: repeating-linear-gradient(
+        to right,
+        var(--stroke) 0 0.125rem,
+        transparent 0 0.25rem
+      );
+      &.rising {
+        transform-origin: 0 50%;
+        rotate: -15deg;
+      }
+    }
+    .pricing-main_tick {
+      width: var(--border-width);
+      height: calc(9 * var(--_u));
+      background: var(--light-300);
+    }
+    .pricing-main_pocket {
+      overflow: clip;
+    }
+    .pricing-main_card {
+      box-sizing: border-box;
+      border: var(--border-width) solid var(--brand-500);
+      background: color-mix(in srgb, var(--brand-500) 20%, var(--light-100));
+      overflow: clip;
+    }
+    .pricing-main_hours {
+      position: absolute;
+      left: calc(6 * var(--_u) - var(--border-width));
+      top: calc(4 * var(--_u) - var(--border-width));
+      display: flex;
+      align-items: center;
+      gap: calc(4 * var(--_u));
+      color: var(--_ink);
+      font-family: var(--mono-family);
+      font-size: calc(12 * var(--_u));
+      line-height: 1.5;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      & img {
+        width: calc(12 * var(--_u));
+        height: calc(12 * var(--_u));
+      }
+      &.large {
+        color: var(--text);
+        font-size: max(0.75rem, calc(16 * var(--_u)));
+        & img {
+          width: calc(14 * var(--_u));
+          height: calc(14 * var(--_u));
+        }
+      }
+    }
+    .pricing-main_caption {
+      --_shift: 0%;
+      translate: var(--_shift) 0;
+      color: color-mix(in lab, var(--_ink) 60%, transparent);
+      font-family: var(--mono-family);
+      font-size: max(0.5625rem, calc(12 * var(--_u)));
+      line-height: 1.5;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+      &.center {
+        --_shift: -50%;
+      }
+      &.end {
+        --_shift: -100%;
+      }
+      &.faint {
+        color: color-mix(in lab, var(--light-100) 40%, transparent);
+      }
+    }
+    .pricing-main_price {
+      display: flex;
+      justify-content: center;
+      gap: calc(2 * var(--_u));
+      color: var(--stroke);
+      font-family: var(--primary-family);
+      font-size: calc(24 * var(--_u));
+      font-weight: var(--primary-medium);
+      line-height: calc(16 * var(--_u));
+      & span {
+        width: calc(13 * var(--_u));
+        text-align: center;
+      }
+      &.faint {
+        color: var(--light-300);
+      }
+    }
+  }
+</style>
+
+<script>
+  import { gsap } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  const FADE = "opacity,visibility";
+
+  onPage(() => {
+    const roots = document.querySelectorAll<HTMLElement>(".pricing-main_wrap");
+    if (roots.length === 0) return;
+
+    const designing =
+      document.documentElement.classList.contains("stacki-designer");
+    const listeners = new AbortController();
+    const ctx = gsap.context(() => {});
+    const mm = gsap.matchMedia();
+    let motion = false;
+
+    roots.forEach((root) => {
+      const tabs = [
+        ...root.querySelectorAll<HTMLButtonElement>(".pricing-main_tab"),
+      ];
+      const panels = [
+        ...root.querySelectorAll<HTMLElement>(".pricing-main_panel"),
+      ];
+      const scenes = [
+        ...root.querySelectorAll<HTMLElement>(".pricing-main_scene"),
+      ];
+      if (tabs.length === 0 || tabs.length !== panels.length) return;
+
+      let current = Math.max(
+        0,
+        tabs.findIndex((tab) => tab.getAttribute("aria-selected") === "true"),
+      );
+      const cardsOf = (index: number) =>
+        scenes[index]?.querySelectorAll(".pricing-main_card") ?? [];
+
+      /* Swaps the plan and its picture with a short cross-fade, the new
+         box's cards rising out of it. */
+      const show = (next: number, focus = false) => {
+        const index = (next + tabs.length) % tabs.length;
+        if (focus) tabs[index].focus();
+        if (index === current) return;
+
+        const leaving = [panels[current], scenes[current]].filter(Boolean);
+        const entering = [panels[index], scenes[index]].filter(Boolean);
+        current = index;
+
+        tabs.forEach((tab, i) => {
+          tab.setAttribute("aria-selected", String(i === index));
+          tab.tabIndex = i === index ? 0 : -1;
+        });
+        leaving.forEach((el) => el.classList.remove("is-active"));
+        entering.forEach((el) => el.classList.add("is-active"));
+
+        if (!motion) return;
+        ctx.add(() => {
+          gsap.fromTo(
+            leaving,
+            { autoAlpha: 1 },
+            {
+              autoAlpha: 0,
+              duration: 0.25,
+              ease: "power1.out",
+              overwrite: true,
+              clearProps: FADE,
+            },
+          );
+          gsap.fromTo(
+            entering,
+            { autoAlpha: 0 },
+            {
+              autoAlpha: 1,
+              duration: 0.45,
+              delay: 0.1,
+              ease: "power1.out",
+              overwrite: true,
+              clearProps: FADE,
+            },
+          );
+          const cards = cardsOf(index);
+          if (cards.length > 0) {
+            gsap.fromTo(
+              cards,
+              { yPercent: 100 },
+              {
+                yPercent: 0,
+                duration: 0.7,
+                delay: 0.15,
+                stagger: 0.06,
+                overwrite: true,
+                clearProps: "transform",
+              },
+            );
+          }
+        });
+      };
+
+      const { signal } = listeners;
+      tabs.forEach((tab, i) =>
+        tab.addEventListener("click", () => show(i), { signal }),
+      );
+      tabs[0].parentElement?.addEventListener(
+        "keydown",
+        (event) => {
+          const moves: Record<string, number> = {
+            ArrowRight: current + 1,
+            ArrowDown: current + 1,
+            ArrowLeft: current - 1,
+            ArrowUp: current - 1,
+            Home: 0,
+            End: tabs.length - 1,
+          };
+          if (!(event.key in moves)) return;
+          event.preventDefault();
+          show(moves[event.key], true);
+        },
+        { signal },
+      );
+
+      /* The first time the picture comes into view, its cards rise out of
+         the box. */
+      if (designing) return;
+      mm.add("(prefers-reduced-motion: no-preference)", () => {
+        motion = true;
+        const cards = cardsOf(current);
+        if (cards.length > 0) {
+          gsap.from(cards, {
+            yPercent: 100,
+            duration: 0.9,
+            delay: 0.2,
+            stagger: 0.08,
+            clearProps: "transform",
+            scrollTrigger: { trigger: scenes[current], start: "top 80%", once: true },
+          });
+        }
+        return () => {
+          motion = false;
+        };
+      });
+    });
+
+    return () => {
+      listeners.abort();
+      mm.revert();
+      ctx.revert();
+    };
+  });
+</script>

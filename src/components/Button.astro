@@ -16,6 +16,8 @@ type Tag =
       type?: "button" | "submit" | "reset";
       /** Greys it out and stops it responding. */
       disabled?: boolean;
+      /** Shows a spinner in place of the label while something is sent. */
+      loading?: boolean;
       href?: never;
     })
   | (Omit<HTMLAttributes<"a">, "type"> & {
@@ -24,6 +26,7 @@ type Tag =
       href?: string;
       type?: never;
       disabled?: never;
+      loading?: never;
     });
 
 type Kind =
@@ -44,6 +47,13 @@ type Kind =
        * - `secondary` — outlined, for anything sitting beside a primary
        */
       emphasis?: Emphasis;
+      /**
+       * Height of the pill.
+       *
+       * - `large` — 56px, for calls to action in the page (default)
+       * - `medium` — 40px, for the header and inside cards
+       */
+      size?: "large" | "medium";
       label?: never;
       pressed?: never;
       direction?: never;
@@ -52,6 +62,7 @@ type Kind =
       variant: "link";
       /** A link carries no weight of its own: it is already the quietest. */
       emphasis?: never;
+      size?: never;
       label?: never;
       pressed?: never;
       direction?: never;
@@ -59,6 +70,7 @@ type Kind =
   | {
       variant: "play";
       emphasis?: Emphasis;
+      size?: never;
       /** What the control does, for anyone who cannot see its mark. Defaults to `Play`, or `Pause` when pressed is `true`. */
       label?: string;
       /** Whether it is playing: shows the pause mark, and reads as pressed. Defaults to `false`. */
@@ -68,6 +80,7 @@ type Kind =
   | {
       variant: "close";
       emphasis?: Emphasis;
+      size?: never;
       /** What the control does, for anyone who cannot see its mark. Defaults to `Close`. */
       label?: string;
       pressed?: never;
@@ -76,6 +89,7 @@ type Kind =
   | {
       variant: "arrow";
       emphasis?: Emphasis;
+      size?: never;
       /** What the control does, for anyone who cannot see its mark. Defaults to `Next`, or `Previous` when direction is `back`. */
       label?: string;
       pressed?: never;
@@ -94,6 +108,8 @@ type AllProps = HTMLAttributes<"button"> &
     render?: boolean;
     variant?: "main" | "link" | "play" | "close" | "arrow";
     emphasis?: Emphasis;
+    size?: "large" | "medium";
+    loading?: boolean;
     label?: string;
     pressed?: boolean;
     direction?: "forward" | "back";
@@ -106,6 +122,8 @@ const {
   render = true,
   variant = "main",
   emphasis = "primary",
+  size = "large",
+  loading = false,
   label,
   pressed = false,
   direction = "forward",
@@ -141,11 +159,13 @@ const named = {
         "button_wrap",
         emphasis !== "primary" && emphasis,
         variant !== "main" && variant,
+        variant === "main" && size === "medium" && "medium",
         variant === "arrow" && direction === "back" && "back",
         className,
       ]}
       aria-label={isWritten ? undefined : (label ?? named[variant])}
       aria-pressed={variant === "play" ? pressed : undefined}
+      aria-busy={loading ? "true" : undefined}
       {...tagAttrs}
       {...rest}
     >
@@ -177,13 +197,16 @@ const named = {
       justify-content: center;
       align-items: center;
       gap: 0.5em;
-      padding: 0.75em 1.5em;
+      position: relative;
+      min-height: 3.5rem;
+      padding: 0 1.5rem;
       background-color: var(--button-background);
       color: var(--button-text);
-      border: var(--border-width) solid var(--button-border);
-      border-radius: var(--radius-small);
-      font-weight: var(--primary-bold);
-      line-height: var(--line-height-huge);
+      border: 0 solid var(--button-border);
+      border-radius: var(--radius-round);
+      font-size: 1rem;
+      font-weight: var(--primary-semibold);
+      line-height: 1.6875;
       text-decoration: none;
       text-align: center;
       transition:
@@ -197,7 +220,37 @@ const named = {
           border-color: var(--button-border-hover);
         }
       }
+      &:active:not(:disabled) {
+        background-color: var(--button-background-pressed, var(--button-background-hover));
+      }
+      &:focus-visible {
+        outline: var(--focus-width) solid var(--button-focus, var(--text));
+        outline-offset: 0;
+      }
+      &.medium {
+        min-height: 2.5rem;
+        padding-inline: 1.25rem;
+      }
+      &[aria-busy="true"] {
+        pointer-events: none;
+        & .button_text {
+          opacity: 0;
+        }
+        &::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          width: 1rem;
+          height: 1rem;
+          margin: auto;
+          border: 0.125rem solid currentcolor;
+          border-right-color: transparent;
+          border-radius: 50%;
+          animation: button-spin 0.8s linear infinite;
+        }
+      }
       &.secondary {
+        border-width: var(--border-width);
         --button-background: var(--button-2-background);
         --button-text: var(--button-2-text);
         --button-border: var(--button-2-border);
@@ -213,6 +266,7 @@ const named = {
         --button-text-hover: var(--link-text-hover);
         --button-border-hover: var(--link-border);
 
+        min-height: 0;
         padding: 0.4em 0;
         border: 0;
         border-bottom: var(--border-width) solid var(--button-border);
@@ -238,7 +292,9 @@ const named = {
       }
       &:is(.play, .close, .arrow) {
         gap: 0;
+        min-height: 0;
         padding: 0.75em;
+        border-width: var(--border-width);
         border-radius: var(--radius-round);
       }
       &.back .button_mark {
@@ -257,7 +313,13 @@ const named = {
       }
       &:disabled {
         cursor: not-allowed;
-        opacity: 0.5;
+        background-color: var(--dark-750);
+        color: color-mix(in lab, var(--light-100) 40%, transparent);
+      }
+    }
+    @keyframes button-spin {
+      to {
+        rotate: 1turn;
       }
     }
   }

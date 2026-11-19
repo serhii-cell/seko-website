@@ -1,0 +1,442 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import Section from "@/components/Wrapper/Section.astro";
+import Heading from "@/components/Typography/Heading.astro";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+import { slotContent } from "@/utils/slots.ts";
+
+interface Props extends HTMLAttributes<"section"> {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** Small line of text above the heading. Inline markup is rendered. */
+  label?: string;
+  /** The section's title. Inline markup is rendered. */
+  heading: string;
+  /** Names the row of cards for screen readers. Defaults to `label`. */
+  listLabel?: string;
+}
+
+const {
+  render = true,
+  label,
+  heading,
+  listLabel = label ?? "Projects",
+  id = "work",
+  class: className,
+  ...rest
+} = Astro.props;
+
+const cards = await slotContent(Astro.slots);
+---
+
+{
+  render && heading && cards && (
+    <Section
+      frame
+      id={id}
+      class:list={["works-main_wrap", className]}
+      containerClass="works-main_frame"
+      {...rest}
+    >
+      <div class="works-main_header">
+        <Paragraph variant="label" class="works-main_label">
+          <Fragment set:html={label} />
+        </Paragraph>
+        <Heading tag="h2" class="works-main_title">
+          <Fragment set:html={heading} />
+        </Heading>
+      </div>
+      <div class="works-main_viewport">
+        <div
+          class="works-main_scroll"
+          role="region"
+          aria-label={listLabel}
+          tabindex="0"
+        >
+          <div class="works-main_list">
+            <Fragment set:html={cards} />
+          </div>
+        </div>
+      </div>
+    </Section>
+  )
+}
+
+<style is:global>
+  @layer components {
+    .works-main_frame {
+      gap: var(--section-space-small);
+      align-items: stretch;
+      padding-top: var(--section-space-xlarge);
+      padding-bottom: var(--section-space-small);
+
+      &::after {
+        content: "";
+        position: absolute;
+        inset-inline: 0;
+        bottom: 0;
+        height: var(--border-width);
+        background-image: repeating-linear-gradient(
+          to right,
+          var(--stroke) 0 var(--dash),
+          transparent 0 calc(var(--dash) * 2)
+        );
+        pointer-events: none;
+      }
+    }
+
+    .works-main_header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-5);
+      text-align: center;
+
+      > * {
+        margin: 0;
+      }
+    }
+
+    .works-main_label {
+      --_trim-top: 0.5lh;
+      --_trim-bottom: 0.5lh;
+      color: color-mix(in srgb, var(--text) 30%, transparent);
+    }
+
+    .works-main_title {
+      --_mw: 53.75rem;
+    }
+
+    /* The row runs past the frame and scrolls sideways: trackpad, mouse drag
+       or keys. It sits just inside the rails, so cards pass under neither,
+       and starts its cards past the rail, as the design counts it. */
+    .works-main_viewport {
+      --_inset: calc(var(--_frame-inset) - var(--border-width));
+      --_ring: 0.25rem;
+      position: relative;
+      margin-inline: calc(var(--_inset) * -1);
+      margin-block: calc(var(--_ring) * -1);
+
+      &:has(> .works-main_scroll:focus-visible)::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        border: var(--focus-width) solid var(--brand-300);
+        pointer-events: none;
+      }
+    }
+
+    /* Trackpads scroll the row freely; touch swipes settle on a card. */
+    .works-main_scroll {
+      --_share: 0.88;
+      --_gap: var(--space-4);
+      position: relative;
+      container-type: inline-size;
+      padding: var(--_ring) var(--_inset);
+      overflow-x: auto;
+      overflow-y: hidden;
+      overscroll-behavior-x: contain;
+      scroll-padding-inline: var(--_frame-inset);
+      scrollbar-width: none;
+      outline: none;
+
+      &::-webkit-scrollbar {
+        display: none;
+      }
+
+      @media (pointer: coarse) {
+        scroll-snap-type: x proximity;
+      }
+
+      @media (pointer: fine) {
+        cursor: grab;
+
+        .card_link {
+          cursor: inherit;
+        }
+      }
+
+      /* Held by the scroll: the page's scroll moves the row instead. */
+      &.is-pinned {
+        overflow: hidden;
+        scroll-snap-type: none;
+        cursor: auto;
+
+        & .card_link {
+          cursor: pointer;
+        }
+      }
+
+      &.is-dragging {
+        cursor: grabbing;
+        scroll-snap-type: none;
+        user-select: none;
+
+        .card_link {
+          pointer-events: none;
+        }
+      }
+
+      @media (width >= 48rem) {
+        --_share: 0.8;
+        --_gap: var(--space-8);
+      }
+
+      @media (width >= 64rem) {
+        --_share: calc(1249 / 1640);
+        --_gap: var(--section-space-small);
+      }
+    }
+
+    .works-main_list {
+      display: flex;
+      align-items: start;
+      gap: var(--_gap);
+      width: max-content;
+      padding-inline: var(--border-width);
+
+      .works-main_scroll & > * {
+        flex: none;
+        width: calc(100cqw * var(--_share));
+        scroll-snap-align: start;
+      }
+    }
+  }
+</style>
+
+<script>
+  import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  /* Where the row holds while pinned, in px from the top of the screen:
+     centred in the space under the nav, or its bottom on the screen's
+     bottom when it is taller than that space. */
+  function holdAt(element: HTMLElement) {
+    const root = getComputedStyle(document.documentElement);
+    const nav = (parseFloat(root.getPropertyValue("--nav-height")) || 0) * parseFloat(root.fontSize);
+    const room = innerHeight - nav;
+    const height = element.offsetHeight;
+    return height <= room ? nav + (room - height) / 2 : innerHeight - height;
+  }
+
+  /* Distance a press has to travel before it counts as a drag, not a click. */
+  const THRESHOLD = 6;
+  /* How far a flick carries on, in ms of its release speed. */
+  const CARRY = 260;
+
+  /* The row scrolls sideways by itself on small screens and with reduced
+     motion: mouse drag here, trackpads and touch natively, keys once it or a
+     card has focus, and on release it glides on to the nearest card. From
+     48rem up, with motion, the page's scroll drives it instead (below). */
+  function setup(row: HTMLElement) {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const section = row.closest<HTMLElement>(".works-main_wrap");
+    const viewport = row.parentElement;
+    const list = row.querySelector<HTMLElement>(".works-main_list");
+    /* Set while the page's scroll drives the row. */
+    let pinned: ScrollTrigger | null = null;
+    let pointer: number | null = null;
+    let startX = 0;
+    let startScroll = 0;
+    let lastX = 0;
+    let lastTime = 0;
+    let velocity = 0;
+    let moved = false;
+    let swallowClick = false;
+    let glide: gsap.core.Tween | null = null;
+
+    const stopGlide = () => {
+      glide?.kill();
+      glide = null;
+      row.classList.remove("is-dragging");
+    };
+
+    /* Each card's start along the row, measured from the list so it holds
+       whether or not the list is moved by the pinned scroll. */
+    const snapPoints = () => {
+      const style = getComputedStyle(row);
+      const inset = parseFloat(style.scrollPaddingLeft) || 0;
+      const padding = parseFloat(style.paddingLeft) || 0;
+      const max = row.scrollWidth - row.clientWidth;
+      const start = list?.getBoundingClientRect().left ?? 0;
+      const items = row.querySelectorAll<HTMLElement>(".works-main_list > *");
+      const points = Array.from(items, (item) =>
+        Math.min(Math.max(padding + item.getBoundingClientRect().left - start - inset, 0), max),
+      );
+      return [...points, max];
+    };
+
+    const settle = () => {
+      const target = row.scrollLeft - velocity * CARRY;
+      const to = snapPoints().reduce((best, point) =>
+        Math.abs(point - target) < Math.abs(best - target) ? point : best,
+      );
+      if (reduce.matches) {
+        row.scrollLeft = to;
+        row.classList.remove("is-dragging");
+        return;
+      }
+      glide = gsap.to(row, {
+        scrollLeft: to,
+        duration: 0.7,
+        onComplete: stopGlide,
+      });
+    };
+
+    const onDown = (event: PointerEvent) => {
+      if (pinned || event.pointerType !== "mouse" || event.button !== 0) return;
+      stopGlide();
+      pointer = event.pointerId;
+      startX = lastX = event.clientX;
+      startScroll = row.scrollLeft;
+      lastTime = performance.now();
+      velocity = 0;
+      moved = false;
+    };
+
+    const onMove = (event: PointerEvent) => {
+      if (pointer !== event.pointerId) return;
+      const dx = event.clientX - startX;
+      if (!moved) {
+        if (Math.abs(dx) < THRESHOLD) return;
+        moved = true;
+        row.classList.add("is-dragging");
+        try {
+          row.setPointerCapture(event.pointerId);
+        } catch {
+          /* The pointer is already gone; the drag still follows it. */
+        }
+        window.getSelection()?.removeAllRanges();
+      }
+      event.preventDefault();
+      row.scrollLeft = startScroll - dx;
+      const now = performance.now();
+      const dt = now - lastTime;
+      if (dt > 0) velocity = 0.8 * ((event.clientX - lastX) / dt) + 0.2 * velocity;
+      lastX = event.clientX;
+      lastTime = now;
+    };
+
+    const onUp = (event: PointerEvent) => {
+      if (pointer !== event.pointerId) return;
+      pointer = null;
+      if (row.hasPointerCapture(event.pointerId)) {
+        row.releasePointerCapture(event.pointerId);
+      }
+      if (!moved) return;
+      if (performance.now() - lastTime > 80) velocity = 0;
+      swallowClick = true;
+      window.setTimeout(() => (swallowClick = false), 0);
+      settle();
+    };
+
+    const onClick = (event: MouseEvent) => {
+      if (!swallowClick) return;
+      event.preventDefault();
+      event.stopPropagation();
+      swallowClick = false;
+    };
+
+    /* Keyboard focus on a card brings the whole card in, not just its title. */
+    const onFocus = (event: FocusEvent) => {
+      const target = event.target as HTMLElement;
+      if (target === row || !target.matches(":focus-visible")) return;
+      const items = Array.from(
+        row.querySelectorAll<HTMLElement>(".works-main_list > *"),
+      );
+      const index = items.findIndex((item) => item.contains(target));
+      if (index < 0) return;
+      if (pinned) {
+        /* The row itself never scrolls while pinned; scroll the page to
+           where the row shows that card. */
+        row.scrollLeft = 0;
+        const shift = pinned.end - pinned.start;
+        const to = Math.min(snapPoints()[index], shift);
+        window.scrollTo({ top: pinned.start + to, behavior: reduce.matches ? "auto" : "smooth" });
+        return;
+      }
+      stopGlide();
+      const to = snapPoints()[index];
+      requestAnimationFrame(() => {
+        if (reduce.matches) {
+          row.scrollLeft = to;
+          return;
+        }
+        glide = gsap.to(row, { scrollLeft: to, duration: 0.5, onComplete: stopGlide });
+      });
+    };
+
+    const onDragStart = (event: DragEvent) => event.preventDefault();
+
+    row.addEventListener("pointerdown", onDown);
+    row.addEventListener("pointermove", onMove);
+    row.addEventListener("pointerup", onUp);
+    row.addEventListener("pointercancel", onUp);
+    row.addEventListener("click", onClick, true);
+    row.addEventListener("dragstart", onDragStart);
+    row.addEventListener("focusin", onFocus);
+    row.addEventListener("wheel", stopGlide, { passive: true });
+
+    /* From 48rem up, with motion, the section holds when its row reaches
+       the space under the nav, and scrolling the page moves the row along
+       until its last card is in; then the page carries on. */
+    const mm = gsap.matchMedia();
+    if (section && viewport && list && !document.documentElement.classList.contains("stacki-designer")) {
+      mm.add("(width >= 48rem) and (prefers-reduced-motion: no-preference)", () => {
+        stopGlide();
+        row.scrollLeft = 0;
+        row.classList.add("is-pinned");
+        const shift = () => Math.max(0, row.scrollWidth - row.clientWidth);
+        const tween = gsap.to(list, {
+          x: () => -shift(),
+          ease: "none",
+          scrollTrigger: {
+            trigger: viewport,
+            start: () => `top ${holdAt(viewport)}`,
+            end: () => `+=${shift()}`,
+            pin: section,
+            /* Off by default inside a flex parent like <main>. */
+            pinSpacing: true,
+            scrub: 0.6,
+            invalidateOnRefresh: true,
+            /* Refreshed before the pinned services below it. */
+            refreshPriority: 1,
+          },
+        });
+        pinned = tween.scrollTrigger ?? null;
+        /* Focus, find-in-page or a selection drag can still scroll a hidden
+           overflow; keep the row's own scroll at the start. */
+        const hold = () => {
+          if (row.scrollLeft !== 0) row.scrollLeft = 0;
+        };
+        row.addEventListener("scroll", hold);
+        return () => {
+          pinned = null;
+          row.removeEventListener("scroll", hold);
+          row.classList.remove("is-pinned");
+          gsap.set(list, { clearProps: "transform" });
+        };
+      });
+    }
+
+    return () => {
+      mm.revert();
+      stopGlide();
+      row.removeEventListener("pointerdown", onDown);
+      row.removeEventListener("pointermove", onMove);
+      row.removeEventListener("pointerup", onUp);
+      row.removeEventListener("pointercancel", onUp);
+      row.removeEventListener("click", onClick, true);
+      row.removeEventListener("dragstart", onDragStart);
+      row.removeEventListener("focusin", onFocus);
+      row.removeEventListener("wheel", stopGlide);
+    };
+  }
+
+  onPage(() => {
+    const rows = gsap.utils.toArray<HTMLElement>(".works-main_scroll");
+    const cleanups = rows.map(setup);
+    return () => cleanups.forEach((cleanup) => cleanup());
+  });
+</script>

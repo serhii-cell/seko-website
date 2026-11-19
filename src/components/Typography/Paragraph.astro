@@ -15,6 +15,7 @@ type ParagraphStyle =
   | "large"
   | "main"
   | "mono"
+  | "label"
   | "small";
 
 interface Props extends HTMLAttributes<"p"> {
@@ -28,6 +29,7 @@ interface Props extends HTMLAttributes<"p"> {
    * - `display`, `h1`–`h6` — the heading sizes
    * - `large`, `main`, `small` — the body sizes
    * - `mono` — the main body size in the mono face
+   * - `label` — small uppercase mono, for section and field labels
    * - `inherit` — take the style from its surroundings (default)
    */
   variant?: ParagraphStyle;

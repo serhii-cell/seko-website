@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="93" height="68" viewBox="0 0 93 68" fill="none"><defs>
+<linearGradient id="paint0_linear_0_1" x1="46.4989" y1="53.0608" x2="46.4989" y2="0" gradientUnits="userSpaceOnUse">
+<stop stop-color="#7BD52D" stop-opacity="0.55" />
+<stop offset="1" stop-color="#7BD52D" stop-opacity="0" />
+</linearGradient>
+</defs>
+<g id="Open box">
+<path id="Flap back-left" d="M13.6266 26.1289L47.7642 11.6235L35.6102 1.89215L1.47266 16.3985L13.6266 26.1289Z" fill="white" stroke="#E0E0E0" stroke-linejoin="round" />
+<path id="Flap back-right" d="M47.7637 11.6236L79.3739 26.9317L92.5002 17.5089L60.89 2.20074L47.7637 11.6236Z" fill="white" stroke="#E0E0E0" stroke-linejoin="round" />
+<path id="Inside wall back" d="M13.625 37.7525L47.7626 23.2462V11.6234L13.625 26.1288V37.7525Z" fill="#F0F0F0" stroke="#E0E0E0" stroke-width="0.901965" stroke-linejoin="round" />
+<path id="Inside wall right" d="M47.7637 23.2463L79.3739 38.5545V26.9317L47.7637 11.6236V23.2463Z" fill="#F0F0F0" stroke="#E0E0E0" stroke-width="0.901965" stroke-linejoin="round" />
+<path id="Green surface" d="M13.625 37.7527L47.7626 23.2464L79.3728 38.5546L45.2353 53.0609L13.625 37.7527Z" fill="#7BD52D" />
+<path id="Glow" d="M13.625 14.5063L47.7626 0L79.3728 15.3082V38.5545L45.2353 53.0608L13.625 37.7527V14.5063Z" fill="url(#paint0_linear_0_1)" />
+<path id="Wall front-left" d="M13.625 51.7005L45.2353 67.0087V41.4371L13.625 26.1289V51.7005Z" fill="#F0F0F0" stroke="#E0E0E0" stroke-linejoin="round" />
+<path id="Wall front-right" d="M45.2363 67.0087L79.3739 52.5024V26.9317L45.2363 41.4371V67.0087Z" fill="#F0F0F0" stroke="#E0E0E0" stroke-linejoin="round" />
+<path id="Flap front-left" d="M13.6263 26.129L45.2366 41.4371L32.1103 43.1707L0.5 27.8625L13.6263 26.129Z" fill="white" stroke="#E0E0E0" stroke-linejoin="round" />
+<path id="Flap front-right" d="M45.2363 41.4371L79.3739 26.9317L91.5279 28.9728L57.3903 43.4792L45.2363 41.4371Z" fill="white" stroke="#E0E0E0" stroke-linejoin="round" />
+</g>
+</svg>
