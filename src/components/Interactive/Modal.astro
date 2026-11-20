@@ -1,6 +1,8 @@
 ---
 import type { HTMLAttributes } from "astro/types";
 import Button from "@/components/Button.astro";
+import Icon from "@/components/Media/Icon.astro";
+import close from "@/assets/home/modals/icon-close.svg";
 import { slotContent } from "@/utils/slots.ts";
 
 type Props = HTMLAttributes<"dialog"> & {
@@ -19,8 +21,10 @@ type Props = HTMLAttributes<"dialog"> & {
    * - `small` — a centred card that rises into place (default)
    * - `side-panel` — a full-height column sliding in from the end edge
    * - `full-screen` — fills the viewport, the content fading up
+   * - `sheet` — a wide page of its own over the blurred site, scrolled as
+   *   one long sheet that rises into place
    */
-  variant?: "small" | "side-panel" | "full-screen";
+  variant?: "small" | "side-panel" | "full-screen" | "sheet";
   /** Hold it open while the visual builder is in design mode. */
   preview?: boolean;
 };
@@ -55,15 +59,28 @@ if (import.meta.env.DEV && render && content && !id) {
         className,
       ]}
       aria-label={label}
+      data-lenis-prevent={variant === "sheet" ? "" : undefined}
+      tabindex={variant === "sheet" ? -1 : undefined}
       {...rest}
     >
       <div class="modal_content">
-        <Button
-          class="modal_close"
-          variant="close"
-          emphasis="secondary"
-          data-modal-close
-        />
+        {variant === "sheet" ? (
+          <button
+            class="modal_close modal_icon-button"
+            type="button"
+            aria-label="Close"
+            data-modal-close
+          >
+            <Icon src={close} />
+          </button>
+        ) : (
+          <Button
+            class="modal_close"
+            variant="close"
+            emphasis="secondary"
+            data-modal-close
+          />
+        )}
         <div class="modal_scroll" data-modal-scroll>
           <div class="modal_body margin-trim">
             <Fragment set:html={content} />
@@ -75,60 +92,98 @@ if (import.meta.env.DEV && render && content && !id) {
 }
 
 <script>
-  for (const modal of document.querySelectorAll<HTMLDialogElement>(
-    ".modal_wrap",
-  )) {
-    const scroll = modal.querySelector<HTMLElement>("[data-modal-scroll]");
+  import { onPage } from "@/utils/lifecycle.ts";
 
-    const open = () => {
-      if (modal.open) return;
-      if (scroll) scroll.scrollTop = 0;
-      modal.showModal();
-      modal.dispatchEvent(new CustomEvent("modal-open", { bubbles: true }));
-    };
+  onPage(() => {
+    const modals = document.querySelectorAll<HTMLDialogElement>(".modal_wrap");
+    if (modals.length === 0) return;
 
-    modal.addEventListener("close", () =>
-      modal.dispatchEvent(new CustomEvent("modal-close", { bubbles: true })),
-    );
+    const listening = new AbortController();
+    const { signal } = listening;
 
-    let fromBackdrop = false;
+    for (const modal of modals) {
+      const scroll = modal.querySelector<HTMLElement>("[data-modal-scroll]");
 
-    modal.addEventListener("mousedown", (event) => {
-      fromBackdrop = event.target === modal;
-    });
+      const open = () => {
+        if (modal.open) return;
+        if (scroll) scroll.scrollTop = 0;
+        modal.scrollTop = 0;
+        const root = document.documentElement;
+        root.toggleAttribute(
+          "data-modal-gutter",
+          window.innerWidth > root.clientWidth,
+        );
+        modal.showModal();
+        if (modal.classList.contains("sheet")) modal.focus();
+        modal.dispatchEvent(new CustomEvent("modal-open", { bubbles: true }));
+      };
 
-    modal.addEventListener("click", (event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      if (target.closest("[data-modal-close]")) modal.close();
-      else if (fromBackdrop && target === modal) modal.close();
-      fromBackdrop = false;
-    });
-
-    document.addEventListener("click", (event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      const trigger = target.closest(
-        `[data-modal-open="${modal.id}"], a[href="#${modal.id}"]`,
+      modal.addEventListener(
+        "close",
+        () =>
+          modal.dispatchEvent(new CustomEvent("modal-close", { bubbles: true })),
+        { signal },
       );
-      if (!trigger) return;
-      event.preventDefault();
-      open();
-    });
 
-    const url = new URL(location.href);
-    if (url.searchParams.get("modal") === modal.id) {
-      open();
-      url.searchParams.delete("modal");
-      history.replaceState(history.state, "", url);
+      let fromBackdrop = false;
+
+      modal.addEventListener(
+        "mousedown",
+        (event) => {
+          fromBackdrop = event.target === modal;
+        },
+        { signal },
+      );
+
+      modal.addEventListener(
+        "click",
+        (event) => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          if (target.closest("[data-modal-close]")) modal.close();
+          else if (fromBackdrop && target === modal) modal.close();
+          fromBackdrop = false;
+        },
+        { signal },
+      );
+
+      document.addEventListener(
+        "click",
+        (event) => {
+          const target = event.target;
+          if (!(target instanceof Element)) return;
+          const trigger = target.closest(
+            `[data-modal-open="${modal.id}"], a[href="#${modal.id}"]`,
+          );
+          if (!trigger) return;
+          event.preventDefault();
+          open();
+        },
+        { signal },
+      );
+
+      const url = new URL(location.href);
+      if (url.searchParams.get("modal") === modal.id) {
+        open();
+        url.searchParams.delete("modal");
+        history.replaceState(history.state, "", url);
+      }
     }
-  }
+
+    return () => {
+      listening.abort();
+      for (const modal of modals) if (modal.open) modal.close();
+    };
+  });
 </script>
 
 <style is:global>
   @layer components {
     html:has(.modal_wrap[open]) {
       overflow: hidden;
+      &[data-modal-gutter] {
+        scrollbar-gutter: stable;
+      }
     }
 
     .modal_wrap {
@@ -200,6 +255,27 @@ if (import.meta.env.DEV && render && content && !id) {
         padding: 0;
         align-items: stretch;
       }
+
+      &.sheet {
+        --_from: 0 3rem;
+        --_backdrop: color-mix(in srgb, var(--dark-900) 10%, transparent);
+        padding: 10rem var(--site-margin) 0;
+        align-items: start;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        html[data-modal-gutter] & {
+          scrollbar-gutter: stable both-edges;
+        }
+        @media (width < 64rem) {
+          padding-top: var(--space-11);
+        }
+        &:focus-visible {
+          outline: 0;
+        }
+        &::backdrop {
+          backdrop-filter: blur(1.5rem);
+        }
+      }
     }
 
     .modal_content {
@@ -230,6 +306,13 @@ if (import.meta.env.DEV && render && content && !id) {
         border-radius: 0;
       }
 
+      .modal_wrap.sheet & {
+        flex: none;
+        max-width: 71.9375rem;
+        max-height: none;
+        border-radius: 0.125rem 0.125rem 0 0;
+      }
+
       .modal_wrap:is([open], .stacki-opened) &,
       .stacki-designer .modal_wrap.preview & {
         opacity: 1;
@@ -254,6 +337,37 @@ if (import.meta.env.DEV && render && content && !id) {
       z-index: 1;
     }
 
+    .modal_icon-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 3rem;
+      height: 3rem;
+      padding: 0;
+      background-color: color-mix(in srgb, var(--light-100) 4%, transparent);
+      color: var(--dark-750);
+      border: 0;
+      border-radius: 0.125rem;
+      font-size: 1rem;
+      cursor: pointer;
+      transition:
+        background-color var(--hover-duration) var(--hover-ease),
+        color var(--hover-duration) var(--hover-ease);
+      @media (hover: hover) {
+        &:hover {
+          background-color: var(--light-250);
+        }
+      }
+      &:active {
+        background-color: var(--dark-750);
+        color: var(--light-100);
+      }
+      &:focus-visible {
+        outline: var(--focus-width) solid var(--dark-950);
+        outline-offset: 0;
+      }
+    }
+
     .modal_scroll {
       flex: 1;
       min-height: 0;
@@ -262,6 +376,10 @@ if (import.meta.env.DEV && render && content && !id) {
 
       .modal_wrap.full-screen & {
         height: 100%;
+      }
+
+      .modal_wrap.sheet & {
+        overflow: visible;
       }
     }
 
@@ -274,6 +392,10 @@ if (import.meta.env.DEV && render && content && !id) {
         min-height: 100%;
         display: grid;
         align-content: center;
+      }
+
+      .modal_wrap.sheet & {
+        padding: 0;
       }
 
       .modal_wrap:is([open], .stacki-opened) &,

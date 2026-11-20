@@ -1,4 +1,5 @@
 ---
+import type { ImageMetadata } from "astro";
 import type { SvgComponent } from "astro/types";
 import Paragraph from "@/components/Typography/Paragraph.astro";
 import Icon from "@/components/Media/Icon.astro";
@@ -8,17 +9,35 @@ interface Props {
   render?: boolean;
   /** The line above the logos. */
   text?: string;
-  /** One cell per logo: the SVG, and the client's name for screen readers. */
-  logos?: { src: SvgComponent; name: string }[];
+  /**
+   * One cell per logo: the SVG, the client's name for screen readers, and
+   * optionally a `scale` to even out a logo that still looks heavier or
+   * lighter than the rest (1 is as is).
+   */
+  logos?: { src: SvgComponent & ImageMetadata; name: string; scale?: number }[];
 }
 
 const { render = true, text, logos = [] } = Astro.props;
+
+/* Logos are balanced by area rather than width or height: each is sized so
+   it covers about the same space, so a long word mark doesn't come out
+   bigger than a compact one. */
+const AREA = 2900;
+const widths = logos.map((logo) => {
+  const ratio = logo.src.width / logo.src.height;
+  return Math.sqrt(AREA * ratio) * (logo.scale ?? 1);
+});
+const widest = Math.max(...widths, 1);
+/* Each logo's width, and its share of the widest, so that in narrow cells
+   they all shrink together and keep their balance. */
+const sizeOf = (index: number) =>
+  `--_width: ${widths[index] / 16}rem; --_share: ${widths[index] / widest}`;
 ---
 
 {
   render && logos.length > 0 && (
     <div class="logos-main_wrap" data-reveal="own">
-      <div class="logos-main_head">
+      <div class="logos-main_head" data-step="5">
         <span class="logos-main_guide" aria-hidden="true" />
         <Paragraph
           variant="mono"
@@ -28,11 +47,11 @@ const { render = true, text, logos = [] } = Astro.props;
           {text}
         </Paragraph>
       </div>
-      <div class="logos-main_band">
+      <div class="logos-main_band" data-step="6">
         <ul class="logos-main_list">
-          {logos.map((logo) => (
+          {logos.map((logo, index) => (
             <li class="logos-main_item">
-              <span class="logos-main_logo">
+              <span class="logos-main_logo" style={sizeOf(index)}>
                 <Icon
                   src={logo.src}
                   variant="full-width"
@@ -51,13 +70,13 @@ const { render = true, text, logos = [] } = Astro.props;
 <script>
   import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
-  import { onIntroOpen } from "@/utils/intro.ts";
+  import { onIntroStep, stepOf } from "@/utils/intro.ts";
   import { createLines } from "@/utils/lines.ts";
 
   /* The line rises in over a single rule; the rule opens downward into the
      cells while the hatch inside drifts left to right, then the logos fade
      in one after another. On the first screen it starts as the hero's ASCII
-     container opens; further down, when the strip scrolls into view. */
+     page's first-screen sequence; further down, when it scrolls into view. */
   function setUp(wrap: HTMLElement) {
     const text = wrap.querySelector<HTMLElement>(".logos-main_text");
     const band = wrap.querySelector<HTMLElement>(".logos-main_band");
@@ -71,37 +90,51 @@ const { render = true, text, logos = [] } = Astro.props;
     gsap.set(logos, { autoAlpha: 0 });
 
     let timeline: gsap.core.Timeline | undefined;
-    const play = () => {
-      lines?.play();
+    const showLine = () => lines?.play();
+    const openBand = (delay = 0) => {
       timeline = gsap
-        .timeline({ delay: 0.15 })
+        .timeline({ delay })
         .set(band, { clearProps: "borderBottomColor" })
         .to(list, { height: "auto", duration: 0.9, ease: "power3.inOut" })
-        .to(list, { "--_hatch": "3rem", duration: 0.9, ease: "power2.out" }, "<")
+        .to(
+          list,
+          { "--_hatch": "3rem", duration: 0.9, ease: "power2.out" },
+          "<",
+        )
         .set(list, { clearProps: "height,overflow" })
-        .to(logos, {
-          autoAlpha: 1,
-          duration: 0.5,
-          stagger: 0.1,
-          clearProps: "opacity,visibility",
-        });
+        .to(
+          logos,
+          {
+            autoAlpha: 1,
+            duration: 0.4,
+            stagger: 0.06,
+            clearProps: "opacity,visibility",
+          },
+          "-=0.2",
+        );
     };
 
+    /* On the first screen the line and the strip each take their step in the
+       page's sequence; further down they play together on scroll. */
     let trigger: ScrollTrigger | undefined;
-    let stopWaiting = () => {};
+    const waits: (() => void)[] = [];
     if (ScrollTrigger.isInViewport(band)) {
-      stopWaiting = onIntroOpen(play);
+      if (text) waits.push(onIntroStep(stepOf(text), showLine));
+      waits.push(onIntroStep(stepOf(band), () => openBand()));
     } else {
       trigger = ScrollTrigger.create({
         trigger: wrap,
         start: "top 85%",
         once: true,
-        onEnter: play,
+        onEnter: () => {
+          showLine();
+          openBand(0.15);
+        },
       });
     }
 
     return () => {
-      stopWaiting();
+      waits.forEach((stop) => stop());
       trigger?.kill();
       timeline?.kill();
       lines?.revert();
@@ -193,6 +226,7 @@ const { render = true, text, logos = [] } = Astro.props;
     }
 
     .logos-main_item {
+      container-type: inline-size;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -207,7 +241,8 @@ const { render = true, text, logos = [] } = Astro.props;
 
     /* Grey, so the logos read without pulling focus. */
     .logos-main_logo {
-      flex: 0 1 9.125rem;
+      flex: none;
+      width: min(var(--_width, 9.125rem), 100cqw * var(--_share, 1));
       color: color-mix(in lab, var(--light-100) 40%, transparent);
     }
   }

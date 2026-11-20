@@ -221,3 +221,111 @@ main > .section:last-child {
     opacity: 0.5;
   }
 }
+
+/* Working-area frame: a 1736px container with its content set 48px inside
+   the rails. The rails themselves are drawn by .frame-rails, a layer over the
+   whole section, so no panel or image inside can cover them. */
+.container.framed {
+  --_frame-inset: var(--space-7);
+  max-width: var(--max-width-frame);
+  padding-inline: var(--_frame-inset);
+  @media (width < 48rem) {
+    --_frame-inset: var(--site-gutter);
+  }
+}
+
+.section > .frame-rails {
+  z-index: 2;
+  &::before {
+    content: "";
+    display: block;
+    width: var(--site-width);
+    max-width: var(--max-width-frame);
+    height: 100%;
+    margin-inline: auto;
+    background-image:
+      repeating-linear-gradient(
+        to bottom,
+        var(--stroke) 0 var(--dash),
+        transparent 0 calc(var(--dash) * 2)
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        var(--stroke) 0 var(--dash),
+        transparent 0 calc(var(--dash) * 2)
+      );
+    background-position:
+      left top,
+      right top;
+    background-size: var(--border-width) 100%;
+    background-repeat: no-repeat;
+  }
+}
+
+/* Dashed rules (3px on, 3px off) on chosen sides. Add `dashed` plus one or
+   more of the side classes; colour follows the theme's stroke. */
+.dashed {
+  --_dash-top: 0rem;
+  --_dash-bottom: 0rem;
+  --_dash-left: 0rem;
+  --_dash-right: 0rem;
+  --_dash-color: var(--stroke);
+  --_dash-h: repeating-linear-gradient(
+    to right,
+    var(--_dash-color) 0 var(--dash),
+    transparent 0 calc(var(--dash) * 2)
+  );
+  --_dash-v: repeating-linear-gradient(
+    to bottom,
+    var(--_dash-color) 0 var(--dash),
+    transparent 0 calc(var(--dash) * 2)
+  );
+  background-image: var(--_dash-h), var(--_dash-h), var(--_dash-v), var(--_dash-v);
+  background-position:
+    left top,
+    left bottom,
+    left top,
+    right top;
+  background-size:
+    100% var(--_dash-top),
+    100% var(--_dash-bottom),
+    var(--_dash-left) 100%,
+    var(--_dash-right) 100%;
+  background-repeat: no-repeat;
+}
+.dashed-top,
+.dashed-block {
+  --_dash-top: var(--border-width);
+}
+.dashed-bottom,
+.dashed-block {
+  --_dash-bottom: var(--border-width);
+}
+.dashed-left,
+.dashed-inline {
+  --_dash-left: var(--border-width);
+}
+.dashed-right,
+.dashed-inline {
+  --_dash-right: var(--border-width);
+}
+
+/* Diagonal hairline hatching ("/" lines every 8px) behind a block's content.
+   The block needs no other ::before; set --_hatch to change its strength. */
+.hatched {
+  position: relative;
+  isolation: isolate;
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      120deg,
+      color-mix(in lab, currentcolor var(--_hatch, 3%), transparent) 0
+        var(--border-width),
+      transparent 0 0.5rem
+    );
+  }
+}

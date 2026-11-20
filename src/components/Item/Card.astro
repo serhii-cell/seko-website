@@ -7,8 +7,9 @@ import Button from "@/components/Button.astro";
 import ButtonWrapper from "@/components/Wrapper/ButtonWrapper.astro";
 import Img from "@/components/Media/Img.astro";
 import Overlay from "@/components/Media/Overlay.astro";
+import { slotContent } from "@/utils/slots.ts";
 
-type CardVariant = "default" | "cover" | "stacked";
+type CardVariant = "default" | "cover" | "stacked" | "work";
 type CardTheme = "inherit" | "light" | "dark" | "brand" | "invert";
 type HeadingTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
 type ImageSource = ImageMetadata | string;
@@ -37,6 +38,8 @@ type Base = HTMLAttributes<"div"> & {
    * - `default` — no image, text only (default)
    * - `cover` — image fills the card, text over it
    * - `stacked` — image above the text, bleeding to the edges
+   * - `work` — a case study: tags, a wide visual, then title, subtitle and
+   *   text side by side; the whole card links to `href`
    */
   variant?: CardVariant;
   /** Colors the card carries with it, whatever section it sits in. */
@@ -49,6 +52,9 @@ type Props = Base &
         variant?: "default";
         image?: never;
         imageAlt?: never;
+        tags?: never;
+        subtitle?: never;
+        href?: never;
       }
     | {
         variant: "cover";
@@ -56,6 +62,9 @@ type Props = Base &
         image?: ImageSource;
         /** Leave unset on decorative images — renders `alt=""`. */
         imageAlt?: string;
+        tags?: never;
+        subtitle?: never;
+        href?: never;
       }
     | {
         variant: "stacked";
@@ -65,12 +74,38 @@ type Props = Base &
         image?: ImageSource;
         /** Leave unset on decorative images — renders `alt=""`. */
         imageAlt?: string;
+        tags?: never;
+        subtitle?: never;
+        href?: never;
+      }
+    | {
+        variant: "work";
+        /** A work card sits on the section's own surface, so it keeps the theme around it. */
+        theme?: never;
+        buttonLabel?: never;
+        buttonHref?: never;
+        /**
+         * An imported asset, a remote `http(s)` URL, or a path to a file in
+         * `public/`. A `media` slot, when filled, takes its place.
+         */
+        image?: ImageSource;
+        /** Leave unset on decorative images — renders `alt=""`. */
+        imageAlt?: string;
+        /** Short labels in pills above the visual. */
+        tags?: string[];
+        /** Line under the heading, such as the kind of work done. */
+        subtitle?: string;
+        /** The case study the card leads to. */
+        href?: string;
       }
   );
 
 type AllProps = Base & {
   image?: ImageSource;
   imageAlt?: string;
+  tags?: string[];
+  subtitle?: string;
+  href?: string;
 };
 
 const {
@@ -85,13 +120,18 @@ const {
   theme = "inherit",
   image,
   imageAlt,
+  tags = [],
+  subtitle,
+  href,
   class: className,
   ...rest
 } = Astro.props as AllProps;
 
-const hasImage = variant !== "default" && !!image;
+const isWork = variant === "work";
+const media = isWork ? await slotContent(Astro.slots, "media") : "";
+const hasImage = variant !== "default" && !!(image || media);
 const hasContent = !!(eyebrow || heading || text || buttonLabel);
-const hasTheme = variant !== "stacked" && theme !== "inherit";
+const hasTheme = variant !== "stacked" && !isWork && theme !== "inherit";
 
 /* The button each variant closes with, so a set of cards reads as one system.
    A link carries no emphasis of its own, so the two are picked together. */
@@ -101,9 +141,9 @@ const buttonKind =
     : ({ emphasis: variant === "cover" ? "primary" : "secondary" } as const);
 
 if (import.meta.env.DEV && render) {
-  if (variant === "stacked" && theme !== "inherit") {
+  if ((variant === "stacked" || isWork) && theme !== "inherit") {
     console.warn(
-      '[lumos] <Card variant="stacked"> has no surface to color, so `theme` was dropped. It keeps the theme around it.',
+      `[lumos] <Card variant="${variant}"> has no surface to color, so \`theme\` was dropped. It keeps the theme around it.`,
     );
   }
   if (variant === "default" && image) {
@@ -111,7 +151,7 @@ if (import.meta.env.DEV && render) {
       '[lumos] <Card variant="default"> holds no image, so `image` was dropped. Use the cover or stacked variant to show it.',
     );
   }
-  if (variant !== "default" && !image) {
+  if (variant !== "default" && !image && !media) {
     console.warn(
       `[lumos] <Card variant="${variant}"> has no \`image\`, so it renders as a plain card.`,
     );
@@ -120,7 +160,56 @@ if (import.meta.env.DEV && render) {
 ---
 
 {
-  render && (hasContent || hasImage) && (
+  render && isWork && heading && (
+    <div class:list={["card_wrap", "work", className]} {...rest}>
+      <div class="card_media">
+        {tags.length > 0 && (
+          <ul class="card_tags" role="list">
+            {tags.map((tag) => (
+              <li class="card_tag text-style-main">{tag}</li>
+            ))}
+          </ul>
+        )}
+        {hasImage && (
+          <div class="card_visual">
+            {media ? (
+              <Fragment set:html={media} />
+            ) : (
+              <Img
+                src={image!}
+                alt={imageAlt}
+                variant="constrained"
+                sizes="(min-width: 64rem) 65vw, 90vw"
+              />
+            )}
+          </div>
+        )}
+      </div>
+      <div class="card_content">
+        <div class="card_title">
+          <Heading tag={headingTag} variant="h3">
+            {href ? (
+              <a class="card_link" href={href}>
+                <Fragment set:html={heading} />
+              </a>
+            ) : (
+              <Fragment set:html={heading} />
+            )}
+          </Heading>
+          <Paragraph class="card_subtitle" variant="main">
+            <Fragment set:html={subtitle} />
+          </Paragraph>
+        </div>
+        <Paragraph class="card_text" variant="main">
+          <Fragment set:html={text} />
+        </Paragraph>
+      </div>
+    </div>
+  )
+}
+
+{
+  render && !isWork && (hasContent || hasImage) && (
     <div
       class:list={[
         "card_wrap",
@@ -242,6 +331,125 @@ if (import.meta.env.DEV && render) {
       .stacked > & {
         padding-inline: 0;
         padding-top: 0;
+      }
+    }
+
+    /* Work: a case study, the whole card one link. Tags and the visual sit in
+       the media column; title and text share a row under it. */
+    .card_wrap.work {
+      --_visual-ratio: 1249 / 725;
+      gap: var(--space-7);
+      background-color: transparent;
+      border-radius: 0.125rem;
+      overflow: visible;
+      outline: var(--focus-width) solid transparent;
+      outline-offset: 0;
+      transition: outline-color var(--hover-duration) var(--hover-ease);
+
+      &:has(.card_link:focus-visible) {
+        outline-color: var(--brand-500);
+      }
+    }
+
+    .card_media {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-4);
+      width: 100%;
+    }
+
+    .card_tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-1);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .card_tag {
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-round);
+      background-color: var(--stroke);
+      color: color-mix(in srgb, var(--text) 70%, transparent);
+    }
+
+    /* Body text in a work card keeps its full line box, as in the design;
+       only the heading is trimmed to its caps. */
+    :is(.card_tag, .card_subtitle, .work .card_text) {
+      --_trim-top: 0.5lh;
+      --_trim-bottom: 0.5lh;
+    }
+
+    .work > .card_media > .card_visual {
+      aspect-ratio: var(--_visual-ratio);
+      border-radius: 0;
+
+      > * {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: scale calc(var(--hover-duration) * 3) var(--hover-ease);
+      }
+    }
+
+    .work > .card_content {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--space-4);
+      align-items: start;
+      padding: 0;
+      text-align: start;
+
+      @media (width >= 64rem) {
+        grid-template-columns: minmax(0, 1fr) calc(568 / 1249 * 100%);
+        gap: 0;
+      }
+    }
+
+    .work > .card_content :is(.heading, .text) {
+      margin: 0;
+    }
+
+    .card_title {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      min-width: 0;
+
+      > .heading {
+        transition: color var(--hover-duration) var(--hover-ease);
+      }
+    }
+
+    .card_subtitle {
+      color: color-mix(in srgb, var(--text) 70%, transparent);
+    }
+
+    .work .card_text {
+      color: color-mix(in srgb, var(--text) 50%, transparent);
+    }
+
+    .card_link {
+      color: inherit;
+      text-decoration: none;
+      outline: none;
+
+      &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+      }
+    }
+
+    .work:has(.card_link:focus-visible) .card_title > .heading {
+      color: var(--brand-500);
+    }
+
+    @media (hover: hover) {
+      .work:has(.card_link):hover > .card_media > .card_visual > * {
+        scale: 1.04;
       }
     }
 

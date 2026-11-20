@@ -25,6 +25,10 @@ const socialImage = new URL(image, Astro.site);
 <style is:inline>
   @layer base, patterns, components, utilities;
 </style>
+<script is:inline>
+  /* A reload starts at the top, not where the page was left. */
+  if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <Font cssVariable="--font-archivo" preload />
 <Font cssVariable="--font-ibm-plex-mono" preload />

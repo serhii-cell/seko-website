@@ -10,56 +10,77 @@ interface Props {
   render?: boolean;
   /** The small label beside the statement. */
   label?: string;
-  /** The statement. Nothing is output without it. */
+  /**
+   * The statement. Nothing is output without it. Words wrapped in
+   * `<strong>` are set in the accent colour.
+   */
   heading?: string;
+  /** The paragraph under the statement. */
+  text?: string;
   /** The label beside the chart. The chart is left out without it. */
   chartLabel?: string;
 }
 
-const { render = true, label, heading, chartLabel } = Astro.props;
+const { render = true, label, heading, text, chartLabel } = Astro.props;
 
-/* Positions on the 950 × 200 chart, as drawn: the time axis along the top
-   40px, and below it a 950 × 160 plot with a divider at each period, an
-   issue tag over a point on the curve in each, and the curve itself. */
+/* Positions on the 861 × 200 chart, as drawn: the time axis along the top
+   40px, and below it an 861 × 160 plot with a divider at each 215px period,
+   an issue tag over a point on the curve in the middle of each, and the
+   curve itself. */
+const WIDTH = 861;
 const ticks = [
-  { text: "Product launch", x: 0 },
-  { text: "6 months", x: 204 },
-  { text: "12 months", x: 438 },
-  { text: "18 months", x: 691 },
-  { text: "24 months", x: 874 },
+  { text: "Product launch", x: 0, anchor: "start" },
+  { text: "6 months", x: 215, anchor: "middle" },
+  { text: "12 months", x: 430, anchor: "middle" },
+  { text: "18 months", x: 645, anchor: "middle" },
+  { text: "24 months", x: WIDTH, anchor: "end" },
 ];
-const dividers = [0, 238, 475, 728, 949];
+const dividers = [0, 215, 430, 645, 860];
 const issues = [
-  { text: "Incoherent design system", x: 39, y: 82, px: 118, py: 125 },
-  { text: "UI errors", x: 323, y: 65, px: 357, py: 108 },
-  { text: "Different UX patterns", x: 535, y: 49, px: 602, py: 92 },
-  { text: "Growing design debt", x: 773, y: 28, px: 839, py: 71 },
+  { text: "Incoherent design system", x: 108, y: 125 },
+  { text: "UI errors", x: 323, y: 112 },
+  { text: "Different UX patterns", x: 538, y: 94 },
+  { text: "Growing design debt", x: 753, y: 84 },
 ];
 const at = (x: number, y: number) =>
-  `left: ${(x / 950) * 100}%; top: ${(y / 160) * 100}%`;
+  `left: ${(x / WIDTH) * 100}%; top: ${(y / 160) * 100}%`;
 ---
 
 {
   render && heading && (
-    <Section class="observations-main_wrap">
+    <Section
+      theme="light"
+      frame
+      class="observations-main_wrap"
+      containerClass="observations-main_frame"
+    >
       <div class="observations-main_content">
         <div class="observations-main_row">
           <Paragraph
-            variant="mono"
+            variant="label"
             class="observations-main_label color-faded"
             render={!!label}
           >
             {label}
           </Paragraph>
-          <Heading tag="h2" class="observations-main_heading">
-            {heading}
-          </Heading>
+          <div class="observations-main_statement">
+            <Heading tag="h2" class="observations-main_heading heading-accent">
+              <Fragment set:html={heading} />
+            </Heading>
+            <Paragraph
+              variant="main"
+              class="observations-main_text"
+              render={!!text}
+            >
+              {text}
+            </Paragraph>
+          </div>
         </div>
         {chartLabel && (
           <div class="observations-main_row">
             <Paragraph
-              variant="mono"
-              class="observations-main_label observations-main_chart-label"
+              variant="label"
+              class="observations-main_label color-faded"
             >
               {chartLabel}
             </Paragraph>
@@ -68,8 +89,11 @@ const at = (x: number, y: number) =>
                 <div class="observations-main_ticks">
                   {ticks.map((tick) => (
                     <span
-                      class="observations-main_tick color-muted"
-                      style={`left: ${(tick.x / 950) * 100}%`}
+                      class:list={[
+                        "observations-main_tick text-style-label",
+                        tick.anchor,
+                      ]}
+                      style={`left: ${(tick.x / WIDTH) * 100}%`}
                     >
                       {tick.text}
                     </span>
@@ -77,24 +101,41 @@ const at = (x: number, y: number) =>
                 </div>
                 <div class="observations-main_plot">
                   <Chart class="observations-main_graph" />
-                  {dividers.map((x) => (
-                    <span class="observations-main_divider" style={at(x, 0)} />
-                  ))}
+                  <svg
+                    class="observations-main_dividers"
+                    viewBox={`0 0 ${WIDTH} 160`}
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                  >
+                    {dividers.map((x) => (
+                      <line
+                        x1={x + 0.5}
+                        x2={x + 0.5}
+                        y1="0"
+                        y2="160"
+                        vector-effect="non-scaling-stroke"
+                        shape-rendering="crispEdges"
+                      />
+                    ))}
+                  </svg>
                   {issues.map((issue) => (
                     <>
                       <Point
                         class="observations-main_point"
-                        style={at(issue.px, issue.py)}
+                        style={at(issue.x, issue.y)}
+                        data-x={issue.x}
                       />
                       <span
                         class="observations-main_issue"
                         style={at(issue.x, issue.y)}
                       >
-                        {issue.text}
+                        <span class="observations-main_tag">{issue.text}</span>
                       </span>
                     </>
                   ))}
-                  <span class="observations-main_runner" aria-hidden="true" />
+                  <span class="observations-main_track" aria-hidden="true">
+                    <span class="observations-main_runner" />
+                  </span>
                 </div>
               </div>
             </div>
@@ -109,7 +150,9 @@ const at = (x: number, y: number) =>
   import { gsap } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
 
-  /* The curve, in the plot's 950 × 160 coordinates, left to right. */
+  /* The visible plot is 861 × 160; the curve, in those coordinates, left to
+     right, runs on past the right edge. */
+  const WIDTH = 861;
   const CURVE: [number, number][] = [
     [1, 129],
     [239, 120],
@@ -117,8 +160,8 @@ const at = (x: number, y: number) =>
     [729.5, 88.33],
     [950, 53],
   ];
-  /* The runner goes on past the right edge, where the plot clips it. */
-  const END = 990;
+  /* The runner goes on past the right edge, where its track clips it. */
+  const END = WIDTH + 40;
 
   const curveY = (x: number) => {
     for (let i = 1; i < CURVE.length; i++) {
@@ -138,15 +181,15 @@ const at = (x: number, y: number) =>
   function buildTimeline(chart: HTMLElement) {
     const plot = chart.querySelector<HTMLElement>(".observations-main_plot");
     const runner = chart.querySelector<HTMLElement>(".observations-main_runner");
-    const points = gsap.utils.toArray<HTMLElement>(".observations-main_point", chart);
+    const points = gsap.utils.toArray<SVGElement>(".observations-main_point", chart);
     const issues = gsap.utils.toArray<HTMLElement>(".observations-main_issue", chart);
     if (!plot || !runner) return null;
 
     const travel = { x: 0 };
     const place = () => {
-      runner.style.left = `${(travel.x / 950) * 100}%`;
+      runner.style.left = `${(travel.x / WIDTH) * 100}%`;
       runner.style.top = `${(curveY(travel.x) / 160) * 100}%`;
-      plot.style.setProperty("--_drawn", String(Math.min(1, travel.x / 950)));
+      plot.style.setProperty("--_drawn", String(Math.min(1, travel.x / WIDTH)));
     };
 
     const timeline = gsap.timeline({ paused: true });
@@ -182,64 +225,25 @@ const at = (x: number, y: number) =>
   function setUp(section: HTMLElement) {
     const chart = section.querySelector<HTMLElement>(".observations-main_chart");
     if (!chart) return () => {};
-    chart
-      .querySelectorAll<SVGElement>(".observations-main_point")
-      .forEach((point) => {
-        point.dataset.x = String(
-          (parseFloat(point.style.left) / 100) * 950,
-        );
-      });
 
+    /* When the chart comes into view the dot runs once by itself; scrolling
+       back past it doesn't replay or reverse it. */
     const mm = gsap.matchMedia();
-    mm.add(
-      {
-        wide: "(width >= 64rem)",
-        motion: "(prefers-reduced-motion: no-preference)",
-      },
-      (context) => {
-        const { wide, motion } = context.conditions as {
-          wide: boolean;
-          motion: boolean;
-        };
-        if (!motion) return;
-        const timeline = buildTimeline(chart);
-        if (!timeline) return;
-        if (wide) {
-          /* The section fills the screen and holds while the dot runs, so
-             it is the only thing in view; scrolling drives the dot. */
-          const scrubbed = gsap.timeline({
-            scrollTrigger: {
-              trigger: section,
-              start: "top top",
-              end: () => `+=${innerHeight * 1.6}`,
-              pin: true,
-              /* Off by default inside a flex parent like <main>. */
-              pinSpacing: true,
-              scrub: 0.5,
-              invalidateOnRefresh: true,
-            },
-          });
-          scrubbed.to(timeline, { progress: 1, ease: "none", duration: 1 });
-          return () => {
-            scrubbed.scrollTrigger?.kill();
-            scrubbed.kill();
-            timeline.progress(1).kill();
-          };
-        }
-        /* Narrower, the dot runs once by itself when the chart comes in. */
-        const play = gsap.to(timeline, {
-          progress: 1,
-          duration: 2.6,
-          ease: "power1.inOut",
-          paused: true,
-          scrollTrigger: { trigger: chart, start: "top 80%", once: true },
-        });
-        return () => {
-          play.kill();
-          timeline.progress(1).kill();
-        };
-      },
-    );
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const timeline = buildTimeline(chart);
+      if (!timeline) return;
+      const play = gsap.to(timeline, {
+        progress: 1,
+        duration: 1.3,
+        ease: "power1.inOut",
+        paused: true,
+        scrollTrigger: { trigger: chart, start: "top 80%", once: true },
+      });
+      return () => {
+        play.kill();
+        timeline.progress(1).kill();
+      };
+    });
     return () => mm.revert();
   }
 
@@ -253,29 +257,32 @@ const at = (x: number, y: number) =>
 
 <style is:global>
   @layer components {
-    /* A screen tall, its content in the middle, so while it holds nothing
-       else is in view. */
-    .observations-main_wrap {
-      min-height: 100svh;
-      padding-block: var(--section-space-medium);
+    /* The dashed rails run the full height, so the space above and below
+       sits inside the framed container rather than on the section. */
+    .observations-main_frame {
+      padding-block: var(--section-space-xlarge);
     }
 
     .observations-main_content {
       display: flex;
       flex-direction: column;
-      gap: calc(var(--section-space-xlarge) / 2);
+      gap: var(--section-space-small);
       width: 100%;
     }
 
     /* A label in a narrow column, the content in a wide one, as drawn on
-       the 1640px working area: 260, a 154 gap, 950, then free space. */
+       the 1640px working area: 228, a 162 gap, then 1250 holding an 860
+       measure. The measure never drops below the chart's 40rem, so on
+       narrower screens it takes the free space on the right first. Text is
+       BG normal (#121212); only the paragraph keeps the theme's text. */
     .observations-main_row {
+      --_measure: max(calc(860 / 1250 * 100%), 40rem);
       display: grid;
       gap: var(--space-4);
+      color: var(--dark-900);
       @media (width >= 64rem) {
-        grid-template-columns:
-          minmax(0, 260fr) minmax(0, 154fr) minmax(0, 950fr)
-          minmax(0, 276fr);
+        grid-template-columns: minmax(0, 228fr) minmax(0, 162fr) minmax(0, 1250fr);
+        column-gap: 0;
         & > :nth-child(2) {
           grid-column: 3;
         }
@@ -283,26 +290,72 @@ const at = (x: number, y: number) =>
     }
 
     .observations-main_label,
-    .observations-main_heading {
+    .observations-main_heading,
+    .observations-main_text {
       margin: 0;
     }
 
-    .observations-main_chart-label {
-      color: var(--brand-500);
+    /* The labels keep their full 18px line, as drawn, so their text sits
+       below the heading's cap line and level with the time axis. */
+    .observations-main_label {
+      --_trim-top: 0.5lh;
+      --_trim-bottom: 0.5lh;
+      @media (width >= 64rem) {
+        white-space: nowrap;
+      }
     }
 
-    /* Narrow screens scroll the chart sideways rather than squash it. */
+    .observations-main_statement {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-8);
+    }
+
+    /* Trimmed to Archivo's cap height and baseline as Figma trims it: the
+       box is 201px for four lines at 44px, with the glyphs placed in it
+       where Figma draws them (ascenders 2px above the box). */
+    .observations-main_heading {
+      --_trim-top: 0.341em;
+      --_trim-bottom: 0.328em;
+      @media (width >= 64rem) {
+        max-width: var(--_measure);
+      }
+    }
+
+    /* The paragraph keeps its full line height, as drawn: only the heading
+       is trimmed to its cap height. */
+    .observations-main_text {
+      --_trim-top: 0.5lh;
+      --_trim-bottom: 0.5lh;
+      max-width: 35.5rem;
+      color: color-mix(in srgb, var(--text) 60%, transparent);
+    }
+
+    /* From 48rem the chart fits its column. Below that it keeps 40rem and
+       scrolls sideways, running out under the rails like the works row and
+       always at least 5rem past them, so it reads as a scroller. */
     .observations-main_scroll {
-      @media (width < 64rem) {
+      @media (width < 48rem) {
+        --_inset: calc(var(--_frame-inset) - var(--border-width));
+        margin-inline: calc(var(--_inset) * -1);
+        padding-inline: var(--_inset);
         overflow-x: auto;
+        overflow-y: hidden;
         overscroll-behavior-x: contain;
+        scrollbar-width: none;
+        &::-webkit-scrollbar {
+          display: none;
+        }
+      }
+      @media (width >= 64rem) {
+        max-width: var(--_measure);
       }
     }
 
     .observations-main_chart {
-      min-width: 37.5rem;
-      font-size: 1rem;
-      line-height: var(--line-height-huge);
+      @media (width < 48rem) {
+        width: max(40rem, 100% + 5rem);
+      }
     }
 
     .observations-main_ticks {
@@ -310,18 +363,36 @@ const at = (x: number, y: number) =>
       height: 2.5rem;
     }
 
+    /* The first time sits on its divider, the middle three are centred on
+       theirs and the last ends on the plot's right edge. */
     .observations-main_tick {
+      --_trim-top: 0.5lh;
+      --_trim-bottom: 0.5lh;
       position: absolute;
       top: 0;
       white-space: nowrap;
+      color: color-mix(in srgb, currentColor 40%, transparent);
+      &.middle {
+        translate: -50% 0;
+      }
+      &.end {
+        translate: -100% 0;
+      }
     }
 
-    /* The plot clips the dot as it runs out past the right edge. */
+    /* Only the running dot is clipped, as it leaves past the right edge;
+       the first tag may spill a little left on a narrow chart. */
     .observations-main_plot {
       --_drawn: 1;
       position: relative;
-      aspect-ratio: 950 / 160;
+      aspect-ratio: 861 / 160;
+    }
+
+    .observations-main_track {
+      position: absolute;
+      inset: 0;
       overflow: hidden;
+      pointer-events: none;
     }
 
     .observations-main_graph {
@@ -335,11 +406,16 @@ const at = (x: number, y: number) =>
       }
     }
 
-    .observations-main_divider {
+    /* Drawn as crisp 1px strokes so each divider snaps to one pixel at any
+       width or zoom, rather than smearing across two. */
+    .observations-main_dividers {
       position: absolute;
-      width: var(--border-width);
+      inset: 0;
+      width: 100%;
       height: 100%;
-      background-color: var(--stroke);
+      overflow: visible;
+      stroke: var(--stroke);
+      stroke-width: 1;
     }
 
     .observations-main_point {
@@ -347,13 +423,23 @@ const at = (x: number, y: number) =>
       translate: -50% -50%;
     }
 
+    /* Each tag is centred over its point, its bottom 17px above the point's
+       centre. The script moves the anchor, so the tag keeps its own offset. */
     .observations-main_issue {
       position: absolute;
+    }
+
+    .observations-main_tag {
+      position: absolute;
+      left: 0;
+      bottom: 1.0625rem;
+      translate: -50% 0;
       padding: 0.25rem 0.625rem;
-      background-color: var(--background);
-      border: var(--border-width) solid var(--stroke);
-      border-radius: 0.125rem;
+      background-color: var(--stroke);
+      border-radius: 999rem;
       font-size: 0.75rem;
+      font-weight: var(--primary-medium);
+      line-height: var(--line-height-huge);
       white-space: nowrap;
     }
 

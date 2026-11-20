@@ -1,0 +1,742 @@
+---
+import Section from "@/components/Wrapper/Section.astro";
+import Heading from "@/components/Typography/Heading.astro";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+import Button from "@/components/Button.astro";
+import type { ComponentProps } from "astro/types";
+import maze from "@/assets/home/problems/problem-1-maze.svg?raw";
+import gearTeam from "@/assets/home/problems/problem-2-gear-team.svg?raw";
+import bicycle from "@/assets/home/problems/problem-3-bicycle.svg?raw";
+
+type Problem = {
+  heading: string;
+  text: string;
+  costs: string[];
+};
+
+type SectionProps = ComponentProps<typeof Section>;
+
+interface Props extends Pick<SectionProps, "paddingTop"> {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** The small label beside the heading. */
+  label?: string;
+  /** The section heading. Nothing is output without it. */
+  heading?: string;
+  /**
+   * The three problems, in order: each one's heading, text and the business
+   * costs listed under it. Each takes its own layout and illustration.
+   */
+  problems?: Problem[];
+  /** Text of the button under the problems. Left out without it. */
+  buttonLabel?: string;
+  /** Where that button goes. Defaults to the contact section. */
+  buttonHref?: string;
+}
+
+const {
+  render = true,
+  label,
+  heading,
+  problems = [],
+  buttonLabel,
+  buttonHref = "#contact",
+  paddingTop = "none",
+} = Astro.props;
+
+/* Figma's exports carry a white card, layer names as ids and ids that clash
+   between files; the card is drawn in CSS, the parts that move are named
+   with data-part and the ids the drawing needs are made unique. */
+function prepare(
+  source: string,
+  prefix: string,
+  parts: Record<string, string> = {},
+  extra = "",
+) {
+  const viewBox = source.match(/viewBox="([^"]+)"/)?.[1] ?? "";
+  const used = new Set(
+    [...source.matchAll(/url\(#([^)]+)\)/g)].map((match) => match[1]),
+  );
+  return source
+    .replace(/<svg[^>]*>/, `<svg viewBox="${viewBox}" fill="none" xmlns="http://www.w3.org/2000/svg" class="problems-main_drawing" aria-hidden="true" focusable="false">`)
+    .replace(/<rect width="[\d.]+" height="[\d.]+" fill="white"\/>/, "")
+    .replace(/ id="([^"]+)"/g, (_, id: string) =>
+      parts[id]
+        ? ` data-part="${parts[id]}"`
+        : used.has(id)
+          ? ` id="${prefix}-${id}"`
+          : "",
+    )
+    .replace(/url\(#([^)]+)\)/g, `url(#${prefix}-$1)`)
+    .replace("</svg>", `${extra}</svg>`);
+}
+
+const visuals = [
+  prepare(maze, "problem-1", { Person: "person", Maze: "maze", Flag: "flag" }),
+  prepare(gearTeam, "problem-2", {
+    "Rectangle 148": "glow",
+    "Frame 1000004461": "chip",
+    "Frame 1000004462": "chip",
+  }),
+  prepare(bicycle, "problem-3", { "Rectangle 148": "beam" }),
+];
+const layouts = ["side", "middle", "top"];
+const total = String(Math.min(problems.length, visuals.length));
+---
+
+{
+  render && heading && (
+    <Section
+      theme="light"
+      frame={true}
+      gap="0"
+      paddingTop={paddingTop}
+      class="problems-main_wrap overflow-x-clip"
+    >
+      <div class="problems-main_header">
+        <Paragraph
+          variant="label"
+          class="problems-main_label color-faded"
+          render={!!label}
+        >
+          {label}
+        </Paragraph>
+        <Heading tag="h2" class="problems-main_heading">
+          {heading}
+        </Heading>
+      </div>
+      <div class="problems-main_band">
+        <div class="problems-main_panel hatched">
+          {problems.slice(0, visuals.length).map((problem, index) => (
+            <Fragment>
+              {index > 0 && (
+                <div class="problems-main_divider dashed dashed-top" aria-hidden="true" />
+              )}
+              <article class:list={["problems-main_problem", layouts[index]]}>
+                <div class="problems-main_meta">
+                  <Paragraph variant="label" class="color-faded">
+                    Problem
+                  </Paragraph>
+                  <p class="problems-main_count text-style-label" data-fade>
+                    <span>{index + 1}</span>
+                    <span class="color-faded" aria-hidden="true">/</span>
+                    <span class="sr-only">of</span>
+                    <span class="color-faded">{total}</span>
+                  </p>
+                </div>
+                <div class="problems-main_visual" data-fade>
+                  <Fragment set:html={visuals[index]} />
+                </div>
+                <div class="problems-main_body">
+                  <div class="problems-main_intro">
+                    <Heading tag="h3" class="problems-main_title">
+                      {problem.heading}
+                    </Heading>
+                    <Paragraph variant="main" class="problems-main_text color-faded">
+                      {problem.text}
+                    </Paragraph>
+                  </div>
+                  <div class="problems-main_costs">
+                    <Paragraph variant="label" class="color-faded">
+                      Business cost
+                    </Paragraph>
+                    <ul class="problems-main_list">
+                      {problem.costs.map((cost) => (
+                        <li class="problems-main_cost">
+                          <svg
+                            class="problems-main_icon"
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                            focusable="false"
+                            data-fade
+                          >
+                            <path
+                              fill="currentColor"
+                              d="M8.4 17 12 13.4l3.6 3.6 1.4-1.4-3.6-3.6L17 8.4 15.6 7 12 10.6 8.4 7 7 8.4l3.6 3.6L7 15.6 8.4 17Zm3.6 5a9.74 9.74 0 0 1-3.9-.79 10.1 10.1 0 0 1-3.17-2.14 10.1 10.1 0 0 1-2.14-3.17A9.74 9.74 0 0 1 2 12c0-1.38.26-2.68.79-3.9a10.1 10.1 0 0 1 2.14-3.17A10.1 10.1 0 0 1 8.1 2.79 9.74 9.74 0 0 1 12 2c1.38 0 2.68.26 3.9.79a10.1 10.1 0 0 1 3.17 2.14 10.1 10.1 0 0 1 2.14 3.17c.53 1.22.79 2.52.79 3.9s-.26 2.68-.79 3.9a10.1 10.1 0 0 1-2.14 3.17 10.1 10.1 0 0 1-3.17 2.14c-1.22.53-2.52.79-3.9.79Zm0-2c2.23 0 4.13-.78 5.68-2.33C19.23 16.13 20 14.23 20 12s-.78-4.13-2.33-5.68C16.13 4.78 14.23 4 12 4s-4.13.78-5.68 2.32C4.78 7.88 4 9.77 4 12s.78 4.13 2.32 5.67C7.88 19.23 9.77 20 12 20Z"
+                            />
+                          </svg>
+                          <Paragraph variant="main" class="problems-main_cost-text">
+                            {cost}
+                          </Paragraph>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </article>
+            </Fragment>
+          ))}
+        </div>
+      </div>
+      {buttonLabel && (
+        <div class="problems-main_cta">
+          <Button element="link" href={buttonHref}>
+            {buttonLabel}
+          </Button>
+        </div>
+      )}
+    </Section>
+  )
+}
+
+<script>
+  import { gsap } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  const START = "top 75%";
+
+  /* A person walks in from beyond the card's edge and stops at the maze's
+     entrance; the maze's edges then draw themselves outward from that
+     point, the wall sides turn grey once the structure is drawn, and the
+     flag at the exit goes up and keeps glowing. */
+  function maze(visual: Element) {
+    const person = visual.querySelector<SVGGElement>('[data-part="person"]');
+    const flag = visual.querySelector<SVGGElement>('[data-part="flag"]');
+    const lines = [...visual.querySelectorAll<SVGLineElement>(".maze-line")];
+    const sides = visual.querySelectorAll(".maze-side");
+    if (!person || !flag || lines.length === 0) return;
+    const pole = flag.querySelector<SVGLineElement>(".maze-flag-pole");
+    const banner = flag.querySelector<SVGPolygonElement>(".maze-flag-banner");
+    const halo = flag.querySelector<SVGPolygonElement>(".maze-flag-halo");
+
+    /* The walk follows the maze's own axis, entering from the top-left. */
+    const wind = waving(banner, halo);
+    const WALK = { x: -0.9002 * 380, y: -0.4359 * 380 };
+    const STEPS = 4;
+    const walk = { at: 0 };
+    const place = () => {
+      const left = 1 - walk.at;
+      const bob = -Math.abs(Math.sin(walk.at * Math.PI * STEPS)) * 3 * left;
+      gsap.set(person, { x: WALK.x * left, y: WALK.y * left + bob });
+    };
+
+    /* Each edge grows from its end nearest the entrance; data-at is how far
+       that end is from it, so the drawing spreads out from one point. */
+    const lengths = lines.map((line) =>
+      Math.hypot(
+        line.x2.baseVal.value - line.x1.baseVal.value,
+        line.y2.baseVal.value - line.y1.baseVal.value,
+      ),
+    );
+    const SPREAD = 1;
+    const SPEED = 360;
+    const drawn = Math.max(
+      ...lines.map(
+        (line, index) =>
+          Number(line.dataset.at ?? 0) * SPREAD + lengths[index] / SPEED,
+      ),
+    );
+
+    place();
+    lines.forEach((line, index) =>
+      gsap.set(line, {
+        strokeDasharray: lengths[index],
+        strokeDashoffset: lengths[index],
+      }),
+    );
+    /* Faces stay solid white while the edges draw (only visible edges are
+       in the drawing), and the sides turn grey once the structure is up. */
+    const SIDE = sides[0]?.getAttribute("fill") ?? "#F0F0F0";
+    gsap.set(sides, { attr: { fill: "#FFFFFF", stroke: "#FFFFFF" } });
+    gsap.set([banner, halo], { opacity: 0 });
+    gsap.set(pole, { opacity: 0 });
+
+    const BUILD = 0.55;
+    gsap
+      .timeline({ scrollTrigger: { trigger: visual, start: START, once: true } })
+      .to(walk, { at: 1, duration: 1.1, ease: "power2.out", onUpdate: place })
+      .to(
+        lines,
+        {
+          strokeDashoffset: 0,
+          ease: "none",
+          duration: (index) => lengths[index] / SPEED,
+          delay: (index) => Number(lines[index].dataset.at ?? 0) * SPREAD,
+        },
+        BUILD,
+      )
+      .to(
+        sides,
+        { attr: { fill: SIDE, stroke: SIDE }, duration: 0.47, ease: "power1.inOut" },
+        BUILD + drawn,
+      )
+      .fromTo(
+        pole,
+        { opacity: 1, attr: { y2: pole?.getAttribute("y1") ?? 0 } },
+        {
+          attr: { y2: pole?.getAttribute("y2") ?? 0 },
+          duration: 0.4,
+          ease: "power2.out",
+          immediateRender: false,
+        },
+        ">-0.2",
+      )
+      .fromTo(
+        [banner, halo],
+        { opacity: 1, scaleX: 0 },
+        {
+          scaleX: 1,
+          duration: 0.5,
+          ease: "back.out(1.6)",
+          transformOrigin: "0% 50%",
+          immediateRender: false,
+        },
+        ">-0.05",
+      )
+      .add(() => wind.start())
+      .to(halo, {
+        opacity: 0.35,
+        duration: 1.4,
+        ease: "sine.inOut",
+        repeat: -1,
+        yoyo: true,
+      });
+
+    return () => wind.stop();
+  }
+
+  /* The banner ripples in the wind: its top and bottom edges follow a
+     travelling sine wave that grows towards the free end, and the glow
+     behind it moves with it. Updates only while the flag is on screen. */
+  function waving(banner: SVGPolygonElement | null, halo: SVGPolygonElement | null) {
+    const shapes = [banner, halo].filter((shape): shape is SVGPolygonElement => !!shape);
+    const corners = [...(banner?.points ?? [])].map((point) => ({ x: point.x, y: point.y }));
+    /* The drawn shapes, put back when the wind stops. */
+    const original = shapes.map((shape) => shape.getAttribute("points") ?? "");
+    if (shapes.length === 0 || corners.length !== 4) return { start() {}, stop() {} };
+    /* Corners, as written by the generator: top at the pole, top at the tip,
+       bottom at the tip, bottom at the pole. */
+    const [topPole, topTip, bottomTip, bottomPole] = corners;
+    const height = Math.hypot(bottomPole.x - topPole.x, bottomPole.y - topPole.y);
+    const SAMPLES = 24;
+    const AMPLITUDE = height * 0.16;
+    const WAVES = 1.15;
+    const SPEED = 1.1;
+    let strength = 0;
+    let visible = true;
+    let running = false;
+    const observer = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));
+    const draw = (time: number) => {
+      if (!visible) return;
+      strength = Math.min(1, strength + 0.02);
+      const top: string[] = [];
+      const bottom: string[] = [];
+      for (let index = 0; index <= SAMPLES; index++) {
+        const along = index / SAMPLES;
+        const phase = time * SPEED * Math.PI * 2 - along * WAVES * Math.PI * 2;
+        const lift = Math.sin(phase) * AMPLITUDE * along * strength;
+        const sag = Math.sin(phase - 0.6) * AMPLITUDE * along * strength;
+        top.push(
+          `${topPole.x + (topTip.x - topPole.x) * along},${topPole.y + (topTip.y - topPole.y) * along + lift}`,
+        );
+        bottom.unshift(
+          `${bottomPole.x + (bottomTip.x - bottomPole.x) * along},${bottomPole.y + (bottomTip.y - bottomPole.y) * along + sag}`,
+        );
+      }
+      const points = [...top, ...bottom].join(" ");
+      shapes.forEach((shape) => shape.setAttribute("points", points));
+    };
+    return {
+      start() {
+        if (running) return;
+        running = true;
+        observer.observe(shapes[0]);
+        gsap.ticker.add(draw);
+      },
+      stop() {
+        running = false;
+        observer.disconnect();
+        gsap.ticker.remove(draw);
+        shapes.forEach((shape, index) => shape.setAttribute("points", original[index]));
+      },
+    };
+  }
+
+  /* Light rises out of the gear's hub. */
+  function gear(visual: Element) {
+    const glow = visual.querySelector('[data-part="glow"]');
+    if (!glow) return;
+    gsap.from(glow, {
+      scaleY: 0,
+      opacity: 0,
+      transformOrigin: "50% 100%",
+      duration: 1.4,
+      delay: 0.3,
+      scrollTrigger: { trigger: visual, start: START, once: true },
+    });
+  }
+
+  /* The headlamp flickers on and throws its beam forward. */
+  function lamp(visual: Element) {
+    const beam = visual.querySelector('[data-part="beam"]');
+    if (!beam) return;
+    gsap
+      .timeline({
+        delay: 0.3,
+        scrollTrigger: { trigger: visual, start: START, once: true },
+      })
+      .fromTo(
+        beam,
+        { opacity: 0, scaleX: 0.15, transformOrigin: "100% 50%" },
+        {
+          keyframes: { opacity: [0, 1, 0.25, 1, 0.5, 1] },
+          duration: 0.5,
+          ease: "none",
+          immediateRender: true,
+        },
+      )
+      .to(beam, { scaleX: 1, duration: 1 }, 0.2);
+  }
+
+  const setUps: ((visual: Element) => (() => void) | void)[] = [maze, gear, lamp];
+
+  onPage(() => {
+    const sections = document.querySelectorAll(".problems-main_wrap");
+    if (sections.length === 0) return;
+    const mm = gsap.matchMedia();
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      if (document.documentElement.classList.contains("stacki-designer")) return;
+      const stops: (() => void)[] = [];
+      sections.forEach((section) =>
+        section
+          .querySelectorAll(".problems-main_visual")
+          .forEach((visual, index) => {
+            const stop = setUps[index]?.(visual);
+            if (stop) stops.push(stop);
+          }),
+      );
+      return () => stops.forEach((stop) => stop());
+    });
+    return () => mm.revert();
+  });
+</script>
+
+<style is:global>
+  @layer components {
+    .problems-main_wrap {
+      --_block: calc(1574 / 1736 * 100%);
+      --_panel-gap: calc(var(--space-11) * 1.25);
+      /* Only headings are trimmed to their caps in the design; body text
+         and labels keep their full line height. */
+      & .text {
+        --_trim-top: 0.5lh;
+        --_trim-bottom: 0.5lh;
+      }
+    }
+
+    /* Label on the left, heading set further in, as on the 1920 frame. */
+    .problems-main_header {
+      display: grid;
+      width: 100%;
+      row-gap: var(--space-4);
+      padding-bottom: var(--section-space-small);
+      @media (width >= 64rem) {
+        grid-template-columns: minmax(0, 389fr) minmax(0, 1251fr);
+        align-items: start;
+      }
+    }
+
+    .problems-main_label,
+    .problems-main_heading {
+      margin: 0;
+    }
+
+    /* Ruled above and below across the whole screen; the off-white panel
+       inside it fills the working area between the rails. */
+    /* The band is exactly as wide as the rails, measured from the framed
+       container rather than the viewport, so its panel can never spill past
+       them (100vw counts the scrollbar). Only its two rules run full width. */
+    .problems-main_band {
+      position: relative;
+      margin-inline: calc(var(--_frame-inset, var(--space-7)) * -1);
+      padding-block: var(--border-width);
+      &::before,
+      &::after {
+        content: "";
+        position: absolute;
+        inset-inline: calc(50% - 50vw);
+        height: var(--border-width);
+        pointer-events: none;
+        background-image: repeating-linear-gradient(
+          to right,
+          var(--stroke) 0 var(--dash),
+          transparent 0 calc(var(--dash) * 2)
+        );
+      }
+      &::before {
+        top: 0;
+      }
+      &::after {
+        bottom: 0;
+      }
+    }
+
+    .problems-main_panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--_panel-gap);
+      padding-block: var(--section-space-small);
+      padding-inline: var(--_frame-inset, var(--space-7));
+      background-color: var(--background-2);
+      overflow: clip;
+      @media (width >= 64rem) {
+        padding-inline: 0;
+      }
+    }
+
+    .problems-main_divider {
+      width: 100%;
+      height: var(--border-width);
+      @media (width >= 64rem) {
+        width: var(--_block);
+      }
+    }
+
+    /* Every problem stacks below 64rem: its label row, the drawing, then
+       the heading, text and costs. */
+    .problems-main_problem {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      width: 100%;
+      @media (width >= 64rem) {
+        display: grid;
+        width: var(--_block);
+      }
+    }
+
+    .problems-main_meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-3);
+      & > .text {
+        margin: 0;
+      }
+    }
+
+    .problems-main_count {
+      display: flex;
+      gap: 0.5rem;
+      margin: 0;
+      /* The leading-trim boxes would take a gap each as flex items. */
+      &::before,
+      &::after {
+        content: none;
+      }
+    }
+
+    .problems-main_visual {
+      overflow: hidden;
+      background-color: var(--background);
+      aspect-ratio: var(--_ratio);
+    }
+
+    .problems-main_drawing {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .problems-main_body {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+      margin-top: var(--space-5);
+      @media (width >= 64rem) {
+        margin-top: 0;
+      }
+    }
+
+    .problems-main_intro {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+    }
+
+    .problems-main_title,
+    .problems-main_text {
+      margin: 0;
+    }
+
+    .problems-main_costs {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      & > .text {
+        margin: 0;
+      }
+    }
+
+    .problems-main_list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .problems-main_cost {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .problems-main_icon {
+      flex: none;
+      width: 1.5rem;
+      height: 1.5rem;
+      opacity: 0.2;
+    }
+
+    .problems-main_cost-text {
+      margin: 0;
+      color: color-mix(in lab, currentcolor 50%, transparent);
+    }
+
+    /* 1: the drawing on the left, the text centred beside it. */
+    .problems-main_problem.side {
+      --_ratio: 779 / 500;
+      @media (width >= 64rem) {
+        grid-template-columns: minmax(0, 779fr) minmax(0, 634fr);
+        grid-template-areas: "meta ." "visual body";
+        column-gap: calc(161 / 1574 * 100%);
+        row-gap: var(--space-3);
+        & > .problems-main_meta {
+          grid-area: meta;
+        }
+        & > .problems-main_visual {
+          grid-area: visual;
+        }
+        & > .problems-main_body {
+          grid-area: body;
+          align-self: center;
+        }
+      }
+    }
+
+    /* 2: the text on the left, the drawing in the middle, costs on the
+       right. Three text-width columns need 80rem; below that the text sits
+       beside the drawing as in 1, mirrored. */
+    .problems-main_problem.middle {
+      --_ratio: 568 / 500;
+      @media (width >= 64rem) {
+        grid-template-columns: minmax(0, 634fr) minmax(0, 779fr);
+        grid-template-areas: ". meta" "body visual";
+        column-gap: calc(161 / 1574 * 100%);
+        row-gap: var(--space-3);
+        & .problems-main_meta {
+          grid-area: meta;
+        }
+        & .problems-main_visual {
+          grid-area: visual;
+        }
+        & .problems-main_body {
+          grid-area: body;
+          align-self: center;
+        }
+      }
+      @media (width >= 80rem) {
+        grid-template-columns:
+          minmax(0, 384fr) minmax(0, 568fr) minmax(0, 384fr);
+        grid-template-areas: ". meta ." "intro visual costs";
+        column-gap: calc(120 / 1576 * 100%);
+        & .problems-main_body {
+          display: contents;
+        }
+        & .problems-main_intro {
+          grid-area: intro;
+          align-self: center;
+        }
+        & .problems-main_costs {
+          grid-area: costs;
+          align-self: center;
+        }
+      }
+      /* The speech chips are drawn at 14 of 568 units; wherever the drawing
+         is shown well under its 568 px they grow about their centres so the
+         words stay readable: on phones, and beside the text from 64rem until
+         the drawing nears full size. */
+      & [data-part="chip"] {
+        transform-box: fill-box;
+        transform-origin: center;
+        scale: 1.6;
+        @media (width >= 30rem) {
+          scale: 1.3;
+        }
+        @media (width >= 48rem) {
+          scale: 1;
+        }
+        @media (width >= 64rem) {
+          scale: 1.3;
+        }
+        @media (width >= 100rem) {
+          scale: 1;
+        }
+      }
+      /* Abutting faces are stroked in their own colour to close the
+         anti-aliasing seams between them. */
+      & .problems-main_drawing path:not([stroke]) {
+        stroke-width: 0.6;
+        &[fill="#7BD52D"] {
+          stroke: #7bd52d;
+        }
+        &[fill="#F0F0F0"] {
+          stroke: #f0f0f0;
+        }
+      }
+    }
+
+    /* 3: centred, the heading above the drawing, the text and costs side
+       by side below it. Narrowed to the drawing's width from 80rem; below
+       that it keeps the full block so the costs fit on one line. */
+    .problems-main_problem.top {
+      --_ratio: 860 / 500;
+      @media (width >= 64rem) {
+        grid-template-columns: minmax(0, 464fr) minmax(0, 276fr);
+        grid-template-areas: "title title" "meta meta" "visual visual" "text costs";
+        column-gap: calc(120 / 860 * 100%);
+        row-gap: 0;
+        & .problems-main_body,
+        & .problems-main_intro {
+          display: contents;
+        }
+        & .problems-main_title {
+          grid-area: title;
+          justify-self: center;
+          width: calc(568 / 860 * 100%);
+          text-align: center;
+        }
+        & .problems-main_meta {
+          grid-area: meta;
+          margin-top: var(--space-7);
+        }
+        & .problems-main_visual {
+          grid-area: visual;
+          margin-top: var(--space-3);
+        }
+        & .problems-main_text {
+          grid-area: text;
+          margin-top: var(--space-7);
+        }
+        & .problems-main_costs {
+          grid-area: costs;
+          margin-top: var(--space-7);
+        }
+      }
+      @media (width >= 80rem) {
+        width: calc(860 / 1736 * 100%);
+      }
+    }
+
+    .problems-main_cta {
+      display: flex;
+      width: 100%;
+      justify-content: center;
+      padding-top: var(--space-7);
+      padding-bottom: var(--section-space-medium);
+    }
+  }
+</style>

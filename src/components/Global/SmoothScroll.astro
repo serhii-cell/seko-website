@@ -6,6 +6,10 @@
     document.documentElement.classList.contains("stacki-designer");
 
   if (!designing) {
+    /* Pages open at the top, a reload included, unless the address points
+       at a part of the page. */
+    if (!location.hash) scrollTo(0, 0);
+
     const lenis = new Lenis({
       autoToggle: true,
       allowNestedScroll: true,
@@ -13,6 +17,30 @@
     });
 
     lenis.on("scroll", ScrollTrigger.update);
+
+    /* When a media query flips (a phone turned to landscape, say), GSAP
+       rebuilds what depends on it and ScrollTrigger refreshes; a pin created
+       in that rebuild can leave the page at the top. Put the reader back
+       where they were. */
+    /* GSAP fires these around a flip; its typings leave them out. */
+    const events = gsap as unknown as {
+      addEventListener(type: "matchMediaInit", callback: () => void): void;
+    };
+    let saved: number | null = null;
+    events.addEventListener("matchMediaInit", () => {
+      if (saved === null) saved = scrollY;
+    });
+    /* The refresh that follows the flip is the one that moves the page. */
+    ScrollTrigger.addEventListener("refresh", () => {
+      if (saved === null) return;
+      const y = Math.min(saved, ScrollTrigger.maxScroll(window));
+      saved = null;
+      if (Math.abs(scrollY - y) <= 1) return;
+      /* Straight away, so a second flip in the same change (orientation,
+         say) records this position rather than the top. */
+      window.scrollTo(0, y);
+      lenis.scrollTo(y, { immediate: true, force: true });
+    });
     gsap.ticker.add((time) => lenis.raf(time * 1000));
     gsap.ticker.lagSmoothing(0);
   }

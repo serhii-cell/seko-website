@@ -1,0 +1,871 @@
+---
+import Section from "@/components/Wrapper/Section.astro";
+import Heading from "@/components/Typography/Heading.astro";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+
+type Stat = {
+  /** The figure, as written. */
+  value: string;
+  /** What the figure is out of, set dimmer after a slash. */
+  total?: string;
+  /** The caption under the figure. */
+  label: string;
+};
+
+type Service = {
+  /** The id of the modal the card opens. */
+  modal: string;
+  title: string;
+  description: string;
+  /** The outcome tags. */
+  outcomes: string[];
+  /** The 120 × 120 illustration tile. */
+  illustration: ImageMetadata;
+};
+
+interface Props {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** The small label above the heading. */
+  label?: string;
+  /** The heading. Nothing is output without it. */
+  heading?: string;
+  /** The figures in a row under the heading. */
+  stats?: Stat[];
+  /**
+   * The service cards, front of the deck first. Clicking a card behind the
+   * front one brings it forward; the front one opens its modal.
+   */
+  services?: Service[];
+}
+
+const { render = true, label, heading, stats = [], services = [] } = Astro.props;
+---
+
+{
+  render && heading && (
+    <Section
+      id="services"
+      theme="dark"
+      frame
+      class="services-main_wrap dashed dashed-bottom"
+      containerClass="services-main_container hatched"
+    >
+      <div class="services-main_intro">
+        <div class="services-main_title">
+          <Paragraph
+            variant="label"
+            class="services-main_label"
+            render={!!label}
+          >
+            {label}
+          </Paragraph>
+          <Heading tag="h2" class="services-main_heading">
+            {heading}
+          </Heading>
+        </div>
+        {stats.length > 0 && (
+          <ul class="services-main_stats" role="list">
+            {stats.map((stat) => (
+              <li class="services-main_stat">
+                <Paragraph variant="h3" class="services-main_value">
+                  {stat.value}{" "}
+                  {stat.total && (
+                    <span class="services-main_total">/ {stat.total}</span>
+                  )}
+                </Paragraph>
+                <Paragraph variant="label" class="services-main_label">
+                  {stat.label}
+                </Paragraph>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {services.length > 0 && (
+        <div
+          class="services-main_deck"
+          role="group"
+          aria-label="Services"
+          data-lines="off"
+        >
+          {services.map((service, index) => (
+            <article
+              class="services-main_card theme-light"
+              data-pos={index}
+              data-modal={service.modal}
+              data-modal-open={index === 0 ? service.modal : undefined}
+              aria-labelledby={`${service.modal}-title`}
+            >
+              <div class="services-main_bg" aria-hidden="true" />
+              <div class="services-main_body" inert={index !== 0}>
+                <div class="services-main_header">
+                  <div class="services-main_name">
+                    <img
+                      class="services-main_tile"
+                      src={service.illustration.src}
+                      width="120"
+                      height="120"
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <Heading
+                      tag="h3"
+                      class="services-main_card-title"
+                      id={`${service.modal}-title`}
+                    >
+                      {service.title}
+                    </Heading>
+                  </div>
+                  <button
+                    type="button"
+                    class="services-main_expand"
+                    data-modal-open={service.modal}
+                    aria-haspopup="dialog"
+                    aria-label={`More about ${service.title}`}
+                  >
+                    <svg
+                      class="services-main_icon"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        class="services-main_arrow-start"
+                        d="M5 19V13H7V17H11V19H5Z"
+                      />
+                      <path
+                        class="services-main_arrow-end"
+                        d="M17 11V7H13V5H19V11H17Z"
+                      />
+                    </svg>
+                  </button>
+                </div>
+                <div class="services-main_divider dashed dashed-top" />
+                <div class="services-main_details">
+                  <div class="services-main_column">
+                    <Paragraph variant="label" class="color-faded">
+                      What we do
+                    </Paragraph>
+                    <Paragraph variant="main" class="color-faded">
+                      {service.description}
+                    </Paragraph>
+                  </div>
+                  <div class="services-main_column">
+                    <Paragraph variant="label" class="color-faded">
+                      Outcomes
+                    </Paragraph>
+                    <ul class="services-main_outcomes" role="list">
+                      {service.outcomes.map((outcome) => (
+                        <li class="services-main_outcome">{outcome}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+              <div class="services-main_cover" aria-hidden="true" />
+              <button
+                type="button"
+                class="services-main_peek"
+                aria-label={`Show ${service.title}`}
+                tabindex={index === 0 ? -1 : undefined}
+              />
+            </article>
+          ))}
+        </div>
+      )}
+    </Section>
+  )
+}
+
+<script>
+  import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  const CARD = ".services-main_card";
+
+  /* Where the deck holds while pinned, in px from the top of the screen:
+     centred in the space under the nav, or its bottom on the screen's
+     bottom when it is taller than that space. */
+  function holdAt(element: HTMLElement) {
+    const root = getComputedStyle(document.documentElement);
+    const nav = (parseFloat(root.getPropertyValue("--nav-height")) || 0) * parseFloat(root.fontSize);
+    const room = innerHeight - nav;
+    const height = element.offsetHeight;
+    return height <= room ? nav + (room - height) / 2 : innerHeight - height;
+  }
+
+  onPage(() => {
+    const decks = document.querySelectorAll<HTMLElement>(".services-main_deck");
+    if (decks.length === 0) return;
+
+    const abort = new AbortController();
+    const { signal } = abort;
+    const ctx = gsap.context(() => {});
+    const mm = gsap.matchMedia();
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+    decks.forEach((deck) => {
+      const cards = gsap.utils.toArray<HTMLElement>(CARD, deck);
+      if (cards.length < 2) return;
+      const posOf = (card: HTMLElement) => Number(card.dataset.pos);
+      let moving = false;
+      /* Set while the page's scroll drives the deck. */
+      let scrolled: { trigger: ScrollTrigger; order: HTMLElement[]; length: number } | null = null;
+      /* A card asked for from the keyboard, to focus once it is in front. */
+      let pending: HTMLElement | null = null;
+
+      /* Only the front card can be used: the rest are inert, and its
+         whole surface opens its modal. */
+      const sync = (focus: boolean) => {
+        cards.forEach((card) => {
+          const front = posOf(card) === 0;
+          const body = card.querySelector<HTMLElement>(".services-main_body");
+          const peek = card.querySelector<HTMLElement>(".services-main_peek");
+          if (body) body.inert = !front;
+          /* Cards that have dropped out (negative positions) take no clicks. */
+          if (peek) peek.tabIndex = posOf(card) > 0 ? 0 : -1;
+          if (front && card.dataset.modal)
+            card.setAttribute("data-modal-open", card.dataset.modal);
+          else card.removeAttribute("data-modal-open");
+          if (front && focus)
+            card.querySelector<HTMLElement>(".services-main_expand")?.focus();
+        });
+      };
+
+      /* Where a card sits at each depth: raised one step and inset 1rem a
+         side per step back, the front one free to grow past its edges. */
+      const place = (pos: number) => {
+        const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+        const step = Number(getComputedStyle(deck).getPropertyValue("--_step")) || 1;
+        const side = pos === 0 ? -0.5 * rem : pos * rem;
+        const top = pos === 0 || pos === 2 ? -0.5 * rem : 0;
+        const bottom = pos === 0 ? -0.5 * rem : 0;
+        return {
+          y: -pos * step * rem,
+          clipPath: `inset(${top}px ${side}px ${bottom}px ${side}px round ${0.125 * rem}px)`,
+        };
+      };
+      const slab = (pos: number) =>
+        getComputedStyle(deck).getPropertyValue(`--_slab-${Math.min(pos, 2)}`);
+
+      const bringForward = (target: HTMLElement, focus: boolean) => {
+        const depth = posOf(target);
+        if (moving || depth === 0) return;
+        const total = cards.length;
+        const next = new Map(
+          cards.map((card) => [card, (posOf(card) - depth + total) % total]),
+        );
+
+        const settle = () => {
+          cards.forEach((card) => {
+            card.dataset.pos = String(next.get(card));
+            gsap.set(card, { clearProps: "all" });
+            gsap.set(card.querySelector(".services-main_cover"), {
+              clearProps: "all",
+            });
+          });
+          deck.classList.remove("is-moving");
+          moving = false;
+          sync(focus);
+        };
+
+        if (reduced.matches) {
+          /* The click that asked for it is still on its way to the modal's
+             listener, so the new front card only opens on the next one. */
+          requestAnimationFrame(settle);
+          return;
+        }
+
+        moving = true;
+        deck.classList.add("is-moving");
+        ctx.add(() => {
+          const timeline = gsap.timeline({ onComplete: settle });
+          cards.forEach((card) => {
+            const from = posOf(card);
+            const to = next.get(card) ?? 0;
+            const cover = card.querySelector(".services-main_cover");
+            const end = place(to);
+            if (from === 0) {
+              /* The front card drops out, then slides in at the back. */
+              timeline
+                .set(card, { zIndex: total + 1 }, 0)
+                .to(
+                  card,
+                  { y: "+=24", autoAlpha: 0, duration: 0.3, ease: "power2.in" },
+                  0,
+                )
+                .set(card, { zIndex: total - to, ...end, y: end.y + 16 }, 0.3)
+                .set(cover, { opacity: 1, backgroundColor: slab(to) }, 0.3)
+                .to(card, { y: end.y, autoAlpha: 1, duration: 0.5 }, 0.3);
+            } else {
+              timeline
+                .set(card, { zIndex: total - to }, 0)
+                .fromTo(
+                  card,
+                  { clipPath: place(from).clipPath },
+                  { ...end, duration: 0.7 },
+                  0.1,
+                )
+                .to(
+                  cover,
+                  to === 0
+                    ? { opacity: 0, duration: 0.5 }
+                    : { backgroundColor: slab(to), duration: 0.5 },
+                  0.1,
+                );
+            }
+          });
+        });
+      };
+
+      deck.addEventListener(
+        "click",
+        (event) => {
+          const peek = (event.target as Element).closest(".services-main_peek");
+          const card = peek?.closest<HTMLElement>(CARD);
+          if (!card) return;
+          if (scrolled) {
+            /* Scroll the page to where that card is at the front. */
+            const { trigger, order, length } = scrolled;
+            const at = order.indexOf(card) / length;
+            if ((event as MouseEvent).detail === 0) pending = card;
+            window.scrollTo({
+              top: trigger.start + at * (trigger.end - trigger.start),
+              behavior: "smooth",
+            });
+            return;
+          }
+          /* A keyboard press reports no clicks; hand focus on to the card it
+             brought forward. */
+          bringForward(card, (event as MouseEvent).detail === 0);
+        },
+        { signal },
+      );
+
+      /* The glow on the front card's border follows the cursor. */
+      deck.addEventListener(
+        "pointermove",
+        (event) => {
+          if (event.pointerType !== "mouse" || moving) return;
+          const card = (event.target as Element).closest<HTMLElement>(CARD);
+          const bg = card?.querySelector(".services-main_bg");
+          if (!card || !bg || posOf(card) !== 0) return;
+          const box = bg.getBoundingClientRect();
+          card.style.setProperty("--_glow-x", `${event.clientX - box.left}px`);
+          card.style.setProperty("--_glow-y", `${event.clientY - box.top}px`);
+        },
+        { signal },
+      );
+
+      /* From 48rem up, with motion, the section holds when its deck reaches
+         the space under the nav, and scrolling drops the front card down
+         out of the deck, uncovering the next one as the cards behind step
+         forward; once the last card is at the front the page carries on.
+         Scrolling back brings them up again. */
+      const section = deck.closest<HTMLElement>(".services-main_wrap");
+      if (!section || document.documentElement.classList.contains("stacki-designer")) return;
+      mm.add("(width >= 48rem) and (prefers-reduced-motion: no-preference)", () => {
+        const total = cards.length;
+        const order = [...cards].sort((a, b) => posOf(a) - posOf(b));
+        const covers = order.map((card) => card.querySelector(".services-main_cover"));
+        let front = 0;
+        const show = (index: number) => {
+          if (index === front) return;
+          front = index;
+          const active = document.activeElement;
+          order.forEach((card, i) => (card.dataset.pos = String(i - index)));
+          sync(false);
+          /* Focus follows to the new front card when a keyboard asked for
+             it, or when the control that had focus has just gone. */
+          const lost =
+            active instanceof HTMLElement &&
+            deck.contains(active) &&
+            (!!active.closest("[inert]") || active.offsetParent === null);
+          if (pending === order[index] || lost) {
+            pending = null;
+            order[index]
+              .querySelector<HTMLElement>(".services-main_expand")
+              ?.focus({ preventScroll: true });
+          }
+        };
+
+        order.forEach((card, i) => {
+          gsap.set(card, { zIndex: total - i, ...place(i) });
+          gsap.set(covers[i], i === 0 ? { opacity: 0 } : { opacity: 1, backgroundColor: slab(i) });
+        });
+
+        const timeline = gsap.timeline({
+          defaults: { ease: "power2.inOut", duration: 1 },
+          scrollTrigger: {
+            trigger: deck,
+            start: () => `top ${holdAt(deck)}`,
+            end: () => `+=${innerHeight * 0.7 * (total - 1)}`,
+            pin: section,
+            /* Off by default inside a flex parent like <main>. */
+            pinSpacing: true,
+            scrub: 0.6,
+            invalidateOnRefresh: true,
+            /* A card counts as gone once it is halfway down. */
+            onUpdate: (self) =>
+              show(Math.min(total - 1, Math.floor(self.progress * timeline.duration() + 0.5))),
+          },
+        });
+        for (let step = 0; step < total - 1; step++) {
+          timeline
+            .to(order[step], { yPercent: 110, ease: "power1.in" }, step)
+            .to(order[step], { autoAlpha: 0, duration: 0.35, ease: "none" }, step + 0.65);
+          for (let next = step + 1; next < total; next++) {
+            const depth = next - step - 1;
+            /* The clip's start is given in full: read back from the page it
+               comes shortened, and its numbers would pair up wrongly. */
+            timeline
+              .fromTo(
+                order[next],
+                { clipPath: place(depth + 1).clipPath },
+                { ...place(depth), immediateRender: false },
+                step,
+              )
+              .to(
+                covers[next],
+                depth === 0 ? { opacity: 0 } : { backgroundColor: slab(depth) },
+                step,
+              );
+          }
+        }
+        /* The last card holds a moment before the page moves on. */
+        timeline.to({}, { duration: 0.3 });
+
+        if (timeline.scrollTrigger) {
+          scrolled = { trigger: timeline.scrollTrigger, order, length: timeline.duration() };
+        }
+        return () => {
+          scrolled = null;
+          pending = null;
+          order.forEach((card, i) => (card.dataset.pos = String(i)));
+          sync(false);
+        };
+      });
+    });
+
+    return () => {
+      abort.abort();
+      mm.revert();
+      ctx.revert();
+    };
+  });
+</script>
+
+<style is:global>
+  @layer components {
+    .services-main_container {
+      align-items: center;
+      gap: var(--section-space-small);
+      padding-block: var(--section-space-xlarge);
+      & :is(.heading, .text) {
+        margin: 0;
+      }
+      /* Labels keep their full line box, as drawn. */
+      & .text-style-label {
+        --_trim-top: 0.5lh;
+        --_trim-bottom: 0.5lh;
+      }
+    }
+
+    /* ---------- Heading and figures ---------- */
+
+    .services-main_intro {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--section-space-small);
+      width: 100%;
+      text-align: center;
+    }
+
+    .services-main_title {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-5);
+    }
+
+    .services-main_label {
+      color: color-mix(in srgb, currentColor 40%, transparent);
+    }
+
+    .services-main_heading {
+      max-width: 32.5rem;
+    }
+
+    .services-main_stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 17.25rem));
+      gap: var(--space-3);
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .services-main_stat {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .services-main_total {
+      color: var(--stroke);
+    }
+
+    /* ---------- Deck ---------- */
+
+    .services-main_deck {
+      --_slab-0: var(--light-100);
+      --_slab-1: #a0a0a0;
+      --_slab-2: #414141;
+      --_step: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      width: 100%;
+      max-width: 53.75rem;
+      padding-top: calc(var(--_step) * 2rem);
+      text-align: start;
+
+      /* Fingers get back-card strips tall enough to hit. */
+      @media (pointer: coarse) {
+        --_step: 1.5;
+      }
+    }
+
+    .services-main_card {
+      --_grow: 0.375rem;
+      --_radius: 0.125rem;
+      --_ease: cubic-bezier(0.165, 0.84, 0.44, 1);
+      --_time: 0.8s;
+      grid-area: 1 / 1;
+      position: relative;
+      z-index: 3;
+      display: flex;
+      background-color: transparent;
+      cursor: pointer;
+      clip-path: inset(-0.5rem round var(--_radius));
+
+      &[data-pos="1"] {
+        z-index: 2;
+        transform: translateY(calc(var(--_step) * -1rem));
+        clip-path: inset(0 1rem round var(--_radius));
+        --_cover: 1;
+        --_slab: var(--_slab-1);
+      }
+
+      /* The furthest strip also takes the empty space above it, so its
+         target is 0.5rem taller than what shows. */
+      &[data-pos="2"] {
+        z-index: 1;
+        transform: translateY(calc(var(--_step) * -2rem));
+        clip-path: inset(-0.5rem 2rem 0 round var(--_radius));
+        --_cover: 1;
+        --_slab: var(--_slab-2);
+
+        & .services-main_peek {
+          top: -0.5rem;
+        }
+      }
+
+      &:has(.services-main_expand:focus-visible) {
+        outline: var(--focus-width) solid var(--brand-500);
+        outline-offset: 0;
+      }
+    }
+
+    .services-main_bg {
+      position: absolute;
+      inset: calc(var(--_grow) * -1);
+      background-color: var(--background);
+      border-radius: var(--_radius);
+      clip-path: inset(var(--_grow) round var(--_radius));
+      pointer-events: none;
+      transition:
+        clip-path var(--_time) var(--_ease),
+        background-color var(--hover-duration) var(--hover-ease);
+
+      /* The 1px border, lit by an accent glow around the cursor. */
+      &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        padding: var(--border-width);
+        border-radius: inherit;
+        background: radial-gradient(
+          62.5% 31.25% at var(--_glow-x, -12.5%) var(--_glow-y, 50%),
+          var(--brand-500),
+          color-mix(in srgb, var(--brand-500) 35%, transparent) 45%,
+          var(--stroke)
+        );
+        mask:
+          linear-gradient(#000 0 0) content-box exclude,
+          linear-gradient(#000 0 0);
+        opacity: 0;
+        transition: opacity var(--_time) var(--_ease);
+      }
+    }
+
+    .services-main_body {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-7);
+      width: 100%;
+      padding: var(--space-7);
+    }
+
+    .services-main_header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--space-4);
+    }
+
+    .services-main_name {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-7);
+      min-width: 0;
+    }
+
+    .services-main_tile {
+      flex: none;
+      display: block;
+      width: 7.5rem;
+      height: 7.5rem;
+      background-color: var(--background-2);
+    }
+
+    .services-main_card-title {
+      width: 17.4375rem;
+      max-width: 100%;
+      transition: translate var(--_time) var(--_ease);
+    }
+
+    .services-main_expand {
+      flex: none;
+      display: grid;
+      place-items: center;
+      width: 2.5rem;
+      height: 2.5rem;
+      padding: 0;
+      border: 0;
+      border-radius: var(--_radius);
+      background-color: color-mix(in srgb, var(--brand-500) 20%, transparent);
+      color: var(--brand-500);
+      cursor: pointer;
+      transition:
+        translate var(--_time) var(--_ease),
+        background-color var(--_time) var(--_ease),
+        color var(--_time) var(--_ease);
+
+      &:focus-visible {
+        outline: 0;
+      }
+    }
+
+    .services-main_icon {
+      display: block;
+      width: 1.5rem;
+      height: 1.5rem;
+      fill: currentColor;
+      overflow: visible;
+    }
+
+    .services-main_arrow-start,
+    .services-main_arrow-end {
+      transition: translate var(--_time) var(--_ease);
+    }
+
+    .services-main_divider {
+      height: var(--border-width);
+    }
+
+    /* Two columns at 373 : 311, until the outcomes no longer fit on one
+       line each; then the outcomes drop below the description. */
+    .services-main_details {
+      display: flex;
+      flex-wrap: wrap;
+      column-gap: var(--section-space-small);
+      row-gap: var(--space-7);
+    }
+
+    .services-main_column {
+      flex: 373 1 0%;
+      min-width: min(100%, 16rem);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-2);
+
+      & + & {
+        flex-grow: 311;
+        min-width: auto;
+      }
+    }
+
+    .services-main_outcomes {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-2);
+      min-width: max-content;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    /* Round at one line; a tag that still wraps keeps the same corners. */
+    .services-main_outcome {
+      padding: 0.25rem 0.625rem;
+      border-radius: calc(0.5lh + 0.25rem);
+      background-color: var(--stroke);
+      color: var(--text);
+      font-size: var(--text-main);
+      line-height: var(--text-main-line-height);
+    }
+
+    .services-main_cover {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      border-radius: var(--_radius);
+      background-color: var(--_slab, var(--_slab-1));
+      opacity: var(--_cover, 0);
+      pointer-events: none;
+    }
+
+    /* A card that has dropped out of the pinned deck, still on its way
+       down, lets clicks through to the new front card. */
+    .services-main_card[data-pos^="-"] {
+      pointer-events: none;
+    }
+
+    /* Covers what shows of a card behind the front one. */
+    .services-main_peek {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      padding: 0;
+      border: 0;
+      background: none;
+      cursor: pointer;
+
+      .services-main_card:is([data-pos="0"], [data-pos^="-"]) > & {
+        display: none;
+      }
+
+      &:focus-visible {
+        outline: var(--focus-width) solid var(--brand-500);
+        outline-offset: calc(var(--focus-width) * -1);
+      }
+    }
+
+    .services-main_card[data-pos="1"] .services-main_peek:focus-visible {
+      inset: 0 1rem auto;
+      height: calc(var(--_step) * 1rem);
+    }
+
+    .services-main_card[data-pos="2"] .services-main_peek:focus-visible {
+      inset: 0 2rem auto;
+      height: calc(var(--_step) * 1rem);
+    }
+
+    /* ---------- Front card states ---------- */
+
+    .services-main_deck:not(.is-moving) .services-main_card[data-pos="0"] {
+      &:active .services-main_bg {
+        background-color: var(--stroke);
+      }
+
+      &:active .services-main_expand {
+        background-color: var(--brand-600);
+        color: var(--brand-text);
+      }
+
+      @media (hover: hover) and (pointer: fine) {
+        &:hover {
+          & .services-main_bg::after {
+            opacity: 1;
+          }
+          & .services-main_expand {
+            background-color: var(--brand-500);
+            color: var(--brand-text);
+          }
+          &:active .services-main_expand {
+            background-color: var(--brand-600);
+          }
+        }
+
+        /* After stripe.com: the card grows past its edges without moving
+           the layout, the title and button travelling out with them. */
+        @media (prefers-reduced-motion: no-preference) {
+          &:hover {
+            & .services-main_bg {
+              clip-path: inset(0 round var(--_radius));
+            }
+            & .services-main_card-title {
+              translate: 0 calc(var(--_grow) * -1);
+            }
+            & .services-main_expand {
+              translate: var(--_grow) calc(var(--_grow) * -1);
+            }
+            & .services-main_arrow-start {
+              translate: -0.0625rem 0.0625rem;
+            }
+            & .services-main_arrow-end {
+              translate: 0.0625rem -0.0625rem;
+            }
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          & .services-main_bg::after {
+            inset: var(--_grow);
+          }
+        }
+      }
+    }
+
+    /* ---------- Narrow screens ---------- */
+
+    /* The tile and button share the top row, the title gets the full width
+       below them, and tags too long for the card wrap. */
+    @media (width < 48rem) {
+      .services-main_header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        row-gap: var(--space-4);
+      }
+
+      .services-main_name {
+        display: contents;
+      }
+
+      .services-main_tile {
+        width: 5rem;
+        height: 5rem;
+      }
+
+      .services-main_card-title {
+        grid-column: 1 / -1;
+        width: auto;
+      }
+
+      .services-main_expand {
+        grid-area: 1 / 2;
+      }
+
+      .services-main_outcomes {
+        min-width: 0;
+      }
+    }
+  }
+</style>

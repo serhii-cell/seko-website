@@ -1,6 +1,9 @@
 ---
+import Heading from "@/components/Typography/Heading.astro";
 import Icon from "@/components/Media/Icon.astro";
-import logo from "@/assets/logo/logo.svg";
+import Img from "@/components/Media/Img.astro";
+import wordmark from "@/assets/home/footer/seko-wordmark.svg";
+import calendar from "@/assets/home/footer/schedule-calendar@2x.png";
 import { SITE_NAME } from "@/consts.ts";
 
 interface Props {
@@ -9,117 +12,402 @@ interface Props {
 }
 
 const { render = true } = Astro.props;
+
+const team = [
+  { role: "Founder", name: "Serhii Shepel" },
+  { role: "Founding designer", name: "Oleksandr Donihin" },
+  { role: "Founding designer", name: "Vladyslav Skorych" },
+];
+
+const columns: { heading: string; links: { label: string; href?: string }[] }[] = [
+  {
+    heading: "Links",
+    links: [
+      { label: "Work", href: "/#work" },
+      { label: "Services", href: "/#services" },
+    ],
+  },
+  {
+    heading: "Company",
+    links: [
+      { label: "About" },
+      { label: "Contact us", href: "#contact" },
+    ],
+  },
+  {
+    heading: "Legal",
+    links: [
+      { label: "Privacy policy" },
+      { label: "Terms and conditions" },
+    ],
+  },
+  {
+    heading: "Socials",
+    links: [
+      { label: "Instagram" },
+      { label: "Facebook" },
+    ],
+  },
+];
 ---
 
 {
   render && (
-    <footer class="footer_wrap">
+    <footer id="contact" class="footer_wrap theme-dark">
       <div class="footer_inner">
         <div class="footer_top">
-          <a class="footer_logo" href="/" aria-label={SITE_NAME}>
-            <Icon src={logo} variant="full-width" />
-          </a>
-          <nav aria-label="Footer">
-            <ul class="footer_links">
-              <li>
-                <a class="footer_link" href="/">
-                  Home
-                </a>
-              </li>
-              <li>
-                <a class="footer_link" href="/example-components">
-                  Example Components
-                </a>
-              </li>
-            </ul>
-          </nav>
+          <div class="footer_brand">
+            <div class="footer_logo">
+              <Icon src={wordmark} variant="full-width" aria-label={SITE_NAME} />
+            </div>
+            <div class="footer_divider dashed dashed-top" aria-hidden="true" />
+            <dl class="footer_team">
+              {team.map(({ role, name }) => (
+                <div class="footer_credit">
+                  <dt class="footer_role text-style-label">{role}</dt>
+                  <dd class="footer_name">{name}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+          <div class="footer_schedule">
+            <div class="footer_schedule_head">
+              <Heading tag="h2" variant="h4" class="footer_title">
+                Schedule a call with us!
+              </Heading>
+              <p class="footer_clock">
+                <time class="footer_clock_time">--:-- --</time>
+                <span class="footer_clock_place">Ukraine</span>
+              </p>
+            </div>
+            <Img
+              src={calendar}
+              alt="Booking calendar for August 2026"
+              variant="constrained"
+              sizes="(width >= 64rem) max(28rem, 30vw), (width >= 48rem) 35.25rem, 100vw"
+              class="footer_calendar"
+            />
+          </div>
         </div>
-        <div class="footer_bottom">
-          <p class="footer_copyright text-style-small">
-            &copy; <span id="year">{new Date().getFullYear()}</span>&#160;
-            {SITE_NAME}
-          </p>
-        </div>
+        <div class="footer_divider dashed dashed-top" aria-hidden="true" />
+        <nav class="footer_nav" aria-label="Footer">
+          {columns.map(({ heading, links }) => (
+            <div class="footer_column">
+              <Heading tag="h2" variant="label" class="footer_heading">
+                {heading}
+              </Heading>
+              <ul class="footer_list" role="list">
+                {links.map(({ label, href }) => (
+                  <li>
+                    <a
+                      class="footer_link"
+                      href={href}
+                      target={href?.startsWith("http") ? "_blank" : undefined}
+                      rel={href?.startsWith("http") ? "noopener" : undefined}
+                    >
+                      {label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
       </div>
     </footer>
   )
 }
 
-<script>
-  const year = document.querySelector<HTMLSpanElement>("#year");
+{/* No-JS fallback */}
+<noscript>
+  <style>
+    .footer_clock {
+      visibility: hidden;
+    }
+  </style>
+</noscript>
 
-  if (year) {
-    year.textContent = new Date().getFullYear().toString();
-  }
+<script>
+  import { gsap } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  const kyiv = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Europe/Kyiv",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  /* Live Kyiv time, ticking over on the minute. */
+  onPage(() => {
+    const time = document.querySelector<HTMLTimeElement>(".footer_clock_time");
+    if (!time) return;
+
+    let timer = 0;
+    const tick = () => {
+      const now = new Date();
+      time.textContent = kyiv.format(now).replace(/\s+/g, " ");
+      time.dateTime = now.toISOString();
+      timer = window.setTimeout(tick, 1000 - (now.getTime() % 1000) + 5);
+    };
+    tick();
+
+    return () => clearTimeout(timer);
+  });
+
+  /* The footer sits outside <main>, so it brings itself in: the wordmark's
+     letters rise into their frame left to right, and the blocks around it
+     fade up after them, once, when the footer comes into view. */
+  onPage(() => {
+    const footer = document.querySelector<HTMLElement>(".footer_wrap");
+    const designing =
+      document.documentElement.classList.contains("stacki-designer");
+    if (!footer || designing) return;
+
+    const mm = gsap.matchMedia();
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const letters = gsap.utils
+        .toArray<SVGGraphicsElement>(".footer_logo path", footer)
+        .sort((a, b) => a.getBBox().x - b.getBBox().x);
+      const blocks = gsap.utils.toArray<HTMLElement>(
+        ".footer_divider, .footer_calendar",
+        footer,
+      );
+
+      const timeline = gsap.timeline({
+        scrollTrigger: { trigger: footer, start: "top 85%", once: true },
+      });
+      timeline
+        .from(letters, { yPercent: 110, duration: 1, stagger: 0.06 })
+        .from(
+          blocks,
+          { autoAlpha: 0, y: "1.5rem", stagger: 0.06, clearProps: "all" },
+          0.2,
+        );
+    });
+
+    return () => mm.revert();
+  });
 </script>
 
 <style is:global>
   @layer components {
     .footer_wrap {
-      display: flex;
-      justify-content: center;
-      padding-block: var(--section-space-small);
-      padding-inline: var(--site-margin);
-      background-color: var(--background);
+      padding-block: calc(var(--section-space-xlarge) / 2);
+      background-color: var(--dark-950);
       color: var(--text);
-      border-top: var(--border-width) solid var(--border);
     }
 
     .footer_inner {
-      width: 100%;
-      max-width: var(--max-width-main);
+      width: var(--site-width);
+      max-width: var(--max-width-frame);
+      margin-inline: auto;
       display: flex;
       flex-direction: column;
-      gap: var(--space-6);
+      gap: var(--section-space-small);
     }
 
     .footer_top {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--section-space-small);
+    }
+
+    .footer_brand {
+      display: flex;
+      flex-direction: column;
+      gap: var(--section-space-small);
+      min-width: 0;
+    }
+
+    .footer_logo svg {
+      overflow: hidden;
+    }
+
+    .footer_divider {
+      height: var(--border-width);
+      width: 100%;
+    }
+
+    .footer_team {
       display: flex;
       flex-wrap: wrap;
-      align-items: center;
+      gap: var(--space-6) var(--section-space-small);
+    }
+
+    .footer_credit {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    /* Labels, names and the clock keep their full line boxes, as in the
+       design; only the heading is trimmed to its cap height. */
+    .footer_role,
+    .footer_heading,
+    .footer_clock {
+      --_trim-top: 0.5lh;
+      --_trim-bottom: 0.5lh;
+    }
+
+    .footer_role,
+    .footer_heading {
+      color: color-mix(in lab, currentcolor 40%, transparent);
+    }
+
+    .footer_name {
+      color: var(--text-2);
+    }
+
+    .footer_schedule {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-7);
+      min-width: 0;
+    }
+
+    .footer_schedule_head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
       justify-content: space-between;
-      gap: var(--space-4) var(--space-6);
+      gap: var(--space-2) var(--space-3);
     }
 
-    .footer_logo {
-      display: block;
-      width: 7.5rem;
-      max-width: 100%;
-      transition: opacity var(--hover-duration) var(--hover-ease);
-      @media (hover: hover) {
-        &:hover {
-          opacity: 0.6;
-        }
-      }
+    .footer_wrap .footer_title {
+      margin: 0;
     }
 
-    .footer_links {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: var(--space-4);
-      font-size: var(--text-small);
+    .footer_clock {
+      color: color-mix(in lab, currentcolor 40%, transparent);
       font-weight: var(--primary-medium);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .footer_clock_time::after {
+      content: ",";
+    }
+
+    .footer_clock_place {
+      margin-left: 0.3em;
+    }
+
+    .footer_calendar {
+      display: block;
+      width: 100%;
+      height: auto;
+      aspect-ratio: 564 / 583;
+      border-radius: 0.75rem;
+    }
+
+    .footer_nav {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(max-content, 1fr));
+      gap: var(--space-8) var(--site-gutter);
+    }
+
+    .footer_column {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .footer_wrap .footer_heading {
+      margin: 0;
+    }
+
+    .footer_list {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-1);
+      padding: 0;
+      list-style: none;
     }
 
     .footer_link {
+      display: inline-flex;
+      border-radius: 0.125rem;
       color: var(--text-2);
       text-decoration: none;
       transition: color var(--hover-duration) var(--hover-ease);
-      @media (hover: hover) {
-        &:hover {
+      &[href] {
+        @media (hover: hover) {
+          &:hover {
+            color: var(--text);
+          }
+        }
+        &:focus-visible {
           color: var(--text);
+          outline-color: var(--brand-500);
+          outline-offset: 0;
+        }
+        &:active {
+          color: var(--brand-500);
         }
       }
     }
 
-    .footer_bottom {
-      padding-top: var(--space-4);
-      border-top: var(--border-width) solid var(--border);
+    @media (width >= 48rem) {
+      .footer_top {
+        grid-template-columns: minmax(0, 1fr) min(35.25rem, 66%);
+        grid-template-areas:
+          "logo logo"
+          "rule rule"
+          "team schedule";
+        column-gap: var(--section-space-small);
+        align-items: start;
+      }
+
+      .footer_brand {
+        display: contents;
+      }
+
+      .footer_logo {
+        grid-area: logo;
+      }
+
+      .footer_brand .footer_divider {
+        grid-area: rule;
+      }
+
+      .footer_team {
+        grid-area: team;
+        flex-direction: column;
+      }
+
+      .footer_schedule {
+        grid-area: schedule;
+      }
+
+      .footer_nav {
+        grid-template-columns: repeat(4, minmax(max-content, 1fr));
+      }
     }
 
-    .footer_copyright {
-      color: var(--text-2);
+    @media (width >= 64rem) {
+      .footer_top {
+        grid-template-columns: minmax(0, 932fr) minmax(28rem, 564fr);
+        grid-template-areas: none;
+        column-gap: calc(240 / 1736 * 100%);
+      }
+
+      .footer_brand {
+        display: flex;
+      }
+
+      .footer_team {
+        flex-direction: row;
+      }
+
+      .footer_schedule {
+        grid-area: auto;
+      }
+
+      .footer_nav {
+        column-gap: calc(213 / 1736 * 100%);
+      }
     }
   }
 </style>

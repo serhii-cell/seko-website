@@ -89,14 +89,18 @@ take no `render` prop; the layout decides where they appear.
   `data-lines="off"` opts out. Blocks with no text of their own, and anything
   marked `data-fade`, fade in from 0 opacity instead. Parts outside `<main>`
   that should join in, like the nav's, are marked `data-intro`. Whatever is on
-  screen at load comes in as one sequence in reading order — rows top to
-  bottom, left to right — 0.07s apart, starting when the first-load curtain's
-  edge reaches the first heading (`page-intro:content`). The rest comes in as
+  screen at load comes in in numbered steps, left to right and top to bottom:
+  each part carries `data-step`, step 1 starts when the first-load curtain's
+  edge reaches the first heading (`page-intro:content`) and each step follows
+  0.1s later (`src/utils/intro.ts`). Items in the same step go in reading
+  order, 0.06s apart; components with their own first-screen animation — the
+  hero's ASCII container and guides, the logo strip — start on their step too. The rest comes in as
   it scrolls into view: text once its first line is fully on screen, blocks in
   batches. A block marked `data-reveal="own"` runs its own reveal and is
   skipped, like the cards of `SectionHelpMain`, which slide up into their
-  columns while the section is pinned. `SectionObservationsMain` pins itself
-  too and drives its chart with the scroll.
+  columns while the section is pinned. `SectionObservationsMain` plays its
+  chart once, by itself, when the chart scrolls into view — it is not pinned
+  or tied to the scroll, so scrolling back up never replays it.
 
 ## Page transitions
 

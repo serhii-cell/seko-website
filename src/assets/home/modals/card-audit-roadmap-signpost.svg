@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="119" height="179" viewBox="0 0 119 179" fill="none"><g id="Signpost">
+<g id="Base">
+<path id="Side" d="M92.5438 162.698L55.3568 178.5L20.9238 161.825V154.703L55.3568 171.378L92.5438 155.576V162.698Z" fill="#F0F0F0" />
+<path id="Side outline" d="M92.5438 155.576V162.698L55.3568 178.5L20.9238 161.825V154.703" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Corner" d="M55.3569 178.5V171.378" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Face" d="M20.9238 154.703L58.1108 138.901L92.5438 155.576L55.3568 171.378L20.9238 154.703Z" fill="white" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<g id="Pole">
+<path id="Side_2" d="M64.5669 155.235L56.4329 158.692L48.8999 155.044V10.2271L56.4329 13.8751L64.5669 10.4181V155.235Z" fill="#F0F0F0" />
+<path id="Side outline_2" d="M64.5669 10.4181V155.235L56.4329 158.692L48.8999 155.044V10.2271" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Corner_2" d="M56.4331 158.692V13.875" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Face_2" d="M48.8999 10.227L57.0349 6.77002L64.5669 10.418L56.4329 13.875L48.8999 10.227Z" fill="white" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<g id="Pole cap">
+<path id="Side_3" d="M67.924 10.459L56.303 15.397L45.543 10.186V5.43799L56.303 10.649L67.924 5.71099V10.459Z" fill="#F0F0F0" />
+<path id="Side outline_3" d="M67.924 5.71099V10.459L56.303 15.397L45.543 10.186V5.43799" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Corner_3" d="M56.3027 15.397V10.649" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Face_3" d="M45.543 5.438L57.164 0.5L67.924 5.711L56.303 10.649L45.543 5.438Z" fill="white" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<g id="Sign left">
+<path id="Side_4" d="M89.252 105.738V81.997L22.537 49.689L7.473 54.264L0.5 57.227L15.565 52.652L82.279 84.96V108.701L89.252 105.738Z" fill="#F0F0F0" />
+<path id="Side outline_4" d="M82.279 108.701L89.252 105.738V81.997L22.537 49.689L7.473 54.264L0.5 57.227" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Corner_4" d="M89.2518 81.9969L82.2788 84.9599" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Corner_5" d="M22.5369 49.689L15.5649 52.652" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+<path id="Face_4" d="M82.279 84.96L15.565 52.652L0.5 57.227L15.565 76.392L82.279 108.701V84.96Z" fill="white" stroke="#E0E0E0" stroke-linecap="round" stroke-linejoin="round" />
+</g>
+<g id="Sign right">
+<path id="Side_5" d="M111.632 16.534L95.3632 11.577L25.6372 41.205V64.945L32.0932 68.072V44.331L101.819 14.703L118.088 19.66L111.632 16.534Z" fill="#B6E88B" />
+<path id="Face_5" d="M32.0933 68.072L101.819 38.444L118.088 19.66L101.819 14.703L32.0933 44.331V68.072Z" fill="#7BD52D" />
+</g>
+</g>
+</svg>

@@ -1,14 +1,35 @@
 ---
 import Layout from "@/layouts/BaseLayout.astro";
-import Section from "@/components/Wrapper/Section.astro";
-import Paragraph from "@/components/Typography/Paragraph.astro";
+import Card from "@/components/Item/Card.astro";
 import SectionHeroMain from "@/components/Section/SectionHeroMain.astro";
-import ContentLogosMain from "@/components/Content/ContentLogosMain.astro";
 import SectionObservationsMain from "@/components/Section/SectionObservationsMain.astro";
-import SectionHelpMain from "@/components/Section/SectionHelpMain.astro";
-import adaptive from "@/assets/clients/adaptive.svg";
+import SectionProblemsMain from "@/components/Section/SectionProblemsMain.astro";
+import SectionWorksMain from "@/components/Section/SectionWorksMain.astro";
+import SectionServicesMain from "@/components/Section/SectionServicesMain.astro";
+import SectionPricingMain from "@/components/Section/SectionPricingMain.astro";
+import SectionReviewsMain from "@/components/Section/SectionReviewsMain.astro";
+import SectionFaqMain from "@/components/Section/SectionFaqMain.astro";
+import ContentServiceModals from "@/components/Content/ContentServiceModals.astro";
+import WorkSceneBidl from "@/components/Media/WorkSceneBidl.astro";
+import adaptive from "@/assets/home/hero/client-adaptive.svg";
+import webshare from "@/assets/home/hero/client-webshare.svg";
+import oblivious from "@/assets/home/hero/client-oblivious.svg";
+import metomic from "@/assets/home/hero/client-metomic.svg";
+import workAdaptive from "@/assets/home/works/work-adaptive-co.jpg";
+import workWyr from "@/assets/home/works/work-wyr.jpg";
+import workHomeRumble from "@/assets/home/works/work-home-rumble.jpg";
+import websiteTile from "@/assets/home/services/service-website-tile.svg";
+import productTile from "@/assets/home/services/service-product-tile.svg";
+import auditTile from "@/assets/home/services/service-audit-tile.svg";
+import logoNokia from "@/assets/home/reviews/logo-nokia.svg";
+import logoSmartValor from "@/assets/home/reviews/logo-smart-valor.svg";
+import logoNftport from "@/assets/home/reviews/logo-nftport.svg";
+import logoProductPhotography from "@/assets/home/reviews/logo-product-photography.svg";
 
-const logo = { src: adaptive, name: "Adaptive & Co" };
+const lorem =
+  "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation";
+const loremLong =
+  "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.";
 ---
 
 <Layout
@@ -18,54 +39,200 @@ const logo = { src: adaptive, name: "Adaptive & Co" };
 >
   {/* Hero */}
   <SectionHeroMain
-    heading="Design agency that scales products to your ambitions."
+    heading="Design agency that scales products to your ambitions"
     text="Seko is a strategic design partner for small teams. We learn your business and product, design solutions around its needs using a structure, that your team can keep building on."
-    facts={[
-      { label: "Areas", value: "SaaS, B2C, B2B" },
-      { label: "Happy clients", value: "50+" },
+    facts={[{ label: "Areas", value: "SaaS, B2C, B2B" }]}
+    stats={[
+      { label: "Client engagement rate", value: "+170%", logo: adaptive, client: "Adaptive & Co" },
+      { label: "Revenue growth after redesign", value: "4.6×", logo: webshare, client: "Webshare" },
+      { label: "Churn across SaaS clients", value: "-37%", logo: oblivious, client: "Oblivious" },
+      { label: "Revenue growth after redesign", value: "3M", logo: metomic, client: "Metomic" },
     ]}
   />
-
-  {/* Clients */}
-  <Section class="overflow-x-clip">
-    <ContentLogosMain
-      text="Trusted by teams around the world"
-      logos={[logo, logo, logo, logo, logo, logo]}
-    />
-  </Section>
 
   {/* Observations */}
   <SectionObservationsMain
     label="Our observations"
-    heading="Every product carries the decisions of the team that builds it. Without consistency, those decisions drift apart, and after a year or two the product needs a redesign to feel whole again."
+    heading="Every <strong>product</strong> carries the decisions of the team that builds it. Without <strong>consistency</strong>, those decisions drift apart, and after a year it needs a redesign to feel whole again"
+    text="A product stays coherent when its rules come with their reasons. A new team member can see why a flow works the way it does and add to it on the same terms. A rule without a reason gets broken the first time it feels inconvenient."
     chartLabel="Product complexity"
   />
 
-  {/* Help */}
-  <SectionHelpMain
+  {/* Problems */}
+  <SectionProblemsMain
     label="Common client issues"
     heading="Where we can help your business"
-    issues={[
+    problems={[
       {
-        heading: "You have an advanced product behind a confusing interface",
-        text: "Your infrastructure handles complexity and holds up under load, but the interface never got the same attention. Now every new user means another demo, another support ticket, another round of last week's questions",
-        model: "smiley",
+        heading: "You have a strong product behind a confusing interface",
+        text: "Your infrastructure handles complexity and holds up under load, but the interface never got the same attention. Now every new user means another demo, another support ticket, another round of last week’s questions.",
+        costs: ["Fewer trial conversions", "More support tickets", "Features nobody finds", "Higher churn"],
       },
       {
         heading: "Every new feature you build restarts the same conversations",
-        text: "The work was deliberate. No standard held it together, so patterns contradict each other, developers make interface calls mid-sprint, and new hires spend a lot of time learning unwritten rules.",
-        model: "gear",
+        text: "The work was deliberate. No standard held it together, so patterns contradict each other, developers make interface calls mid-sprint, and new hires spend months learning unwritten rules.",
+        costs: ["Slower releases", "Inconsistent UI", "Growing technical debt"],
       },
       {
         heading: "The product works. It doesn't look like it's worth what you charge",
-        text: "The interface still looks like an internal tool, and that's what buyers price against. Decisions take longer, prospects ask for more proof and lean toward products that do less but feel finished.",
-        model: "tractor",
+        text: "The interface still looks like an internal tool, and that’s what buyers price against. Your current users stopped noticing the rough edges long ago. A new prospect sees them in the first five minutes, before reaching the features that justify your price.",
+        costs: ["Longer sales cycles", "More price objections", "Pressure to discount"],
+      },
+    ]}
+    buttonLabel="Book a Call"
+  />
+
+  {/* Our works */}
+  <SectionWorksMain
+    label="Our recent work"
+    heading="We make complex products easy to understand and hard to undervalue"
+  >
+    <Card
+      variant="work"
+      heading="Adaptive &amp; Co"
+      subtitle="Corporate website design on Webflow"
+      text={lorem}
+      tags={["Data", "Marketing", "Analytics"]}
+      image={workAdaptive}
+      imageAlt="A man at a laptop showing the Adaptive growth overview dashboard"
+      href="/case/adaptive"
+    />
+    <Card
+      variant="work"
+      heading="WYR™"
+      subtitle="Product Design"
+      text={lorem}
+      tags={["Finance"]}
+      image={workWyr}
+      imageAlt="The WYR app's cards screen on a phone, with balance and transfer widgets"
+      href="/case/wyr"
+    />
+    <Card
+      variant="work"
+      heading="Home Rumble"
+      subtitle="Product strategy, UX/UI"
+      text={lorem}
+      tags={["Real estate"]}
+      image={workHomeRumble}
+      imageAlt="A laptop showing Home Rumble's side-by-side property comparison"
+      href="/case/home-rumble"
+    />
+    <Card
+      variant="work"
+      heading="BIDL"
+      subtitle="Product Design"
+      text={lorem}
+      tags={["Finance"]}
+      href="/case/bidl"
+    >
+      <WorkSceneBidl
+        slot="media"
+        alt="BIDL's dashboard on a desktop and its invoices on a phone, against purple mountains"
+      />
+    </Card>
+  </SectionWorksMain>
+
+  {/* Services */}
+  <SectionServicesMain
+    label="Our services"
+    heading="Fix what loses users, build what keeps them"
+    stats={[
+      { value: "20+", label: "finished projects" },
+      { value: "10+", label: "Years of experience" },
+      { value: "4.8", total: "5", label: "Average reviews rating" },
+    ]}
+    services={[
+      {
+        modal: "service-website",
+        title: "Website design and development",
+        description: "We specialize in creating functional websites that are not just visually appealing, but thoroughly designed to achieve your business goals.",
+        outcomes: ["Higher credibility with visitors", "Higher conversions", "Organic traffic increase"],
+        illustration: websiteTile,
+      },
+      {
+        modal: "service-product",
+        title: "Product design",
+        description: "We learn how the business and the product work, design the interface and system of components end to end, document the reasoning behind the decisions and the guidelines that keep it consistent as it grows.",
+        outcomes: ["Optimized path from intent to result", "Less load on support team", "Scaling features with a system"],
+        illustration: productTile,
+      },
+      {
+        modal: "service-audit",
+        title: "UX / UI Audit",
+        description: "We walk through the product the way its users do, check the data and analytics, hand over a report where every issue comes with its cause, its cost, and a way to fix it.",
+        outcomes: ["Interface weak points map", "Issues ranked by impact and effort", "Detailed plan for improvements"],
+        illustration: auditTile,
       },
     ]}
   />
 
-  {/* Placeholder: the next section, still to be designed */}
-  <Section fullHeight={true} align="center">
-    <Paragraph variant="mono" class="color-muted">Next section</Paragraph>
-  </Section>
+  {/* Payment model */}
+  <SectionPricingMain
+    heading="Endless possibilities with flexible payment model"
+    plans={[
+      {
+        tab: "Fixed project price",
+        text: "Founders and teams without an in-house designer who need one defined result: a new website, an MVP, or a redesign before launch. Price and deadline are agreed before work starts.",
+        priceLabel: "Projects start from:",
+        price: "$1500+",
+        visual: "fixed",
+      },
+      {
+        tab: "Subscription",
+        text: "Small product teams that need design every week but aren’t ready to hire a full-time designer. We work through your backlog in order: new features, tests, fixes from support tickets.",
+        priceLabel: "Subscription price:",
+        price: "Discussed",
+        visual: "subscription",
+      },
+    ]}
+  />
+
+  {/* Client stories */}
+  <SectionReviewsMain
+    id="testimonials"
+    label="What people think of our work"
+    heading="Client stories"
+    text="Great work is built through partnership. Here’s what our client say."
+    reviews={[
+      {
+        client: "Nokia",
+        quote: "Very professional and great to work with. Guys from Seko are full of creative ideas that helped shaped the direction of the project. Looking forward to working on more projects together.",
+        logo: logoNokia,
+        tagline: "Consumer Electronics Corporation",
+      },
+      {
+        client: "Smart Valor",
+        quote: "It was easy to work with such professionals! During the process, Seko have been always in touch and offered creative ideas which have been included in the design. As a result, I've received the quality work. I will highly recommend for everyone!",
+        logo: logoSmartValor,
+        tagline: "Europe's trusted digital asset exchange",
+      },
+      {
+        client: "NFT Port",
+        quote: "Seko is awesome. They are excellent on all fronts. Creative. Technical. Professional. Fun to work with. Beautiful work done efficiently and responsively. We couldn't ask for more. Thanks guys!",
+        logo: logoNftport,
+        tagline: "NFT Infrastructure & APIs for Devs",
+      },
+      {
+        client: "Product Photography",
+        quote: "Seko did an amazing job with the relaunch of our website. They understood the brief fully and over exceeded my expectations. I'm really happy with what they have designed and will be working with them again in the future.",
+        logo: logoProductPhotography,
+        tagline: "Leading Product Photography company in UK",
+      },
+    ]}
+  />
+
+  {/* FAQ */}
+  <SectionFaqMain
+    label="find out more"
+    heading="Frequently asked questions"
+    items={[
+      { question: "Do you work on retainers or just fixed projects?", answer: loremLong },
+      { question: "How fast can you start?", answer: loremLong },
+      { question: "Can you work with our existing development team?", answer: loremLong },
+      { question: "How do refunds and cancellations work?", answer: loremLong },
+    ]}
+  />
+
+  {/* Service modals, opened from the service cards */}
+  <ContentServiceModals />
 </Layout>

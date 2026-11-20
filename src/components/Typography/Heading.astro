@@ -14,6 +14,7 @@ type HeadingStyle =
   | "h6"
   | "large"
   | "main"
+  | "label"
   | "small";
 
 interface Props extends HTMLAttributes<"div"> {
@@ -27,6 +28,7 @@ interface Props extends HTMLAttributes<"div"> {
    *
    * - `display`, `h1`–`h6` — the heading sizes
    * - `large`, `main`, `small` — the body sizes
+   * - `label` — small uppercase mono, for section and field labels
    * - `inherit` — take the style from its surroundings
    */
   variant?: HeadingStyle;

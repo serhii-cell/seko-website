@@ -1,6 +1,5 @@
 ---
 import type { HTMLAttributes } from "astro/types";
-import Corner from "@/assets/ascii/corner.svg";
 
 interface Props extends HTMLAttributes<"div"> {
   /** Set to `false` to skip rendering this component and its children. */
@@ -21,10 +20,10 @@ const { render = true, class: className, ...rest } = Astro.props;
       <div class="ascii-stage_visual">
         <canvas class="ascii-stage_cubes" />
       </div>
-      <Corner class="ascii-stage_corner top-left" />
-      <Corner class="ascii-stage_corner top-right" />
-      <Corner class="ascii-stage_corner bottom-left" />
-      <Corner class="ascii-stage_corner bottom-right" />
+      <span class="ascii-stage_corner top-left" />
+      <span class="ascii-stage_corner top-right" />
+      <span class="ascii-stage_corner bottom-left" />
+      <span class="ascii-stage_corner bottom-right" />
     </div>
   )
 }
@@ -32,7 +31,7 @@ const { render = true, class: className, ...rest } = Astro.props;
 <script>
   import { gsap } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
-  import { onIntroOpen } from "@/utils/intro.ts";
+  import { onIntroStep, stepOf } from "@/utils/intro.ts";
   import {
     GLYPH,
     smoothstep,
@@ -482,9 +481,9 @@ const { render = true, class: className, ...rest } = Astro.props;
   }
 
   /* The container opens from its centre like a window, from 1px and
-     transparent to full size, as the first-load curtain is half up (or at
-     once without it). Then the CRT lines start drifting and, half a second
-     later, the cubes flicker on. */
+     transparent to full size, on its step of the first-screen sequence
+     (src/utils/intro.ts). Then the CRT lines start drifting and, half a
+     second later, the cubes flicker on. */
   const OPEN = 0.7;
   const AFTER_OPEN = 0.5;
 
@@ -533,7 +532,9 @@ const { render = true, class: className, ...rest } = Astro.props;
     };
 
     if (motion) gsap.set(stage, { opacity: 0 });
-    const stopWaiting = motion ? onIntroOpen(open) : (open(), () => {});
+    const stopWaiting = motion
+      ? onIntroStep(stepOf(stage), open)
+      : (open(), () => {});
 
     document.fonts
       .load(`12px ${look.font}`)
@@ -579,12 +580,11 @@ const { render = true, class: className, ...rest } = Astro.props;
       display: grid;
       place-items: center;
       width: 100%;
-      aspect-ratio: 674 / 442;
+      aspect-ratio: 860 / 611;
       min-height: 15rem;
       isolation: isolate;
       container-type: size;
       background-color: var(--background-2);
-      border: var(--border-width) solid var(--stroke);
     }
 
     /* CRT lines: 1px every 8px, drifting down once the container is open. */
@@ -623,26 +623,33 @@ const { render = true, class: className, ...rest } = Astro.props;
       height: 100%;
     }
 
+    /* Corner brackets, 16px L-shapes inset 20px from each edge. */
     .ascii-stage_corner {
+      --_inset: 1.25rem;
       position: absolute;
-      color: var(--light-100);
+      width: 1rem;
+      height: 1rem;
+      border-top: var(--border-width) solid var(--light-100);
+      border-left: var(--border-width) solid var(--light-100);
+      opacity: 0.2;
+      pointer-events: none;
       &.top-left {
-        top: -0.03125rem;
-        left: -0.03125rem;
+        top: var(--_inset);
+        left: var(--_inset);
       }
       &.top-right {
-        top: -0.03125rem;
-        right: -0.03125rem;
+        top: var(--_inset);
+        right: var(--_inset);
         scale: -1 1;
       }
       &.bottom-left {
-        bottom: -0.03125rem;
-        left: -0.03125rem;
+        bottom: var(--_inset);
+        left: var(--_inset);
         scale: 1 -1;
       }
       &.bottom-right {
-        right: -0.03125rem;
-        bottom: -0.03125rem;
+        right: var(--_inset);
+        bottom: var(--_inset);
         scale: -1 -1;
       }
     }

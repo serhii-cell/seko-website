@@ -1,0 +1,145 @@
+---
+import type { ImageMetadata } from "astro";
+import type { HTMLAttributes } from "astro/types";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+
+export type Stat = {
+  /** What the figure measures, set small above it. */
+  label: string;
+  /** The figure itself, such as `+170%`. */
+  value: string;
+  /** The client's logo, an SVG imported from `src/assets`, shown faded under the figure. */
+  logo?: ImageMetadata;
+  /** The client's name, read out in place of the logo. */
+  client?: string;
+};
+
+interface Props extends HTMLAttributes<"div"> {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** The tiles, in order. Nothing is output without them. */
+  stats?: Stat[];
+}
+
+const { render = true, stats = [], class: className, ...rest } = Astro.props;
+---
+
+{
+  render && stats.length > 0 && (
+    <div class:list={["stats-main_wrap", className]} {...rest}>
+      <span class="stats-main_rule dashed dashed-block" aria-hidden="true" />
+      <ul class="stats-main_list hatched">
+        {stats.map((stat) => (
+          <li class="stats-main_tile dashed">
+            <Paragraph variant="label" class="stats-main_label color-faded">
+              {stat.label}
+            </Paragraph>
+            <Paragraph variant="h2" class="stats-main_value">
+              {stat.value}
+            </Paragraph>
+            {stat.logo && (
+              <img
+                class="stats-main_logo"
+                src={stat.logo.src}
+                width={stat.logo.width}
+                height={stat.logo.height}
+                alt={stat.client ?? ""}
+                loading="lazy"
+                data-fade
+              />
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+<style is:global>
+  @layer components {
+    /* A band of figures across the working area, ruled across the whole page
+       above and below, with dashed dividers between the tiles. */
+    .stats-main_wrap {
+      --_inset: var(--_frame-inset, var(--space-7));
+      position: relative;
+      width: 100%;
+    }
+
+    .stats-main_rule {
+      position: absolute;
+      inset-block: 0;
+      left: 50%;
+      width: 100vw;
+      translate: -50% 0;
+      pointer-events: none;
+    }
+
+    .stats-main_list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      @media (width >= 64rem) {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        column-gap: 1rem;
+      }
+    }
+
+    /* Each tile spans three rows of the list, so labels that wrap to a
+       second line keep the figures and logos level across the row. */
+    .stats-main_tile {
+      grid-row: span 3;
+      display: grid;
+      grid-template-rows: subgrid;
+      justify-items: start;
+      align-content: start;
+      row-gap: var(--space-5);
+      min-width: 0;
+      padding: var(--_inset);
+      padding-bottom: calc(var(--_inset) + 0.25rem);
+      &:nth-child(2n) {
+        --_dash-left: var(--border-width);
+      }
+      &:nth-child(n + 3) {
+        --_dash-top: var(--border-width);
+      }
+      @media (width >= 64rem) {
+        &:not(:first-child) {
+          --_dash-left: var(--border-width);
+        }
+        &:nth-child(n + 3) {
+          --_dash-top: 0;
+        }
+      }
+    }
+
+    .stats-main_label,
+    .stats-main_value {
+      margin: 0;
+    }
+
+    /* The label keeps its full line height; the figure is trimmed to its
+       capitals, a box 0.68em tall (30px at 44px) as in Figma, so the logo
+       under it lands where the design puts it. */
+    .stats-main_label {
+      --_trim-top: 0.5lh;
+      --_trim-bottom: 0.5lh;
+    }
+
+    .stats-main_value {
+      --_trim-bottom: 0.28em;
+      align-self: end;
+      white-space: nowrap;
+    }
+
+    .stats-main_logo {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      height: 1.125rem;
+      opacity: 0.2;
+    }
+  }
+</style>
