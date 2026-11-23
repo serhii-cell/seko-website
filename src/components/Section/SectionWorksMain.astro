@@ -391,6 +391,7 @@ const cards = await slotContent(Astro.slots);
         const tween = gsap.to(list, {
           x: () => -shift(),
           ease: "none",
+          force3D: true,
           scrollTrigger: {
             trigger: viewport,
             start: () => `top ${holdAt(viewport)}`,

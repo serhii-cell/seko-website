@@ -87,12 +87,26 @@ take no `render` prop; the layout decides where they appear.
   paragraph and element marked `data-lines` rises in line by line (from
   `src/utils/lines.ts`: each line slides up from its own mask while fading in);
   `data-lines="off"` opts out. Blocks with no text of their own, and anything
-  marked `data-fade`, fade in from 0 opacity instead. Parts outside `<main>`
+  marked `data-fade`, fade in from 0 opacity instead. (The line rise is
+  switched off for now with `TEXT_REVEAL` in `ScrollReveal`.) Section
+  headlines (display or h2) fill from the left (`src/utils/wave.ts`, after
+  baseline.agency's statement reveal): a soft 146° gradient edge, 5em wide,
+  sweeps across the whole block over 2.4s, so every line fills at once with
+  the upper ones slightly ahead. Text ahead of the edge sits at 27% of its
+  colour and passes through the brand green as the edge reaches it. It is
+  one CSS gradient clipped to the text, on a wrapper given 0.25em of room
+  above and below (taken back with negative margins) so no descender is cut.
+  Everything else that reveals rises into its own clip while fading in
+  (`src/utils/rise.ts`, after baseline.agency's hero): the page's opening h1
+  and the paragraphs under headings word by word, smaller headings (h3),
+  eyebrows and labels letter by letter. None of these is tied to the scroll:
+  each starts once its text is 15% of the way up the screen and plays at its
+  own pace; whatever is on screen at load plays on its intro step. Text
+  inside `data-lines="off"` takes none of them. Parts outside `<main>`
   that should join in, like the nav's, are marked `data-intro`. Whatever is on
   screen at load comes in in numbered steps, left to right and top to bottom:
-  each part carries `data-step`, step 1 starts when the first-load curtain's
-  edge reaches the first heading (`page-intro:content`) and each step follows
-  0.1s later (`src/utils/intro.ts`). Items in the same step go in reading
+  each part carries `data-step`, step 1 starts as soon as the page does and
+  each step follows 0.1s later (`src/utils/intro.ts`). There is no loader. Items in the same step go in reading
   order, 0.06s apart; components with their own first-screen animation — the
   hero's ASCII container and guides, the logo strip — start on their step too. The rest comes in as
   it scrolls into view: text once its first line is fully on screen, blocks in
@@ -104,10 +118,11 @@ take no `render` prop; the layout decides where they appear.
 
 ## Page transitions
 
-- One component, `src/components/Global/PageTransition.astro`, owns them: the
-  overlay markup, its CSS and the script that drives every page change.
-  `BaseLayout` renders it once, its overlay marked `transition:persist` so it
-  survives the swap it covers. No other component animates the page in or out.
+- One component, `src/components/Global/PageTransition.astro`, will own them
+  once the router is on: the overlay markup, its CSS and the script that drives
+  every page change. `BaseLayout` renders it once, its overlay marked
+  `transition:persist` so it survives the swap it covers. No other component
+  animates the page in or out. The site has no first-load loader.
 - The old page leaves in `astro:before-preparation`, by wrapping
   `event.loader` so the next page loads while the animation plays, and Astro
   waits for both.
@@ -118,7 +133,6 @@ take no `render` prop; the layout decides where they appear.
   needs its own carries `data-page` on `<main>`.
 - Astro's own fade is turned off with `transition:animate="none"` on `<html>`,
   so only one animation runs.
-- The first-load animation runs on the first `astro:page-load` only.
 - Clicks are ignored while a transition runs.
 - Lenis, and anything else site-wide, is created once per visit, never per page.
 - A link that must reload the page fully carries `data-astro-reload`.

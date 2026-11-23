@@ -60,6 +60,7 @@
   --radius-small: 0.375rem;
   --radius-main: 1rem;
   --radius-round: 100vw;
+  --radius-button: var(--radius-small);
 
   /* Fluid scale range */
   --viewport-min: 320;
@@ -76,6 +77,7 @@
 
   /* Nav */
   --nav-height: 6.5rem;
+  --nav-height-compact: 4rem;
 
   /* Typography styles */
   --display: clamp(var(--display-min) / 16 * 1rem, ((var(--display-min) - ((var(--display-max) - var(--display-min)) / (var(--viewport-max) - var(--viewport-min)) * var(--viewport-min))) / 16 * 1rem + ((var(--display-max) - var(--display-min)) / (var(--viewport-max) - var(--viewport-min))) * 100vw), var(--display-max) / 16 * 1rem);
@@ -313,12 +315,12 @@
   --button-background-pressed: var(--brand-600);
   --button-focus: var(--text);
 
-  --button-2-background: transparent;
-  --button-2-border: var(--border);
+  --button-2-background: color-mix(in lab, var(--text) 10%, transparent);
+  --button-2-border: transparent;
   --button-2-text: var(--text);
-  --button-2-background-hover: var(--text);
-  --button-2-border-hover: var(--button-2-background-hover);
-  --button-2-text-hover: var(--background);
+  --button-2-background-hover: color-mix(in lab, var(--text) 16%, transparent);
+  --button-2-border-hover: transparent;
+  --button-2-text-hover: var(--text);
 
   --link-text: var(--text);
   --link-border: var(--border);
@@ -352,12 +354,12 @@
   --button-background-pressed: var(--brand-600);
   --button-focus: var(--brand-300);
 
-  --button-2-background: transparent;
-  --button-2-border: var(--border);
+  --button-2-background: color-mix(in lab, var(--text) 10%, transparent);
+  --button-2-border: transparent;
   --button-2-text: var(--text);
-  --button-2-background-hover: var(--text);
-  --button-2-border-hover: var(--button-2-background-hover);
-  --button-2-text-hover: var(--background);
+  --button-2-background-hover: color-mix(in lab, var(--text) 16%, transparent);
+  --button-2-border-hover: transparent;
+  --button-2-text-hover: var(--text);
 
   --link-text: var(--text);
   --link-border: var(--border);
@@ -388,12 +390,12 @@
   --button-border-hover: var(--button-background-hover);
   --button-text-hover: var(--dark-900);
 
-  --button-2-background: transparent;
-  --button-2-border: var(--border);
+  --button-2-background: color-mix(in lab, var(--text) 10%, transparent);
+  --button-2-border: transparent;
   --button-2-text: var(--text);
-  --button-2-background-hover: var(--light-100);
-  --button-2-border-hover: var(--button-2-background-hover);
-  --button-2-text-hover: var(--dark-900);
+  --button-2-background-hover: color-mix(in lab, var(--text) 16%, transparent);
+  --button-2-border-hover: transparent;
+  --button-2-text-hover: var(--text);
 
   --link-text: var(--text);
   --link-border: var(--border);

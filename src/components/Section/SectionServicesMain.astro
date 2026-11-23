@@ -393,6 +393,9 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
         order.forEach((card, i) => {
           gsap.set(card, { zIndex: total - i, ...place(i) });
           gsap.set(covers[i], i === 0 ? { opacity: 0 } : { opacity: 1, backgroundColor: slab(i) });
+          card.style.willChange = "transform";
+          const cover = covers[i];
+          if (cover instanceof HTMLElement) cover.style.willChange = "opacity";
         });
 
         const timeline = gsap.timeline({
@@ -442,7 +445,12 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
         return () => {
           scrolled = null;
           pending = null;
-          order.forEach((card, i) => (card.dataset.pos = String(i)));
+          order.forEach((card, i) => {
+            card.dataset.pos = String(i);
+            card.style.willChange = "";
+            const cover = covers[i];
+            if (cover instanceof HTMLElement) cover.style.willChange = "";
+          });
           sync(false);
         };
       });

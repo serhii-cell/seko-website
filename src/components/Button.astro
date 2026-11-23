@@ -1,6 +1,7 @@
 ---
 import type { HTMLAttributes } from "astro/types";
 import Icon from "@/components/Media/Icon.astro";
+import FlipText from "@/components/Typography/FlipText.astro";
 import arrow from "@/assets/icons/arrow-full.svg";
 import close from "@/assets/icons/close.svg";
 import play from "@/assets/icons/play.svg";
@@ -44,14 +45,14 @@ type Kind =
        * How much weight the button carries.
        *
        * - `primary` — filled, for the main action (default)
-       * - `secondary` — outlined, for anything sitting beside a primary
+       * - `secondary` — a quiet tint, for anything sitting beside a primary
        */
       emphasis?: Emphasis;
       /**
-       * Height of the pill.
+       * Height of the button.
        *
-       * - `large` — 56px, for calls to action in the page (default)
-       * - `medium` — 40px, for the header and inside cards
+       * - `large` — 40px, for calls to action in the page (default)
+       * - `medium` — 32px, for the header and inside cards
        */
       size?: "large" | "medium";
       label?: never;
@@ -169,7 +170,14 @@ const named = {
       {...tagAttrs}
       {...rest}
     >
-      {isWritten && (
+      {variant === "main" && (
+        <span class="button_text text-style-trim">
+          <FlipText>
+            <Fragment set:html={content} />
+          </FlipText>
+        </span>
+      )}
+      {variant === "link" && (
         <span class="button_text text-style-trim">
           <Fragment set:html={content} />
         </span>
@@ -198,21 +206,24 @@ const named = {
       align-items: center;
       gap: 0.5em;
       position: relative;
-      min-height: 3.5rem;
-      padding: 0 1.5rem;
+      min-height: 2.5rem;
+      padding: 0 1rem;
       background-color: var(--button-background);
       color: var(--button-text);
       border: 0 solid var(--button-border);
-      border-radius: var(--radius-round);
-      font-size: 1rem;
-      font-weight: var(--primary-semibold);
-      line-height: 1.6875;
+      border-radius: var(--radius-button);
+      font-size: 0.875rem;
+      font-weight: var(--primary-medium);
+      line-height: 1.5;
       text-decoration: none;
       text-align: center;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
       transition:
         background-color var(--hover-duration) var(--hover-ease),
         color var(--hover-duration) var(--hover-ease),
-        border-color var(--hover-duration) var(--hover-ease);
+        border-color var(--hover-duration) var(--hover-ease),
+        scale 0.15s cubic-bezier(0.4, 0, 0.2, 1);
       @media (hover: hover) {
         &:hover:not(:disabled) {
           background-color: var(--button-background-hover);
@@ -222,14 +233,16 @@ const named = {
       }
       &:active:not(:disabled) {
         background-color: var(--button-background-pressed, var(--button-background-hover));
+        scale: 0.955 0.925;
       }
       &:focus-visible {
         outline: var(--focus-width) solid var(--button-focus, var(--text));
         outline-offset: 0;
       }
       &.medium {
-        min-height: 2.5rem;
-        padding-inline: 1.25rem;
+        min-height: 2rem;
+        padding-inline: 0.75rem;
+        font-size: 0.8125rem;
       }
       &[aria-busy="true"] {
         pointer-events: none;
@@ -257,6 +270,7 @@ const named = {
         --button-background-hover: var(--button-2-background-hover);
         --button-text-hover: var(--button-2-text-hover);
         --button-border-hover: var(--button-2-border-hover);
+        --button-background-pressed: var(--button-2-background-hover);
       }
       &.link {
         --button-background: transparent;
@@ -288,6 +302,9 @@ const named = {
             background-position: 0 100%;
             background-size: 100% var(--border-width);
           }
+        }
+        &:active {
+          scale: none;
         }
       }
       &:is(.play, .close, .arrow) {

@@ -139,11 +139,16 @@ const links = [
     /* The live Kyiv clock, ticking on the second. */
     if (time) {
       let timer = 0;
+      let shown = "";
       const tick = () => {
         const now = new Date();
-        time.textContent = kyiv.format(now).replace(/\s+/g, " ");
-        time.dateTime = now.toISOString();
-        timer = window.setTimeout(tick, 1000 - (now.getTime() % 1000) + 5);
+        const label = kyiv.format(now).replace(/\s+/g, " ");
+        if (label !== shown) {
+          shown = label;
+          time.textContent = label;
+          time.dateTime = now.toISOString();
+        }
+        timer = window.setTimeout(tick, 60000 - (now.getTime() % 60000) + 5);
       };
       tick();
       cleanups.push(() => clearTimeout(timer));
@@ -169,6 +174,7 @@ const links = [
         return section ? { link, section } : null;
       })
       .filter((entry) => entry !== null);
+    let current: HTMLAnchorElement | null = null;
     const spy = () => {
       const line = innerHeight * 0.4;
       let active: HTMLAnchorElement | null = null;
@@ -176,26 +182,17 @@ const links = [
         const { top, bottom } = section.getBoundingClientRect();
         if (top <= line && bottom > line) active = link;
       }
-      for (const { link } of spied) {
-        if (link === active) link.setAttribute("aria-current", "location");
-        else link.removeAttribute("aria-current");
-      }
+      if (active === current) return;
+      current?.removeAttribute("aria-current");
+      active?.setAttribute("aria-current", "location");
+      current = active;
     };
 
-    /* Off the top of the page the bar takes a solid backdrop, so it never
-       sits on the content. Scrolling down past the bar hides it: its parts
-       slide up and fade out. Scrolling up brings them back. */
-    let lastY = scrollY;
+    /* Off the top of the page the bar stays, shorter and on a solid
+       backdrop, so it never sits on the content. */
     let frame = 0;
     const onScroll = () => {
-      const y = scrollY;
-      nav.classList.toggle("solid", y > 0);
-      if (!nav.classList.contains("open")) {
-        if (y < nav.offsetHeight) nav.classList.remove("hidden");
-        else if (y > lastY + 4) nav.classList.add("hidden");
-        else if (y < lastY - 4) nav.classList.remove("hidden");
-      }
-      if (Math.abs(y - lastY) > 4 || nav.classList.contains("open")) lastY = y;
+      nav.classList.toggle("solid", scrollY > 0);
       if (spied.length > 0 && !frame) {
         frame = requestAnimationFrame(() => {
           frame = 0;
@@ -255,7 +252,7 @@ const links = [
 
     return () => {
       cleanups.forEach((cleanup) => cleanup());
-      nav.classList.remove("hidden", "solid");
+      nav.classList.remove("solid");
     };
   });
 </script>
@@ -316,10 +313,15 @@ const links = [
       height: 100%;
     }
 
-    .nav_wrap.solid .nav_backdrop {
-      opacity: 1;
-      visibility: visible;
-      pointer-events: auto;
+    .nav_wrap.solid {
+      & .nav_backdrop {
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+      }
+      & .nav_inner {
+        min-height: var(--nav-height-compact);
+      }
     }
 
     /* Inset from inside the rails, as Figma counts them. */
@@ -328,6 +330,7 @@ const links = [
       width: var(--site-width);
       max-width: var(--max-width-frame);
       min-height: var(--nav-height);
+      transition: min-height var(--open-duration) var(--open-ease);
       padding-inline: calc(var(--_inset) + var(--border-width));
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto auto;
@@ -508,41 +511,10 @@ const links = [
       }
     }
 
-    /* Hidden on scroll: everything in the bar slides up and fades out
-       together, and comes back down from the top. */
-    .nav_logo,
-    .nav_call,
-    .nav_aside,
-    .nav_toggle {
-      transition:
-        opacity 0.45s var(--open-ease),
-        translate 0.55s var(--open-ease),
-        visibility 0.55s var(--open-ease),
-        border-color var(--hover-duration) var(--hover-ease);
-    }
-
     .nav_backdrop {
       transition:
-        opacity 0.45s var(--open-ease),
-        translate 0.55s var(--open-ease),
-        visibility 0.55s var(--open-ease);
-    }
-
-    .nav_wrap.hidden {
-      & .nav_logo,
-      & .nav_call,
-      & .nav_aside,
-      & .nav_toggle {
-        opacity: 0;
-        visibility: hidden;
-        translate: 0 calc(var(--nav-height) * -0.75);
-      }
-      & .nav_backdrop {
-        opacity: 0;
-        visibility: hidden;
-        pointer-events: none;
-        translate: 0 -100%;
-      }
+        opacity var(--open-duration) var(--open-ease),
+        visibility var(--open-duration) var(--open-ease);
     }
 
     @media (width >= 64rem) {
@@ -570,21 +542,12 @@ const links = [
         overflow: visible;
         background: none;
         border: 0;
-        transition:
-          opacity 0.45s var(--open-ease),
-          translate 0.55s var(--open-ease),
-          visibility 0.55s var(--open-ease);
+        transition: none;
       }
 
       .nav_menu_inner {
         overflow: visible;
         opacity: 1;
-      }
-
-      .nav_wrap.hidden .nav_menu {
-        opacity: 0;
-        visibility: hidden;
-        translate: 0 calc(var(--nav-height) * -0.75);
       }
 
       .nav_links {
@@ -596,42 +559,39 @@ const links = [
         }
       }
 
-      /* Pills, with the states of the Figma "Nav item" set: Current marks
-         the section in view. */
+      /* Outlined; Current marks the section in view. */
       .nav_link {
         display: flex;
         align-items: center;
-        height: 2.5rem;
-        padding: 0 1rem;
-        background-color: var(--background);
+        height: 2rem;
+        padding: 0 0.75rem;
         border: var(--border-width) solid var(--stroke);
-        border-radius: var(--radius-round);
-        color: var(--brand-500);
+        border-radius: var(--radius-button);
+        color: var(--text);
+        font-size: 0.8125rem;
+        font-weight: var(--primary-medium);
         white-space: nowrap;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition:
+          color var(--hover-duration) var(--hover-ease),
+          border-color var(--hover-duration) var(--hover-ease),
+          scale 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+        @media (hover: hover) {
+          &:hover {
+            border-color: color-mix(in lab, var(--text) 40%, transparent);
+          }
+        }
         &[aria-current] {
-          background-color: var(--brand-tint);
           border-color: var(--brand-500);
           color: var(--brand-500);
         }
-        @media (hover: hover) {
-          &:hover {
-            background-color: color-mix(
-              in srgb,
-              var(--dark-900),
-              var(--light-100) 2.5%
-            );
-            border-color: var(--brand-500);
-          }
-        }
         &:focus-visible {
-          border-color: transparent;
           outline: var(--focus-width) solid var(--brand-300);
           outline-offset: 0;
         }
         &:active {
-          background-color: var(--dark-950);
-          border-color: var(--brand-600);
-          color: var(--brand-500);
+          scale: 0.955 0.925;
         }
       }
     }

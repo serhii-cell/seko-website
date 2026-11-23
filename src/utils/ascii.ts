@@ -9,6 +9,8 @@ export type Rgb = [number, number, number];
 export type Engine = { play(): void; pause(): void; destroy(): void };
 export type Controller = {
   running(): boolean;
+  /** Whether the element is on screen, with the margin, started or not. */
+  visible(): boolean;
   onChange(listener: (running: boolean) => void): void;
   destroy(): void;
 };
@@ -219,6 +221,7 @@ export function createController(element: HTMLElement): Controller {
 
   return {
     running: () => started && visible,
+    visible: () => visible,
     onChange: (listener) => listeners.add(listener),
     destroy() {
       observer.disconnect();

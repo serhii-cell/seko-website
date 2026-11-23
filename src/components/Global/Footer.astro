@@ -2,6 +2,7 @@
 import Heading from "@/components/Typography/Heading.astro";
 import Icon from "@/components/Media/Icon.astro";
 import Img from "@/components/Media/Img.astro";
+import FlipText from "@/components/Typography/FlipText.astro";
 import wordmark from "@/assets/home/footer/seko-wordmark.svg";
 import calendar from "@/assets/home/footer/schedule-calendar@2x.png";
 import { SITE_NAME } from "@/consts.ts";
@@ -105,7 +106,7 @@ const columns: { heading: string; links: { label: string; href?: string }[] }[] 
                       target={href?.startsWith("http") ? "_blank" : undefined}
                       rel={href?.startsWith("http") ? "noopener" : undefined}
                     >
-                      {label}
+                      <FlipText>{label}</FlipText>
                     </a>
                   </li>
                 ))}
@@ -144,11 +145,16 @@ const columns: { heading: string; links: { label: string; href?: string }[] }[] 
     if (!time) return;
 
     let timer = 0;
+    let shown = "";
     const tick = () => {
       const now = new Date();
-      time.textContent = kyiv.format(now).replace(/\s+/g, " ");
-      time.dateTime = now.toISOString();
-      timer = window.setTimeout(tick, 1000 - (now.getTime() % 1000) + 5);
+      const text = kyiv.format(now).replace(/\s+/g, " ");
+      if (text !== shown) {
+        shown = text;
+        time.textContent = text;
+        time.dateTime = now.toISOString();
+      }
+      timer = window.setTimeout(tick, 60000 - (now.getTime() % 60000) + 5);
     };
     tick();
 
