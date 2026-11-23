@@ -3,8 +3,8 @@
  * into lines, each line sits in its own clip and rises into it from below.
  * It takes the page's opening headline, the paragraphs under headings,
  * smaller headings, eyebrows and labels, and anything marked `data-lines`;
- * `data-lines="off"` opts out. Once every line is in, the text goes back to
- * how it was.
+ * `data-lines="off"` opts out, and `data-fade` fades instead. Once every line
+ * is in, the text goes back to how it was.
  */
 import { gsap, SplitText } from "@/utils/gsap.ts";
 
@@ -18,7 +18,9 @@ const TARGETS = [
 ].join(", ");
 
 export const isLineText = (element: Element) =>
-  element.matches(TARGETS) && !element.closest('[data-lines="off"]');
+  element.matches(TARGETS) &&
+  !element.hasAttribute("data-fade") &&
+  !element.closest('[data-lines="off"]');
 
 export type Lines = {
   /** Brings the lines in, after `delay` seconds. */
@@ -33,6 +35,7 @@ export function createLines(element: HTMLElement): Lines {
   let tween: gsap.core.Tween | undefined;
 
   const rise = (delay: number) => {
+    tween?.kill();
     tween = gsap.to(lines, {
       yPercent: 0,
       duration: 0.8,
@@ -52,13 +55,17 @@ export function createLines(element: HTMLElement): Lines {
   const split = SplitText.create(element, {
     type: "lines",
     mask: "lines",
+    aria: "none",
     linesClass: "scroll-reveal_line",
     autoSplit: true,
     onSplit(self) {
       if (state === "done") return;
       lines = self.lines as HTMLElement[];
       gsap.set(lines, { yPercent: 110 });
-      if (state === "playing") return rise(0);
+      if (state === "playing") {
+        const time = tween?.totalTime() ?? 0;
+        return rise(0).totalTime(time);
+      }
     },
   });
 

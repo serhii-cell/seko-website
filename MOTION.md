@@ -106,8 +106,8 @@ take no `render` prop; the layout decides where they appear.
   0.1s later (`src/utils/intro.ts`). Items in the same step go in reading
   order, 0.06s apart; components with their own first-screen animation — the
   hero's ASCII container and guides, the logo strip — start on their step too. The rest comes in as
-  it scrolls into view: text once its first line is fully on screen, blocks in
-  batches. A block marked `data-reveal="own"` runs its own reveal and is
+  it scrolls into view: text once its top reaches `clamp(top 80%)`, section
+  headlines tied to the scroll, blocks in batches (`top 90%`). A block marked `data-reveal="own"` runs its own reveal and is
   skipped, like the cards of `SectionHelpMain`, which slide up into their
   columns while the section is pinned. `SectionObservationsMain` plays its
   chart once, by itself, when the chart scrolls into view — it is not pinned

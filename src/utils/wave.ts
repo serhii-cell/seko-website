@@ -25,6 +25,10 @@ export type Wave = {
   revert: () => void;
 };
 
+/* Each letter's own tweens stay out of the page's GSAP context, which would
+   otherwise keep every one made while scrolling; revert() kills them. */
+const loose = gsap.context(() => {});
+
 const dim = (color: string) => {
   const [r, g, b, a = 1] = gsap.utils.splitColor(color) as number[];
   return `rgba(${r}, ${g}, ${b}, ${a * 0.2})`;
@@ -42,19 +46,24 @@ export function createWave(element: HTMLElement): Wave {
   let ready = false;
   let tween: gsap.core.Tween | undefined;
 
-  const sync = () => {
-    const count = Math.round(progress.value * chars.length);
-    chars.forEach((char, index) => {
-      const on = index < count;
-      gsap.killTweensOf(char);
-      gsap.set(char, { color: on ? ends[index] : starts[index] });
-      if (on) active.add(char);
-      else active.delete(char);
+  const sync = () =>
+    loose.ignore(() => {
+      const count = Math.round(progress.value * chars.length);
+      chars.forEach((char, index) => {
+        const on = index < count;
+        gsap.killTweensOf(char);
+        gsap.set(char, { color: on ? ends[index] : starts[index] });
+        if (on) active.add(char);
+        else active.delete(char);
+      });
     });
-  };
 
   const update = () => {
     if (!ready) return;
+    loose.ignore(() => step());
+  };
+
+  const step = () => {
     const count = Math.round(progress.value * chars.length);
     chars.forEach((char, index) => {
       const on = index < count;
