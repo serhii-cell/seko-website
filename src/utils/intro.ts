@@ -1,8 +1,8 @@
 /**
  * The first screen appears in numbered steps, in reading order: left to
- * right, top to bottom. Step 1 starts when the first-load curtain's edge
- * reaches the first heading (`page-intro:content`, sent by PageTransition),
- * or straight away when the page loads without it, and each step after
+ * right, top to bottom. Step 1 starts when the first-load loader hands the
+ * page over (`page-intro:content`, sent by PageTransition a moment before its
+ * glyphs land in the hero's ASCII panel), or straight away when the page loads without it, and each step after
  * follows `STEP_GAP` seconds later. A component marks its parts with
  * `data-step` and starts each part's animation here.
  *

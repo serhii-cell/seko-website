@@ -90,8 +90,9 @@ take no `render` prop; the layout decides where they appear.
   marked `data-fade`, fade in from 0 opacity instead. Parts outside `<main>`
   that should join in, like the nav's, are marked `data-intro`. Whatever is on
   screen at load comes in in numbered steps, left to right and top to bottom:
-  each part carries `data-step`, step 1 starts when the first-load curtain's
-  edge reaches the first heading (`page-intro:content`) and each step follows
+  each part carries `data-step`, step 1 starts when the first-load loader
+  hands the page over (`page-intro:content`), a moment before its glyphs
+  land in the hero's ASCII panel, and each step follows
   0.1s later (`src/utils/intro.ts`). Items in the same step go in reading
   order, 0.06s apart; components with their own first-screen animation — the
   hero's ASCII container and guides, the logo strip — start on their step too. The rest comes in as
