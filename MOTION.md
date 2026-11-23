@@ -100,8 +100,10 @@ take no `render` prop; the layout decides where they appear.
   `data-fade`, fade in from 0 opacity instead. Parts outside `<main>`
   that should join in, like the nav's, are marked `data-intro`. Whatever is on
   screen at load comes in in numbered steps, left to right and top to bottom:
-  each part carries `data-step`, step 1 starts as soon as the page does and
-  each step follows 0.1s later (`src/utils/intro.ts`). There is no loader. Items in the same step go in reading
+  each part carries `data-step`, step 1 starts when the first-load loader
+  hands the page over (`page-intro:content`), a moment before its glyphs
+  land in the hero's ASCII panel, and each step follows
+  0.1s later (`src/utils/intro.ts`). Items in the same step go in reading
   order, 0.06s apart; components with their own first-screen animation — the
   hero's ASCII container and guides, the logo strip — start on their step too. The rest comes in as
   it scrolls into view: text once its first line is fully on screen, blocks in
@@ -113,11 +115,10 @@ take no `render` prop; the layout decides where they appear.
 
 ## Page transitions
 
-- One component, `src/components/Global/PageTransition.astro`, will own them
-  once the router is on: the overlay markup, its CSS and the script that drives
-  every page change. `BaseLayout` renders it once, its overlay marked
-  `transition:persist` so it survives the swap it covers. No other component
-  animates the page in or out. The site has no first-load loader.
+- One component, `src/components/Global/PageTransition.astro`, owns them: the
+  overlay markup, its CSS and the script that drives every page change.
+  `BaseLayout` renders it once, its overlay marked `transition:persist` so it
+  survives the swap it covers. No other component animates the page in or out.
 - The old page leaves in `astro:before-preparation`, by wrapping
   `event.loader` so the next page loads while the animation plays, and Astro
   waits for both.
@@ -128,6 +129,7 @@ take no `render` prop; the layout decides where they appear.
   needs its own carries `data-page` on `<main>`.
 - Astro's own fade is turned off with `transition:animate="none"` on `<html>`,
   so only one animation runs.
+- The first-load animation runs on the first `astro:page-load` only.
 - Clicks are ignored while a transition runs.
 - Lenis, and anything else site-wide, is created once per visit, never per page.
 - A link that must reload the page fully carries `data-astro-reload`.

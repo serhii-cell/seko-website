@@ -88,7 +88,7 @@
 
       /* What is on screen at load comes in step by step (each part's
          `data-step`, see src/utils/intro.ts), in reading order within a
-         step. */
+         step, once the first-load loader hands the page over. */
       const first = [...texts, ...faders, ...waves.keys()]
         .filter((element) => ScrollTrigger.isInViewport(element))
         .sort(byReadingOrder) as HTMLElement[];

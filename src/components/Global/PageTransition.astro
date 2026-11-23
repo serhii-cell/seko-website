@@ -1,0 +1,1190 @@
+---
+/*
+ * The first-load loader (version 3 of the SEKO Loader Lab artifact): a glyph
+ * cube grows and spins in the middle of a dark screen, a dashed + opens out
+ * from behind it with the four SEKO words past its ends, and a row of
+ * slashes along the bottom lights up with the percentage. Once the page has
+ * loaded, the cube comes to rest facing exactly as the hero's first cube does
+ * and its glyphs are pulled into the hero's ASCII panel, which takes over the
+ * moment they land.
+ */
+
+/* The words around the cross, each past the end of its arm. */
+const words = [
+  { word: "Structured", x: -1, y: 0 },
+  { word: "Efficient", x: 0, y: -1 },
+  { word: "Knowing", x: 1, y: 0 },
+  { word: "Organized", x: 0, y: 1 },
+];
+/* The percentage on drums: hundreds, tens, ones. */
+const drums = ["01", "01234567890", "01234567890"];
+---
+
+<div class="page-transition_wrap" transition:persist aria-hidden="true">
+  <div class="page-transition_backdrop"></div>
+  <canvas class="page-transition_canvas"></canvas>
+  {
+    words.map(({ word, x, y }) => (
+      <div
+        class="page-transition_word"
+        data-word={word.toUpperCase()}
+        data-x={x}
+        data-y={y}
+      />
+    ))
+  }
+  <div class="page-transition_status">Loading...</div>
+  <svg class="page-transition_bar"></svg>
+  <div class="page-transition_count">
+    <span>{"(   "}</span>
+    {
+      drums.map((digits) => (
+        <span class="page-transition_drum">
+          <span class="page-transition_strip">
+            {[...digits].map((digit) => (
+              <span class="page-transition_digit">{digit}</span>
+            ))}
+          </span>
+        </span>
+      ))
+    }
+    <span>{"%   )"}</span>
+  </div>
+</div>
+
+<script is:inline>
+  if (!document.documentElement.classList.contains("stacki-designer")) {
+    document.documentElement.classList.add("page-intro");
+  }
+</script>
+
+<script>
+  import { gsap } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+  import {
+    GLYPH,
+    clamp,
+    smoothstep,
+    mix,
+    toRgb,
+    glyphForSize,
+    measureRamp,
+    pickGlyph,
+    rotation,
+    LIGHT,
+    HALF,
+    KEY,
+    type Rgb,
+  } from "@/utils/ascii.ts";
+
+  const root = document.documentElement;
+  const SVG = "http://www.w3.org/2000/svg";
+
+  /* ---------- timing, in seconds ---------- */
+  /* The percentage runs 0 → 100 over this span. */
+  const LOAD_START = 0.2;
+  const LOAD_END = 3.4;
+  /* If the page hasn't loaded by ~85%, everything waits here. */
+  const WAIT = LOAD_END - 0.55;
+  /* The cube comes to rest facing as the hero's first cube does, and the
+     pull begins. */
+  const REST = 3.6;
+  /* The glyphs nearest the hero go first, the far side last, each on its
+     own trip. */
+  const SPREAD = 0.55;
+  const JITTER = 0.08;
+  const TRAVEL = 1.05;
+  /* Every glyph has landed: the hero takes over. */
+  const LANDED = REST + SPREAD + JITTER + TRAVEL;
+  /* The page starts its first-screen steps this long before the glyphs land,
+     so the hero's panel has opened (its step 4, 1.0s after the steps start)
+     just before they arrive and its loop starts (1.5s) right after. */
+  const HANDOFF = 1.45;
+
+  /* ---------- small helpers ---------- */
+  type Matrix = number[];
+  type Grid = {
+    cols: number;
+    rows: number;
+    cw: number;
+    ch: number;
+    ox: number;
+    oy: number;
+    cx: number;
+    cy: number;
+    scale: number;
+    x0: number;
+    x1: number;
+    y0: number;
+    y1: number;
+  };
+  type Glyph = { x: number; y: number; c: string; col: Rgb };
+  type CubeLook = { green: Rgb; ramp: string[]; coverage: number[] };
+
+  const smooth = (u: number) => smoothstep(0, 1, u);
+  const hash = (value: number) => {
+    let n = Math.imul(value ^ (value >>> 16), 0x45d9f3b);
+    n = Math.imul(n ^ (n >>> 16), 0x45d9f3b);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+  };
+  const seeded = (start: number) => {
+    let seed = start;
+    return () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  };
+  const rgb = (color: Rgb) =>
+    `rgb(${color[0] | 0},${color[1] | 0},${color[2] | 0})`;
+
+  const multiply = (a: Matrix, b: Matrix) => {
+    const out: Matrix = [];
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 3; c++) {
+        out.push(
+          a[r * 3] * b[c] + a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c],
+        );
+      }
+    }
+    return out;
+  };
+  const turnX = (a: number) => {
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    return [1, 0, 0, 0, c, -s, 0, s, c];
+  };
+  const turnY = (a: number) => {
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    return [c, 0, s, 0, 1, 0, -s, 0, c];
+  };
+  const turnZ = (a: number) => {
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    return [c, -s, 0, s, c, 0, 0, 0, 1];
+  };
+
+  /* ---------- the cube, drawn exactly as the hero draws its cubes ----------
+     The same camera, box, lights, edge rule and glyph ramp as AsciiStage, so
+     a cube drawn here is glyph for glyph the one the hero draws. */
+  const CAM = 9;
+  const HIGHLIGHT: Rgb = [255, 255, 250];
+
+  function sdBox(
+    px: number,
+    py: number,
+    pz: number,
+    bx: number,
+    by: number,
+    bz: number,
+  ) {
+    const qx = Math.abs(px - bx) - 0.5;
+    const qy = Math.abs(py - by) - 0.5;
+    const qz = Math.abs(pz - bz) - 0.5;
+    const ax = Math.max(qx, 0);
+    const ay = Math.max(qy, 0);
+    const az = Math.max(qz, 0);
+    return (
+      Math.sqrt(ax * ax + ay * ay + az * az) +
+      Math.min(Math.max(qx, Math.max(qy, qz)), 0) -
+      0.02
+    );
+  }
+
+  /** The glyphs of one unit cube centred at `at`, turned by `R`, in the cells
+      x0..x1, y0..y1 of `grid`. */
+  function cubeGlyphs(R: Matrix, at: number[], grid: Grid, look: CubeLook) {
+    const { ox, oy, cw, ch, cx, cy, scale, x0, x1, y0, y1 } = grid;
+    const w = x1 - x0;
+    const n = w * (y1 - y0);
+    const bright = new Float32Array(n);
+    const spec = new Float32Array(n);
+    const depth = new Float32Array(n);
+    const hit = new Uint8Array(n);
+    const [bx, by, bz] = at;
+    const sdf = (x: number, y: number, z: number) =>
+      sdBox(
+        R[0] * x + R[3] * y + R[6] * z,
+        R[1] * x + R[4] * y + R[7] * z,
+        R[2] * x + R[5] * y + R[8] * z,
+        bx,
+        by,
+        bz,
+      );
+    for (let gy = y0; gy < y1; gy++) {
+      for (let gx = x0; gx < x1; gx++) {
+        const X = (ox + gx * cw + cw / 2 - cx) / scale;
+        const Y = (cy - (oy + gy * ch + ch / 2)) / scale;
+        const rl = Math.sqrt(X * X + Y * Y + CAM * CAM);
+        const rx = X / rl;
+        const ry = Y / rl;
+        const rz = -CAM / rl;
+        let t = CAM - 3.4;
+        let found = false;
+        let px = 0;
+        let py = 0;
+        let z = 0;
+        for (let step = 0; step < 64; step++) {
+          px = rx * t;
+          py = ry * t;
+          z = CAM + rz * t;
+          const d = sdf(px, py, z);
+          if (d < 0.004) {
+            found = true;
+            break;
+          }
+          if (t > CAM + 3.4) break;
+          t += Math.max(d * 0.95, 0.006);
+        }
+        if (!found) continue;
+        const i = (gy - y0) * w + (gx - x0);
+        const e = 0.008;
+        hit[i] = 1;
+        depth[i] = z;
+        let nx = sdf(px + e, py, z) - sdf(px - e, py, z);
+        let ny = sdf(px, py + e, z) - sdf(px, py - e, z);
+        let nz = sdf(px, py, z + e) - sdf(px, py, z - e);
+        const nl = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+        nx /= nl;
+        ny /= nl;
+        nz /= nl;
+        const diffuse = Math.max(
+          0,
+          nx * LIGHT[0] + ny * LIGHT[1] + nz * LIGHT[2],
+        );
+        const sp = Math.pow(
+          Math.max(0, nx * HALF[0] + ny * HALF[1] + nz * HALF[2]),
+          16,
+        );
+        const wnx = R[0] * nx + R[3] * ny + R[6] * nz;
+        const wny = R[1] * nx + R[4] * ny + R[7] * nz;
+        const wnz = R[2] * nx + R[5] * ny + R[8] * nz;
+        const tone = 0.5 + 0.5 * (wnx * KEY[0] + wny * KEY[1] + wnz * KEY[2]);
+        bright[i] = Math.min(1, 0.1 + 0.62 * tone + 0.18 * diffuse + 0.3 * sp);
+        spec[i] = sp;
+      }
+    }
+    /* The silhouette and the cube's own edges read brighter. */
+    for (let i = 0; i < n; i++) {
+      if (!hit[i]) continue;
+      for (const j of [i - 1, i + 1, i - w, i + w]) {
+        if (j < 0 || j >= n) continue;
+        if (!hit[j] || Math.abs(depth[j] - depth[i]) > 0.12) {
+          bright[i] = Math.max(bright[i], 0.5);
+          break;
+        }
+      }
+    }
+    const glyphs: Glyph[] = [];
+    for (let gy = y0; gy < y1; gy++) {
+      for (let gx = x0; gx < x1; gx++) {
+        const i = (gy - y0) * w + (gx - x0);
+        const b = bright[i];
+        if (!hit[i] || b <= 0.003) continue;
+        const c = pickGlyph(look.ramp, look.coverage, b, gx, gy);
+        if (c === " ") continue;
+        let color = look.green;
+        if (spec[i] > 0.3) {
+          color = mix(
+            color,
+            HIGHLIGHT,
+            Math.min(1, (spec[i] - 0.3) * 1.3) * 0.7,
+          );
+        }
+        const lum = Math.min(1.25, 0.55 + 0.45 * b);
+        glyphs.push({
+          x: ox + gx * cw,
+          y: oy + gy * ch,
+          c,
+          col: color.map((v) => Math.min(255, v * lum)) as Rgb,
+        });
+      }
+    }
+    return glyphs;
+  }
+
+  /* ---------- text effects ---------- */
+  const NOISE = "ABCDEFGHJKLMNOPRSTUXZ0123456789#%&*+=/<>";
+
+  /** `word` typing in, or out (`away`), left to right over random glyphs
+      that change about 20 times a second, so it resolves calmly. */
+  function scramble(
+    element: HTMLElement,
+    word: string,
+    duration: number,
+    away = false,
+  ) {
+    const state = { p: away ? 1 : 0 };
+    let noise: string[] = [];
+    let last = -1;
+    const render = () => {
+      const now = performance.now();
+      if (now - last > 50) {
+        noise = [...word].map(
+          () => NOISE[Math.floor(Math.random() * NOISE.length)],
+        );
+        last = now;
+      }
+      if (state.p >= 1) element.textContent = word;
+      else if (state.p <= 0) element.textContent = "";
+      else {
+        const settled = Math.floor(state.p * (word.length + 4)) - 4;
+        const shown = Math.ceil(state.p * (word.length + 4));
+        let out = "";
+        for (let i = 0; i < word.length; i++) {
+          if (word[i] === " " || i < settled) out += word[i];
+          else if (i >= shown) out += " ";
+          else out += noise[i];
+        }
+        element.textContent = out;
+      }
+    };
+    return gsap.to(state, {
+      p: away ? 0 : 1,
+      duration,
+      ease: "sine.inOut",
+      onStart: render,
+      onUpdate: render,
+    });
+  }
+
+  /** Sets the percentage on its drums: the ones roll over at every step,
+      each carry rolls the next drum with it, and the tens and hundreds slide
+      in when first needed. */
+  function drumCounter(count: HTMLElement) {
+    const columns = [
+      ...count.querySelectorAll<HTMLElement>(".page-transition_drum"),
+    ];
+    const strips = [
+      ...count.querySelectorAll<HTMLElement>(".page-transition_strip"),
+    ];
+    const probe = document.createElement("span");
+    probe.textContent = "0";
+    probe.style.cssText = "position:absolute;visibility:hidden";
+    count.appendChild(probe);
+    const digit =
+      probe.getBoundingClientRect().width /
+      parseFloat(getComputedStyle(count).fontSize);
+    probe.remove();
+    return (p: number) => {
+      const value = p * 100;
+      const n = Math.floor(value + 1e-6);
+      const roll = n >= 100 ? 0 : smooth((value - n - 0.45) / 0.55);
+      const ones = n % 10;
+      const tens = Math.floor(n / 10) % 10;
+      const carry = ones === 9 ? roll : 0;
+      const carryTwice = ones === 9 && tens === 9 ? roll : 0;
+      const positions = [
+        Math.floor(n / 100) + carryTwice,
+        tens + carry,
+        ones + roll,
+      ];
+      strips.forEach((strip, i) => {
+        strip.style.transform = `translateY(${-1.3 * positions[i]}em)`;
+      });
+      columns[0].style.width = `${digit * (n >= 100 ? 1 : carryTwice)}em`;
+      columns[1].style.width = `${digit * (n >= 10 ? 1 : carry)}em`;
+      columns[2].style.width = `${digit}em`;
+    };
+  }
+
+  /* ---------- the loader ---------- */
+  function createLoader(
+    loader: HTMLElement,
+    ready: Promise<void>,
+    content: () => void,
+  ) {
+    const backdrop = loader.querySelector<HTMLElement>(
+      ".page-transition_backdrop",
+    );
+    const canvas = loader.querySelector<HTMLCanvasElement>(
+      ".page-transition_canvas",
+    );
+    const status = loader.querySelector<HTMLElement>(".page-transition_status");
+    const bar = loader.querySelector<SVGSVGElement>(".page-transition_bar");
+    const count = loader.querySelector<HTMLElement>(".page-transition_count");
+    const wordEls = [
+      ...loader.querySelectorAll<HTMLElement>(".page-transition_word"),
+    ];
+    const context = canvas?.getContext("2d");
+    if (!backdrop || !canvas || !status || !bar || !count || !context) {
+      return null;
+    }
+
+    /* The box the loader fills: the viewport without its scrollbar, so the
+       canvas maps 1:1 to the page and the glyphs land on the hero exactly. */
+    const W = loader.clientWidth || innerWidth;
+    const H = loader.clientHeight || innerHeight;
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+
+    const style = getComputedStyle(loader);
+    const read = (name: string, fallback: string) =>
+      style.getPropertyValue(name).trim() || fallback;
+    const off = read("--_off", "#303030");
+    const light = toRgb(read("--_light", "#ffffff"));
+    const lit = toRgb(read("--_accent", "#7bd52d"));
+    /* The newest lit slashes come on white and cool to green. */
+    const slashColor = (age: number) =>
+      age <= 0 ? off : rgb(mix(light, lit, smooth(age / 3)));
+
+    /* The hero's ASCII panel: its glyph size, font and colour, and where its
+       first cube sits. */
+    const hero = document.querySelector<HTMLElement>("main .ascii-stage_wrap");
+    const heroCanvas =
+      hero?.querySelector<HTMLCanvasElement>(".ascii-stage_cubes");
+    const heroStyle = hero ? getComputedStyle(hero) : null;
+    const glyphFont =
+      heroStyle?.getPropertyValue("--_glyph-font").trim() || "monospace";
+    const green = toRgb(
+      heroStyle?.getPropertyValue("--_accent").trim() || "#7bd52d",
+    );
+    const heroSize = (rect: DOMRect) => ({
+      width: Math.max(160, Math.round(rect.width)),
+      height: Math.max(120, Math.round(rect.height)),
+    });
+    const startRect = heroCanvas?.getBoundingClientRect();
+    const g =
+      startRect && startRect.width > 10
+        ? (({ width, height }) => glyphForSize(Math.min(width, height)))(
+            heroSize(startRect),
+          )
+        : glyphForSize(Math.min(W, H) * 0.6);
+    const cw = g * GLYPH.cellW;
+    const ch = g * GLYPH.cellH;
+    const font = `${g}px ${glyphFont}`;
+    let look: CubeLook | null = null;
+    const prepare = () => {
+      look ??= { green, ...measureRamp(font, cw, ch) };
+    };
+
+    /* The loader's cube: centred, on the hero's glyph grid. */
+    const scale = Math.min(0.135 * H, 0.15 * W);
+    const cols = Math.floor(W / cw);
+    const rows = Math.floor(H / ch);
+    const ox = (W - cols * cw) / 2;
+    const oy = (H - rows * ch) / 2;
+    const reach = 1.05 * scale;
+    const grid: Grid = {
+      cols,
+      rows,
+      cw,
+      ch,
+      ox,
+      oy,
+      cx: W / 2,
+      cy: H / 2,
+      scale,
+      x0: Math.max(0, Math.floor((W / 2 - reach - ox) / cw)),
+      x1: Math.min(cols, Math.ceil((W / 2 + reach - ox) / cw)),
+      y0: Math.max(0, Math.floor((H / 2 - reach - oy) / ch)),
+      y1: Math.min(rows, Math.ceil((H / 2 + reach - oy) / ch)),
+    };
+
+    /* It turns about all three axes, slowing over its last 1.1s to rest
+       exactly at the hero's opening view. */
+    const HERO_VIEW = rotation(0.66, 0.44);
+    const SPIN = [1.25, 2.0, 0.75];
+    const DECEL = 1.1;
+    const angle = (speed: number, t: number) => {
+      const left = REST - t;
+      if (left <= 0) return 0;
+      return left < DECEL
+        ? (speed * left * left) / (2 * DECEL)
+        : speed * (left - DECEL / 2);
+    };
+    const viewAt = (t: number) =>
+      multiply(
+        HERO_VIEW,
+        multiply(
+          turnX(angle(SPIN[0], t)),
+          multiply(turnY(angle(SPIN[1], t)), turnZ(angle(SPIN[2], t))),
+        ),
+      );
+    /* It grows out of a point, fast at first, settling into full size. */
+    const cubeAt = (t: number) => {
+      if (!look) return [];
+      const k = 1 - Math.pow(1 - clamp((t - 0.1) / 1.0, 0, 1), 3);
+      if (k <= 0) return [];
+      return cubeGlyphs(
+        viewAt(t),
+        [0, 0, 0],
+        k >= 1 ? grid : { ...grid, scale: scale * k },
+        look,
+      );
+    };
+
+    /* The hero's first cube at the start of its loop, where it is on screen
+       now, drawn as the hero will draw it. */
+    function heroGlyphs(): Glyph[] {
+      const rect = heroCanvas?.getBoundingClientRect();
+      if (!rect || rect.width < 10 || !look) return [];
+      /* The panel is below the fold: there is nowhere to land. */
+      if (rect.top > H - 80 || rect.bottom < 80) return [];
+      const { width, height } = heroSize(rect);
+      const hc = Math.floor(width / cw);
+      const hr = Math.floor(height / ch);
+      const heroGrid: Grid = {
+        cols: hc,
+        rows: hr,
+        cw,
+        ch,
+        ox: (width - hc * cw) / 2,
+        oy: (height - hr * ch) / 2,
+        cx: width / 2,
+        cy: height / 2 + 2,
+        scale: Math.min(0.21 * height, (width / 2 - 12) / 2.75),
+        x0: 0,
+        x1: hc,
+        y0: 0,
+        y1: hr,
+      };
+      const sx = rect.width / width;
+      const sy = rect.height / height;
+      return cubeGlyphs(HERO_VIEW, [-0.5, -0.5, 0.5], heroGrid, look).map(
+        (glyph) => ({
+          ...glyph,
+          x: rect.left + glyph.x * sx,
+          y: rect.top + glyph.y * sy,
+        }),
+      );
+    }
+
+    /* ---- the flight: every glyph of the hero's cube is one of the loader
+       cube's glyphs, matched by where it sits in its cube; the rest are dust ---- */
+    type Particle = {
+      from: Glyph;
+      to: Glyph;
+      delay: number;
+      seed: number;
+      bend: number;
+      dust: number;
+    };
+    type Flight = {
+      particles: Particle[];
+      centre: { x: number; y: number };
+      dx: number;
+      dy: number;
+      lands: boolean;
+    };
+    const SCRAMBLE = "=+*ctxowq#M%@";
+    let flight: Flight | null = null;
+
+    function launch(): Flight {
+      const source = cubeAt(REST);
+      const target = heroGlyphs();
+      const random = seeded(11);
+      const box = (glyphs: Glyph[]) => {
+        let left = Infinity;
+        let right = -Infinity;
+        let top = Infinity;
+        let bottom = -Infinity;
+        for (const glyph of glyphs) {
+          left = Math.min(left, glyph.x);
+          right = Math.max(right, glyph.x);
+          top = Math.min(top, glyph.y);
+          bottom = Math.max(bottom, glyph.y);
+        }
+        return {
+          x: (left + right) / 2,
+          y: (top + bottom) / 2,
+          w: Math.max(1, right - left),
+          h: Math.max(1, bottom - top),
+        };
+      };
+      const from = box(source);
+      const to = target.length ? box(target) : { ...from, x: from.x + W * 0.3 };
+      const spot = source.map((glyph) => [
+        (glyph.x - from.x) / from.w,
+        (glyph.y - from.y) / from.h,
+      ]);
+      const used = new Uint8Array(source.length);
+      const pairs: (Glyph | null)[] = source.map(() => null);
+      const extra: [Glyph, number, number][] = [];
+      const nearest = (u: number, v: number, free: boolean) => {
+        let best = -1;
+        let bestDistance = Infinity;
+        for (let k = 0; k < spot.length; k++) {
+          if (free && used[k]) continue;
+          const d = (spot[k][0] - u) ** 2 + (spot[k][1] - v) ** 2;
+          if (d < bestDistance) {
+            bestDistance = d;
+            best = k;
+          }
+        }
+        return best;
+      };
+      target
+        .map((glyph) => [glyph, random()] as const)
+        .sort((a, b) => a[1] - b[1])
+        .forEach(([glyph]) => {
+          const u = (glyph.x - to.x) / to.w;
+          const v = (glyph.y - to.y) / to.h;
+          const best = nearest(u, v, true);
+          if (best >= 0) {
+            used[best] = 1;
+            pairs[best] = glyph;
+          } else extra.push([glyph, u, v]);
+        });
+      /* A loader cube smaller than the hero's has too few glyphs: the rest
+         split off from the nearest glyph and travel with it. */
+      for (const [glyph, u, v] of extra) {
+        const best = nearest(u, v, false);
+        if (best < 0) continue;
+        source.push(source[best]);
+        spot.push(spot[best]);
+        pairs.push(glyph);
+      }
+      /* The pull runs from the cube's centre toward the hero's cube. The side
+         facing the hero is sucked in first and the far side last, so the cube
+         stretches out into a stream instead of breaking apart. */
+      const length = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+      const dx = (to.x - from.x) / length;
+      const dy = (to.y - from.y) / length;
+      const depth = Math.max(
+        1,
+        ...source.map((glyph) =>
+          Math.abs((glyph.x - from.x) * dx + (glyph.y - from.y) * dy),
+        ),
+      );
+      const particles = source.map((glyph, k): Particle => {
+        const front =
+          ((glyph.x - from.x) * dx + (glyph.y - from.y) * dy) / depth;
+        const delay = (SPREAD * (1 - front)) / 2 + random() * JITTER;
+        const pair = pairs[k];
+        let landing = pair;
+        let dust = 0;
+        if (!landing) {
+          /* Dust: pulled the same way into the hero's cube, gone before it
+             gets there. */
+          const a = random() * Math.PI * 2;
+          const r = Math.sqrt(random()) * 0.5;
+          landing = {
+            x: to.x + Math.cos(a) * r * to.w,
+            y: to.y + Math.sin(a) * r * to.h,
+            c: glyph.c,
+            col: glyph.col,
+          };
+          dust = 0.45 + random() * 0.35;
+        }
+        /* Every path bows the same way, gently: one current, not a spray. */
+        const bend = 0.05 + random() * 0.07;
+        return {
+          from: glyph,
+          to: landing,
+          delay,
+          seed: (k * 2654435761) >>> 0,
+          bend,
+          dust,
+        };
+      });
+      return {
+        particles,
+        centre: from,
+        dx,
+        dy,
+        lands: pairs.some(Boolean),
+      };
+    }
+
+    /* A vacuum: a slow start that keeps accelerating, then a short soft
+       landing (cubic-bezier 0.5, 0, 0.16, 1). */
+    const pull = (u: number) => {
+      if (u <= 0) return 0;
+      if (u >= 1) return 1;
+      const bx = (t: number) =>
+        1.5 * t * (1 - t) ** 2 + 0.48 * t * t * (1 - t) + t ** 3;
+      const by = (t: number) => 3 * t * t * (1 - t) + t ** 3;
+      let low = 0;
+      let high = 1;
+      for (let i = 0; i < 18; i++) {
+        const mid = (low + high) / 2;
+        if (bx(mid) < u) low = mid;
+        else high = mid;
+      }
+      return by((low + high) / 2);
+    };
+    /* Where a glyph is at time t: it swells out a little with the whole cube
+       and leans toward the hero, then is drawn in along a shallow arc. */
+    function place(flight: Flight, p: Particle, t: number) {
+      const since = t - REST;
+      const { centre, dx, dy } = flight;
+      const swell = 0.07 * smooth(since / 0.5);
+      const lean = 26 * Math.pow(clamp(since / 1.2, 0, 1), 1.6);
+      const sx = p.from.x + (p.from.x - centre.x) * swell + dx * lean;
+      const sy = p.from.y + (p.from.y - centre.y) * swell + dy * lean;
+      const u = clamp((since - p.delay) / TRAVEL, 0, 1);
+      const e = pull(u);
+      const vx = p.to.x - sx;
+      const vy = p.to.y - sy;
+      const arc = p.bend * Math.sin(Math.PI * e);
+      return { x: sx + vx * e + vy * arc, y: sy + vy * e - vx * arc, u, e };
+    }
+    function drawFlight(flight: Flight, t: number) {
+      if (!context) return;
+      for (const p of flight.particles) {
+        const now = place(flight, p, t);
+        const alpha = p.dust ? 1 - smooth(now.u / p.dust) : 1;
+        if (alpha <= 0.01) continue;
+        const c =
+          now.u <= 0.12
+            ? p.from.c
+            : !p.dust && now.u > 0.8
+              ? p.to.c
+              : SCRAMBLE[
+                  Math.floor(
+                    hash(p.seed + Math.floor(t * 12)) * SCRAMBLE.length,
+                  )
+                ];
+        const glow = 0.22 * Math.sin(Math.PI * now.e);
+        const color = mix(p.from.col, p.to.col, now.e);
+        context.fillStyle = rgb(mix(color, [255, 255, 255], glow));
+        /* At speed, a short faint trail behind it. */
+        if (now.u > 0 && now.u < 1) {
+          for (const [back, a] of [
+            [0.05, 0.3],
+            [0.1, 0.12],
+          ]) {
+            const before = place(flight, p, t - back);
+            if (Math.hypot(before.x - now.x, before.y - now.y) < 3) continue;
+            context.globalAlpha = alpha * a;
+            context.fillText(c, before.x, before.y);
+          }
+        }
+        context.globalAlpha = alpha;
+        context.fillText(c, now.x, now.y);
+      }
+      context.globalAlpha = 1;
+    }
+
+    /* ---- the cross: four dashed arms out of the cube's centre, a word past
+       each end ---- */
+    const ARM = Math.min(0.222 * H, 0.22 * W);
+    const GAP = Math.min(0.045 * H, 0.04 * W);
+    const cx = Math.round(W / 2) + 0.5;
+    const cy = Math.round(H / 2) + 0.5;
+    const cross = { r: 0 };
+    for (const word of wordEls) {
+      const x = Number(word.dataset.x);
+      const y = Number(word.dataset.y);
+      word.style.left = `${W / 2 + x * (ARM + GAP)}px`;
+      word.style.top = `${H / 2 + y * (ARM + GAP)}px`;
+      /* The side words sit beside the arm's end, the top and bottom ones
+         centred on it. */
+      word.style.transform = `translate(${x < 0 ? "-100%" : x > 0 ? "0" : "-50%"}, -50%)`;
+    }
+    function drawCross() {
+      if (!context) return;
+      const r = cross.r * ARM;
+      if (r < 0.5) return;
+      context.save();
+      context.strokeStyle = off;
+      context.lineWidth = 1;
+      context.setLineDash([3, 3]);
+      context.beginPath();
+      /* Each arm is drawn from the centre out, so its dashes start there. */
+      for (const [x, y] of [
+        [-1, 0],
+        [1, 0],
+        [0, -1],
+        [0, 1],
+      ]) {
+        context.moveTo(cx, cy);
+        context.lineTo(cx + x * r, cy + y * r);
+      }
+      context.stroke();
+      context.restore();
+    }
+
+    /* ---- painting ---- */
+    let landed = false;
+    function paint(t: number) {
+      if (!context) return;
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      context.clearRect(0, 0, W, H);
+      const live = t >= LANDED && !!flight?.lands;
+      if (live !== landed) {
+        landed = live;
+        root.classList.toggle("page-transition-handoff", live);
+      }
+      drawCross();
+      if (!look || t >= LANDED) return;
+      context.font = font;
+      context.textBaseline = "top";
+      if (t < REST) {
+        for (const glyph of cubeAt(t)) {
+          /* The arms run behind the cube. */
+          context.clearRect(glyph.x, glyph.y, cw, ch);
+          context.fillStyle = rgb(glyph.col);
+          context.fillText(glyph.c, glyph.x, glyph.y);
+        }
+        return;
+      }
+      flight ??= launch();
+      drawFlight(flight, t);
+    }
+
+    /* ---- the bar: a row of slashes that light up left to right ---- */
+    const bounds = bar.getBoundingClientRect();
+    const bw = Math.round(bounds.width);
+    const bh = Math.round(bounds.height) || 32;
+    const SLANT = 14;
+    const PITCH = 10;
+    const slashCount = Math.max(8, Math.floor((bw - SLANT - 2) / PITCH) + 1);
+    bar.setAttribute("viewBox", `0 0 ${bw} ${bh}`);
+    const slashes: SVGLineElement[] = [];
+    for (let k = 0; k < slashCount; k++) {
+      const line = document.createElementNS(SVG, "line");
+      const x = 1 + k * PITCH;
+      line.setAttribute("x1", String(x));
+      line.setAttribute("y1", String(bh));
+      line.setAttribute("x2", String(x + SLANT));
+      line.setAttribute("y2", "0");
+      line.setAttribute("stroke-width", "1.5");
+      bar.appendChild(line);
+      slashes.push(line);
+    }
+    const setCount = drumCounter(count);
+    const progress = { p: 0 };
+    const drawProgress = () => {
+      const on = progress.p * slashCount;
+      slashes.forEach((line, k) =>
+        line.setAttribute("stroke", slashColor(on - k)),
+      );
+      setCount(progress.p);
+    };
+    drawProgress();
+
+    /* ---- the timeline, painted after every child has rendered, so what is
+       drawn under the cube is always current ---- */
+    const timeline = gsap.timeline({
+      onUpdate: () => {
+        if (!look && timeline.time() >= REST) prepare();
+        paint(timeline.time());
+      },
+    });
+    timeline.set({}, {}, LANDED + 0.05);
+    document.fonts
+      .load(`12px ${glyphFont}`)
+      .catch(() => {})
+      .then(() => {
+        prepare();
+        paint(timeline.time());
+      });
+    timeline.addPause(WAIT, () => {
+      ready.then(() => timeline.resume());
+    });
+
+    timeline
+      .to([status, count], { opacity: 1, duration: 0.4, ease: "sine.out" }, 0)
+      .from(
+        slashes,
+        {
+          opacity: 0,
+          duration: 0.25,
+          stagger: 0.3 / slashCount,
+          ease: "sine.out",
+        },
+        0,
+      )
+      .to(
+        progress,
+        {
+          p: 1,
+          duration: LOAD_END - LOAD_START,
+          ease: "power1.inOut",
+          onUpdate: drawProgress,
+        },
+        LOAD_START,
+      );
+    const dots = { v: 0 };
+    timeline.to(
+      dots,
+      {
+        v: 9,
+        duration: LOAD_END,
+        ease: "none",
+        onUpdate: () => {
+          status.textContent = `Loading${".".repeat((Math.floor(dots.v) % 3) + 1)}`;
+        },
+      },
+      0,
+    );
+    /* The + opens out of the cube as it grows, and the words type in past
+       its ends. */
+    timeline.to(cross, { r: 1, duration: 1.0, ease: "power2.inOut" }, 0.7);
+    wordEls.forEach((word, i) =>
+      timeline.add(
+        scramble(word, word.dataset.word ?? "", 0.7),
+        1.25 + i * 0.1,
+      ),
+    );
+    /* Out: the words dissolve, the + is drawn back into the cube just as the
+       pull begins, the bar switches off from the right and the labels fade. */
+    wordEls.forEach((word, i) =>
+      timeline.add(
+        scramble(word, word.dataset.word ?? "", 0.45, true),
+        LOAD_END - 0.05 + i * 0.05,
+      ),
+    );
+    timeline
+      .to(cross, { r: 0, duration: 0.55, ease: "power2.in" }, REST - 0.15)
+      .to(
+        [...slashes].reverse(),
+        {
+          opacity: 0,
+          duration: 0.3,
+          stagger: 0.35 / slashCount,
+          ease: "sine.in",
+        },
+        LOAD_END + 0.1,
+      )
+      .to(
+        [status, count],
+        { opacity: 0, duration: 0.45, ease: "sine.inOut" },
+        LOAD_END + 0.15,
+      )
+      /* The backdrop lifts as the glyphs fly, showing the page. */
+      .to(
+        backdrop,
+        { opacity: 0, duration: 0.7, ease: "sine.inOut" },
+        REST + 0.35,
+      )
+      .call(content, undefined, LANDED - HANDOFF);
+    return timeline;
+  }
+
+  let played = false;
+
+  onPage(() => {
+    if (played || !root.classList.contains("page-intro")) return;
+    played = true;
+    const loader = document.querySelector<HTMLElement>(".page-transition_wrap");
+
+    /* Sent once, a moment before the glyphs land, or at the latest when the
+       loader ends: the first screen starts to appear, step by step
+       (src/utils/intro.ts). */
+    let sent = false;
+    const content = () => {
+      if (sent) return;
+      sent = true;
+      document.dispatchEvent(new Event("page-intro:content"));
+    };
+    let timeline: gsap.core.Timeline | null = null;
+    let fade: gsap.core.Tween | undefined;
+    let cancelled = false;
+    let done = false;
+    let fallback = 0;
+    const finish = () => {
+      done = true;
+      clearTimeout(fallback);
+      root.classList.remove("page-intro");
+      if (loader) gsap.set(loader, { clearProps: "opacity" });
+      content();
+    };
+    /* Never leave the page covered: if the loader hasn't started 12s after
+       the page is on screen, or overruns, the page opens anyway. */
+    const deadline = (seconds: number) => {
+      clearTimeout(fallback);
+      fallback = window.setTimeout(finish, seconds * 1000);
+    };
+
+    /* The glyphs land on the hero, so the page opens at the top, unless the
+       address points at a part of the page (as SmoothScroll does). */
+    if (!location.hash) scrollTo(0, 0);
+    const ready = new Promise<void>((resolve) =>
+      document.readyState === "complete"
+        ? resolve()
+        : addEventListener("load", () => resolve(), { once: true }),
+    );
+    const fonts = Promise.race([
+      document.fonts.ready,
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
+
+    const play = () => {
+      if (done || cancelled || timeline || fade || !loader) return;
+      if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        const status = loader.querySelector(".page-transition_status");
+        if (status) gsap.set(status, { opacity: 1 });
+        ready.then(() => {
+          if (cancelled) return;
+          content();
+          fade = gsap.to(loader, {
+            opacity: 0,
+            duration: 0.5,
+            onComplete: finish,
+          });
+        });
+        return;
+      }
+      timeline = createLoader(loader, ready, content);
+      if (!timeline) {
+        finish();
+        return;
+      }
+      const active = timeline;
+      deadline(active.duration() + 8);
+      /* It may have waited at ~85% for the page to load: the rest of it
+         still gets its time. */
+      ready.then(() => {
+        if (!done) deadline(active.duration() - active.time() + 8);
+      });
+      active.eventCallback("onComplete", finish);
+    };
+
+    /* Starts once the fonts are in and the page is on screen, so a page
+       opened in a background tab doesn't play its loader unseen. */
+    const onScreen = () => {
+      if (document.visibilityState !== "visible") return;
+      document.removeEventListener("visibilitychange", onScreen);
+      deadline(12);
+      play();
+    };
+    fonts.then(() => {
+      if (cancelled || done) return;
+      document.addEventListener("visibilitychange", onScreen);
+      onScreen();
+    });
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onScreen);
+      timeline?.kill();
+      fade?.kill();
+      finish();
+    };
+  });
+</script>
+
+<style is:global>
+  @layer components {
+    .page-transition_wrap {
+      --_x: clamp(1.25rem, 2.5vw, 3rem);
+      --_row: clamp(2rem, 6vh, 4.0625rem);
+      --_off: var(--dark-750);
+      --_light: var(--light-100);
+      --_accent: var(--brand-500);
+      display: none;
+      position: fixed;
+      inset: 0;
+      /* Above the nav, so the whole page appears from under it. */
+      z-index: 101;
+      color: var(--light-100);
+      pointer-events: none;
+      .page-intro & {
+        display: block;
+      }
+    }
+
+    /* The page holds still under the loader (Lenis stops with it), so the
+       glyphs land where the hero is; the scrollbar's space is kept so
+       nothing shifts when it comes back. */
+    html.page-intro {
+      overflow: hidden;
+      scrollbar-gutter: stable;
+    }
+
+    .page-transition_backdrop {
+      position: absolute;
+      inset: 0;
+      background-color: var(--dark-900);
+    }
+
+    .page-transition_canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .page-transition_status,
+    .page-transition_count,
+    .page-transition_word {
+      position: absolute;
+      font-family: var(--mono-family);
+      font-weight: 400;
+      text-transform: uppercase;
+      white-space: pre;
+    }
+
+    /* The status, the bar and the count share one line along the bottom. */
+    .page-transition_status,
+    .page-transition_count {
+      bottom: calc(var(--_row) + env(safe-area-inset-bottom, 0px));
+      translate: 0 50%;
+      font-size: 0.875rem;
+      line-height: 1.3;
+      letter-spacing: 0.06em;
+      opacity: 0;
+    }
+
+    .page-transition_status {
+      left: var(--_x);
+    }
+
+    .page-transition_count {
+      right: var(--_x);
+      display: flex;
+      align-items: center;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0;
+    }
+
+    .page-transition_bar {
+      position: absolute;
+      left: 50%;
+      bottom: calc(var(--_row) + env(safe-area-inset-bottom, 0px));
+      width: min(32rem, 100vw - 2 * var(--_x) - 22.5rem);
+      height: 2rem;
+      translate: -50% 50%;
+      overflow: visible;
+      /* On a phone the bar takes its own line, full width, above the labels. */
+      @media (width < 48rem) {
+        width: calc(100vw - 2 * var(--_x));
+        bottom: calc(var(--_row) + 2.75rem + env(safe-area-inset-bottom, 0px));
+      }
+    }
+
+    .page-transition_word {
+      font-size: 0.6875rem;
+      line-height: 1.3;
+      letter-spacing: 0.06em;
+      color: color-mix(in lab, var(--light-100) 60%, transparent);
+    }
+
+    /* Each digit rolls on its own drum, faded at the top and bottom edge. */
+    .page-transition_drum {
+      display: inline-block;
+      width: 0;
+      height: 1.3em;
+      overflow: hidden;
+      mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        black 16%,
+        black 84%,
+        transparent
+      );
+    }
+
+    .page-transition_strip {
+      display: block;
+    }
+
+    .page-transition_digit {
+      display: block;
+      height: 1.3em;
+      text-align: center;
+    }
+
+    /* The hero's cube takes over from the loader's glyphs the moment they
+       land: shown at once, without its flicker. */
+    .page-transition-handoff .ascii-stage_cubes {
+      opacity: 1 !important;
+    }
+  }
+</style>

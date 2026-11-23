@@ -1,7 +1,9 @@
 /**
  * The first screen appears in numbered steps, in reading order: left to
- * right, top to bottom. Step 1 starts as soon as the page does, and each step
- * after follows `STEP_GAP` seconds later. A component marks its parts with
+ * right, top to bottom. Step 1 starts when the first-load loader hands the
+ * page over (`page-intro:content`, sent by PageTransition a moment before its
+ * glyphs land in the hero's ASCII panel), or straight away when the page loads without it, and each step after
+ * follows `STEP_GAP` seconds later. A component marks its parts with
  * `data-step` and starts each part's animation here.
  *
  * On the home page: 1 the logo, 2 the menus, 3 the clock and button, 4 the
@@ -15,9 +17,18 @@ export const stepOf = (element: Element, fallback = 1) =>
   fallback;
 
 export function onIntroStep(step: number, start: () => void): () => void {
-  const timer = window.setTimeout(
-    start,
-    Math.max(0, step - 1) * STEP_GAP * 1000,
-  );
-  return () => clearTimeout(timer);
+  let timer = 0;
+  const run = () => {
+    document.removeEventListener("page-intro:content", run);
+    timer = window.setTimeout(start, Math.max(0, step - 1) * STEP_GAP * 1000);
+  };
+  if (document.documentElement.classList.contains("page-intro")) {
+    document.addEventListener("page-intro:content", run);
+  } else {
+    run();
+  }
+  return () => {
+    document.removeEventListener("page-intro:content", run);
+    clearTimeout(timer);
+  };
 }
