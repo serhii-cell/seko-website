@@ -93,6 +93,8 @@ const content = await slotContent(Astro.slots);
       visibility: hidden;
     }
 
+    /* Each letter's pose is set through custom properties, so a minifier
+       can't fold rotate, translate and transform into one another. */
     .flip-text_char {
       --_t: calc(var(--index) / max(var(--max-index), 1));
       --_delay: calc(0.05s + sin(calc(var(--_t) * 1.5deg)) * 2.9s);
@@ -100,7 +102,12 @@ const content = await slotContent(Astro.slots);
         clamp(-1, var(--signed-index), 1) * sin(calc(var(--_t) * 30deg)) *
           -36deg
       );
+      --_spread: calc(var(--signed-index) * 0.125em);
       display: inline-block;
+      rotate: x var(--_turn, 0deg);
+      translate: var(--_x, 0em) var(--_y, 0em) 0;
+      transform: rotateZ(var(--_twist, 0deg)) scale(var(--_size, 1));
+      opacity: var(--_shown, 1);
       transition:
         transform 0.325s var(--_ease),
         translate 0.425s var(--_ease),
@@ -109,10 +116,12 @@ const content = await slotContent(Astro.slots);
     }
 
     .flip-text_hover .flip-text_char {
-      rotate: 1 0 0 -72deg;
-      transform: rotateZ(var(--_tilt)) scale(0.65);
-      translate: calc(var(--signed-index) * 0.125em) var(--_rise) 0;
-      opacity: 0;
+      --_turn: -72deg;
+      --_twist: var(--_tilt);
+      --_size: 0.65;
+      --_x: var(--_spread);
+      --_y: var(--_rise);
+      --_shown: 0;
       transition:
         transform 0.35s var(--_ease),
         translate 0.35s var(--_ease),
@@ -122,10 +131,12 @@ const content = await slotContent(Astro.slots);
 
     @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
       :is(a, button, [data-hover]):is(:hover, :focus-visible) .flip-text_copy:not(.flip-text_hover) .flip-text_char {
-        rotate: 1 0 0 72deg;
-        transform: rotateZ(var(--_tilt)) scale(0.65);
-        translate: calc(var(--signed-index) * 0.125em) calc(var(--_rise) * -1) 0;
-        opacity: 0;
+        --_turn: 72deg;
+        --_twist: var(--_tilt);
+        --_size: 0.65;
+        --_x: var(--_spread);
+        --_y: calc(var(--_rise) * -1);
+        --_shown: 0;
         transition:
           transform 0.35s var(--_delay) var(--_ease),
           translate 0.35s var(--_delay) var(--_ease),
@@ -134,10 +145,12 @@ const content = await slotContent(Astro.slots);
       }
 
       :is(a, button, [data-hover]):is(:hover, :focus-visible) .flip-text_hover .flip-text_char {
-        rotate: 1 0 0 0deg;
-        transform: rotateZ(0deg) scale(1);
-        translate: 0 0 0;
-        opacity: 1;
+        --_turn: 0deg;
+        --_twist: 0deg;
+        --_size: 1;
+        --_x: 0em;
+        --_y: 0em;
+        --_shown: 1;
         transition:
           transform 0.325s calc(var(--_delay) + 0.05s) var(--_ease),
           translate 0.425s calc(var(--_delay) + 0.05s) var(--_ease),
