@@ -3,7 +3,6 @@
   import { onPage } from "@/utils/lifecycle.ts";
   import { createLines, isLineText, type Lines } from "@/utils/lines.ts";
   import { createWave, isWaveText, type Wave } from "@/utils/wave.ts";
-  import { createRise, riseUnit, type Rise } from "@/utils/rise.ts";
   import { onIntroStep, stepOf } from "@/utils/intro.ts";
 
   const blocks = [
@@ -12,21 +11,11 @@
     ".section > .container > :not(.layout, .grid)",
     "[data-fade]",
   ].join(", ");
-  const TEXT = ".heading, .text, [data-lines]";
-  /* The line-by-line text reveal is switched off for now: text is simply
-     there. Set to `true` to bring it back. */
-  const TEXT_REVEAL = false;
+  const TEXT = ".heading, .text, .eyebrow_text, .text-style-label, [data-lines]";
   /* Time between one item and the next within a step of the first screen. */
   const STAGGER = 0.06;
   /* First-screen items with no step of their own come after the rest. */
   const LAST_STEP = 7;
-
-  /* When the first line of `element` is fully on screen. */
-  const firstLine = (element: Element) => {
-    const style = getComputedStyle(element);
-    const height = parseFloat(style.lineHeight);
-    return `top+=${Number.isNaN(height) ? parseFloat(style.fontSize) * 1.2 : height} bottom`;
-  };
 
   /* Reading order: rows top to bottom, left to right within a row. */
   const byReadingOrder = (a: Element, b: Element) => {
@@ -49,42 +38,23 @@
         element.getClientRects().length > 0 &&
         getComputedStyle(element).visibility !== "hidden";
 
-      /* Every heading and paragraph rises in line by line; blocks with no
-         text of their own, the nav's parts and anything marked `data-fade`
-         fade in instead. */
-      const own = (element: Element) =>
-        isWaveText(element) || riseUnit(element) !== null;
-      const texts = TEXT_REVEAL
-        ? gsap.utils
-            .toArray<HTMLElement>(TEXT, main)
-            .filter(
-              (element) =>
-                isLineText(element) && !own(element) && shown(element),
-            )
-        : [];
-
-      /* Section headlines fill from the left under a soft green edge; the
-         opening headline, the paragraphs under headings, smaller headings,
-         eyebrows and labels rise into their own clips. */
+      /* Section headlines light up letter by letter as they scroll
+         through. The opening headline, the paragraphs under headings,
+         smaller headings, eyebrows and labels rise line by line from under
+         their own masks. Blocks with no text of their own, the nav's parts
+         and anything marked `data-fade` fade in instead. */
       const waves = new Map<Element, Wave>(
         gsap.utils
           .toArray<HTMLElement>(".heading", main)
           .filter((element) => isWaveText(element) && shown(element))
           .map((element) => [element, createWave(element)]),
       );
-      const rises = new Map<Element, Rise>(
-        gsap.utils
-          .toArray<HTMLElement>(
-            ".heading, .text, .eyebrow_text, .text-style-label",
-            main,
-          )
-          .filter((element) => shown(element))
-          .flatMap((element) => {
-            const unit = riseUnit(element);
-            return unit ? [[element, createRise(element, unit)] as const] : [];
-          }),
-      );
-      const typed = [...waves.keys(), ...rises.keys()];
+      const texts = gsap.utils
+        .toArray<HTMLElement>(TEXT, main)
+        .filter(
+          (element) =>
+            isLineText(element) && !waves.has(element) && shown(element),
+        );
 
       const faders = [
         ...gsap.utils.toArray<HTMLElement>("[data-intro]"),
@@ -96,8 +66,7 @@
               (!isLineText(block) && !block.querySelector(TEXT)),
           ),
       ].filter(
-        (block) =>
-          shown(block) && !texts.includes(block) && !typed.includes(block),
+        (block) => shown(block) && !texts.includes(block) && !waves.has(block),
       );
 
       const lines = new Map<Element, Lines>(
@@ -120,7 +89,7 @@
       /* What is on screen at load comes in step by step (each part's
          `data-step`, see src/utils/intro.ts), in reading order within a
          step. */
-      const first = [...texts, ...faders, ...waves.keys(), ...rises.keys()]
+      const first = [...texts, ...faders, ...waves.keys()]
         .filter((element) => ScrollTrigger.isInViewport(element))
         .sort(byReadingOrder) as HTMLElement[];
       const steps = new Map<number, HTMLElement[]>();
@@ -132,37 +101,27 @@
         onIntroStep(step, () =>
           group.forEach((element, index) => {
             const delay = index * STAGGER;
-            const reveal =
-              lines.get(element) ?? waves.get(element) ?? rises.get(element);
+            const reveal = lines.get(element) ?? waves.get(element);
             if (reveal) reveal.play(delay);
             else fadeIn([element], 0, delay);
           }),
         ),
       );
 
-      /* The rest comes in as it scrolls into view: text once its first line
-         is fully on screen, blocks in batches. */
+      /* The rest comes in as it scrolls into view: text once its top is 20%
+         of the way up the screen, headlines tied to the scroll, blocks in
+         batches. */
       lines.forEach((reveal, element) => {
         if (first.includes(element as HTMLElement)) return;
         ScrollTrigger.create({
           trigger: element,
-          start: () => firstLine(element),
-          end: "max",
+          start: "clamp(top 80%)",
           once: true,
           onEnter: () => reveal.play(),
         });
       });
-
-      /* Headlines and the text that rises play at their own pace once
-         they are 15% of the way up the screen. */
-      [...waves, ...rises].forEach(([element, reveal]) => {
-        if (first.includes(element as HTMLElement)) return;
-        ScrollTrigger.create({
-          trigger: element,
-          start: "top 85%",
-          once: true,
-          onEnter: () => reveal.play(),
-        });
+      waves.forEach((wave, element) => {
+        if (!first.includes(element as HTMLElement)) wave.scrub();
       });
 
       const reveal = context.add("reveal", (batch: Element[]) => {
@@ -186,7 +145,6 @@
         waits.forEach((stop) => stop());
         lines.forEach((lines) => lines.revert());
         waves.forEach((wave) => wave.revert());
-        rises.forEach((reveal) => reveal.revert());
         gsap.set(faders, { clearProps: settle });
       };
     });
@@ -194,40 +152,3 @@
     return () => mm.revert();
   });
 </script>
-
-<style is:global>
-  @layer components {
-    .scroll-reveal_wave {
-      --reveal: 0;
-      display: inline-block;
-      width: 100%;
-      vertical-align: top;
-      padding-block: 0.25em;
-      margin-block: -0.25em;
-      --_soft: 5em;
-      --_edge: calc(var(--reveal) * (100% + var(--_soft)));
-      --_dim: color-mix(in srgb, currentcolor 27%, transparent);
-      background-image: linear-gradient(
-        in oklab 146deg,
-        currentcolor calc(var(--_edge) - var(--_soft)),
-        color-mix(in oklab, currentcolor 55%, var(--brand-500))
-          calc(var(--_edge) - var(--_soft) * 0.78),
-        color-mix(in oklab, var(--brand-500) 85%, transparent)
-          calc(var(--_edge) - var(--_soft) * 0.55),
-        color-mix(in oklab, var(--brand-500) 40%, var(--_dim))
-          calc(var(--_edge) - var(--_soft) * 0.3),
-        var(--_dim) var(--_edge)
-      );
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    /* Room for ascenders and descenders inside each word's clip. */
-    .scroll-reveal_word-mask {
-      padding: 0.1em 0.04em 0.22em 0;
-      margin: -0.1em -0.04em -0.22em 0;
-      vertical-align: bottom;
-    }
-  }
-</style>
