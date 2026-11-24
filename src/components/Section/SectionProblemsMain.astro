@@ -4,7 +4,7 @@ import Heading from "@/components/Typography/Heading.astro";
 import Paragraph from "@/components/Typography/Paragraph.astro";
 import Button from "@/components/Button.astro";
 import type { ComponentProps } from "astro/types";
-import maze from "@/assets/home/problems/problem-1-maze.svg?raw";
+import { grip, panel, PLACE, STILL, STEP, W, H } from "@/utils/dial-scene.ts";
 import gearTeam from "@/assets/home/problems/problem-2-gear-team.svg?raw";
 import bicycle from "@/assets/home/problems/problem-3-bicycle.svg?raw";
 
@@ -58,7 +58,10 @@ function prepare(
     [...source.matchAll(/url\(#([^)]+)\)/g)].map((match) => match[1]),
   );
   return source
-    .replace(/<svg[^>]*>/, `<svg viewBox="${viewBox}" fill="none" xmlns="http://www.w3.org/2000/svg" class="problems-main_drawing" aria-hidden="true" focusable="false">`)
+    .replace(
+      /<svg[^>]*>/,
+      `<svg viewBox="${viewBox}" fill="none" xmlns="http://www.w3.org/2000/svg" class="problems-main_drawing" aria-hidden="true" focusable="false">`,
+    )
     .replace(/<rect width="[\d.]+" height="[\d.]+" fill="white"\/>/, "")
     .replace(/ id="([^"]+)"/g, (_, id: string) =>
       parts[id]
@@ -72,7 +75,11 @@ function prepare(
 }
 
 const visuals = [
-  prepare(maze, "problem-1", { Person: "person", Maze: "maze", Flag: "flag" }),
+  prepare(
+    `<svg viewBox="0 0 ${W} ${H}"><g transform="${PLACE}"><g id="Panel">${panel(STILL)}</g><g id="Grip">${grip(STILL * STEP)}</g></g></svg>`,
+    "problem-1",
+    { Panel: "panel", Grip: "grip" },
+  ),
   prepare(gearTeam, "problem-2", {
     "Rectangle 148": "glow",
     "Frame 1000004461": "chip",
@@ -110,7 +117,10 @@ const total = String(Math.min(problems.length, visuals.length));
           {problems.slice(0, visuals.length).map((problem, index) => (
             <Fragment>
               {index > 0 && (
-                <div class="problems-main_divider dashed dashed-top" aria-hidden="true" />
+                <div
+                  class="problems-main_divider dashed dashed-top"
+                  aria-hidden="true"
+                />
               )}
               <article class:list={["problems-main_problem", layouts[index]]}>
                 <div class="problems-main_meta">
@@ -119,7 +129,9 @@ const total = String(Math.min(problems.length, visuals.length));
                   </Paragraph>
                   <p class="problems-main_count text-style-label" data-fade>
                     <span>{index + 1}</span>
-                    <span class="color-faded" aria-hidden="true">/</span>
+                    <span class="color-faded" aria-hidden="true">
+                      /
+                    </span>
                     <span class="sr-only">of</span>
                     <span class="color-faded">{total}</span>
                   </p>
@@ -132,7 +144,10 @@ const total = String(Math.min(problems.length, visuals.length));
                     <Heading tag="h3" class="problems-main_title">
                       {problem.heading}
                     </Heading>
-                    <Paragraph variant="main" class="problems-main_text color-faded">
+                    <Paragraph
+                      variant="main"
+                      class="problems-main_text color-faded"
+                    >
                       {problem.text}
                     </Paragraph>
                   </div>
@@ -155,7 +170,10 @@ const total = String(Math.min(problems.length, visuals.length));
                               d="M8.4 17 12 13.4l3.6 3.6 1.4-1.4-3.6-3.6L17 8.4 15.6 7 12 10.6 8.4 7 7 8.4l3.6 3.6L7 15.6 8.4 17Zm3.6 5a9.74 9.74 0 0 1-3.9-.79 10.1 10.1 0 0 1-3.17-2.14 10.1 10.1 0 0 1-2.14-3.17A9.74 9.74 0 0 1 2 12c0-1.38.26-2.68.79-3.9a10.1 10.1 0 0 1 2.14-3.17A10.1 10.1 0 0 1 8.1 2.79 9.74 9.74 0 0 1 12 2c1.38 0 2.68.26 3.9.79a10.1 10.1 0 0 1 3.17 2.14 10.1 10.1 0 0 1 2.14 3.17c.53 1.22.79 2.52.79 3.9s-.26 2.68-.79 3.9a10.1 10.1 0 0 1-2.14 3.17 10.1 10.1 0 0 1-3.17 2.14c-1.22.53-2.52.79-3.9.79Zm0-2c2.23 0 4.13-.78 5.68-2.33C19.23 16.13 20 14.23 20 12s-.78-4.13-2.33-5.68C16.13 4.78 14.23 4 12 4s-4.13.78-5.68 2.32C4.78 7.88 4 9.77 4 12s.78 4.13 2.32 5.67C7.88 19.23 9.77 20 12 20Z"
                             />
                           </svg>
-                          <Paragraph variant="main" class="problems-main_cost-text">
+                          <Paragraph
+                            variant="main"
+                            class="problems-main_cost-text"
+                          >
                             {cost}
                           </Paragraph>
                         </li>
@@ -181,6 +199,15 @@ const total = String(Math.min(problems.length, visuals.length));
 
 <script>
   import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
+  import {
+    ACCENT,
+    grip,
+    knobGlyphs,
+    RAMP,
+    settingAt,
+    STEP,
+    STILL,
+  } from "@/utils/dial-scene.ts";
   import { onPage } from "@/utils/lifecycle.ts";
 
   const START = "top 75%";
@@ -225,187 +252,177 @@ const total = String(Math.min(problems.length, visuals.length));
 
   type Layer = ReturnType<typeof layered>;
 
-  /* A person walks in from beyond the card's edge and stops at the maze's
-     entrance; the maze's edges then draw themselves outward from that
-     point, the wall sides turn grey once the structure is drawn, and the
-     flag at the exit goes up and keeps glowing. */
-  function maze(visual: Element, layer: Layer) {
-    const person = visual.querySelector<SVGGElement>('[data-part="person"]');
-    const flag = visual.querySelector<SVGGElement>('[data-part="flag"]');
-    const lines = [...visual.querySelectorAll<SVGLineElement>(".maze-line")];
-    const sides = visual.querySelectorAll(".maze-side");
-    if (!person || !flag || lines.length === 0) return;
-    const pole = flag.querySelector<SVGLineElement>(".maze-flag-pole");
-    const banner = flag.querySelector<SVGPolygonElement>(".maze-flag-banner");
-    const halo = flag.querySelector<SVGPolygonElement>(".maze-flag-halo");
+  /* The knob can't settle: it turns on two settings, back one, on
+     again, and ends where it began, so the loop runs on without a seam. Every
+     turn lands on a different setting from the one it left, and none
+     overshoots, so the pointer never swings back to where it just was. Each
+     setting lights while the pointer rests on it. Only plays while the
+     drawing is on screen, once the intro has played. */
+  const TURNS: [to: number, duration: number, ease: string, rest: number][] = [
+    [STILL + 2, 0.55, "power3.inOut", 0.7],
+    [STILL + 1, 0.35, "power2.out", 0.9],
+    [STILL + 4, 0.65, "power3.inOut", 0.8],
+    [STILL + 3, 0.45, "power2.inOut", 0.8],
+    [STILL + 6, 0.7, "power3.inOut", 0.6],
+    [STILL + 5, 0.4, "power2.out", 0.7],
+    [STILL + 8, 0.9, "power3.inOut", 0],
+  ];
+  /* How long the knob rests on its first setting each time round. */
+  const FIRST_REST = 0.9;
 
-    /* The walk follows the maze's own axis, entering from the top-left. */
-    const wind = waving(banner, halo);
-    const WALK = { x: -0.9002 * 380, y: -0.4359 * 380 };
-    const STEPS = 4;
-    const walk = { at: 0 };
-    const setX = gsap.quickSetter(person, "x", "px");
-    const setY = gsap.quickSetter(person, "y", "px");
-    const place = () => {
-      const left = 1 - walk.at;
-      const bob = -Math.abs(Math.sin(walk.at * Math.PI * STEPS)) * 3 * left;
-      setX(WALK.x * left);
-      setY(WALK.y * left + bob);
-    };
+  function dial(visual: Element, layer: Layer) {
+    const knob = visual.querySelector<SVGGElement>('[data-part="grip"]');
+    const glow = visual.querySelector<SVGCircleElement>(".dial-glow");
+    const frames = [
+      ...visual.querySelectorAll<SVGCircleElement>("[data-setting]"),
+    ];
+    const symbols = [
+      ...visual.querySelectorAll<SVGPathElement>("[data-symbol]"),
+    ];
+    const body = visual.querySelector<SVGGElement>(".dial-knob");
+    const settings = [...visual.querySelectorAll<SVGGElement>(".dial-setting")];
+    const holder = knob?.parentElement;
+    if (!knob || !glow || !body || !holder || frames.length === 0) return;
+    const still = knob.innerHTML;
+    const line =
+      frames
+        .find((frame) => frame.getAttribute("stroke") !== ACCENT)
+        ?.getAttribute("stroke") ?? "currentColor";
+    const ink =
+      symbols
+        .find((symbol) => symbol.getAttribute("fill") !== ACCENT)
+        ?.getAttribute("fill") ?? "currentColor";
 
-    /* Each edge grows from its end nearest the entrance; data-at is how far
-       that end is from it, so the drawing spreads out from one point. */
-    const lengths = lines.map((line) =>
-      Math.hypot(
-        line.x2.baseVal.value - line.x1.baseVal.value,
-        line.y2.baseVal.value - line.y1.baseVal.value,
-      ),
-    );
-    const SPREAD = 1;
-    const SPEED = 360;
-    const drawn = Math.max(
-      ...lines.map(
-        (line, index) =>
-          Number(line.dataset.at ?? 0) * SPREAD + lengths[index] / SPEED,
-      ),
-    );
-
-    gsap.set(person, { x: WALK.x, y: WALK.y });
-    lines.forEach((line, index) =>
-      gsap.set(line, {
-        strokeDasharray: lengths[index],
-        strokeDashoffset: lengths[index],
-      }),
-    );
-    /* Faces stay solid white while the edges draw (only visible edges are
-       in the drawing), and the sides turn grey once the structure is up. */
-    const SIDE = sides[0]?.getAttribute("fill") ?? "#F0F0F0";
-    gsap.set(sides, { attr: { fill: "#FFFFFF", stroke: "#FFFFFF" } });
-    gsap.set([banner, halo], { opacity: 0 });
-    gsap.set(pole, { opacity: 0 });
-
-    const BUILD = 0.55;
-    gsap
-      .timeline({
-        scrollTrigger: { trigger: visual, start: START, once: true },
-        onStart: layer.hold,
-        onComplete: layer.release,
-      })
-      .to(walk, { at: 1, duration: 1.1, ease: "power2.out", onUpdate: place })
-      .to(
-        lines,
-        {
-          strokeDashoffset: 0,
-          ease: "none",
-          duration: (index) => lengths[index] / SPEED,
-          delay: (index) => Number(lines[index].dataset.at ?? 0) * SPREAD,
-        },
-        BUILD,
-      )
-      .to(
-        sides,
-        { attr: { fill: SIDE, stroke: SIDE }, duration: 0.47, ease: "power1.inOut" },
-        BUILD + drawn,
-      )
-      .fromTo(
-        pole,
-        { opacity: 1, attr: { y2: pole?.getAttribute("y1") ?? 0 } },
-        {
-          attr: { y2: pole?.getAttribute("y2") ?? 0 },
-          duration: 0.4,
-          ease: "power2.out",
-          immediateRender: false,
-        },
-        ">-0.2",
-      )
-      .fromTo(
-        [banner, halo],
-        { opacity: 1, scaleX: 0 },
-        {
-          scaleX: 1,
-          duration: 0.5,
-          ease: "back.out(1.6)",
-          transformOrigin: "0% 50%",
-          immediateRender: false,
-        },
-        ">-0.05",
-      )
-      .add(() => wind.start());
-
-    return () => wind.stop();
-  }
-
-  /* The banner ripples in the wind: its top and bottom edges follow a
-     travelling sine wave that grows towards the free end, and the glow
-     behind it moves with it. Updates only while the flag is on screen. */
-  function waving(banner: SVGPolygonElement | null, halo: SVGPolygonElement | null) {
-    const shapes = [banner, halo].filter((shape): shape is SVGPolygonElement => !!shape);
-    const corners = [...(banner?.points ?? [])].map((point) => ({ x: point.x, y: point.y }));
-    /* The drawn shapes, put back when the wind stops. */
-    const original = shapes.map((shape) => shape.getAttribute("points") ?? "");
-    if (shapes.length === 0 || corners.length !== 4) return { start() {}, stop() {} };
-    /* Corners, as written by the generator: top at the pole, top at the tip,
-       bottom at the tip, bottom at the pole. */
-    const [topPole, topTip, bottomTip, bottomPole] = corners;
-    const height = Math.hypot(bottomPole.x - topPole.x, bottomPole.y - topPole.y);
-    const SAMPLES = 24;
-    const AMPLITUDE = height * 0.16;
-    const WAVES = 1.15;
-    const SPEED = 1.1;
-    let strength = 0;
-    let visible = true;
-    let running = false;
-    let pulse: gsap.core.Tween | null = null;
-    const observer = new IntersectionObserver(([entry]) => {
-      visible = entry.isIntersecting;
-      if (visible) pulse?.resume();
-      else pulse?.pause();
-    });
-    const draw = (time: number) => {
-      if (!visible) return;
-      strength = Math.min(1, strength + 0.02);
-      const top: string[] = [];
-      const bottom: string[] = [];
-      for (let index = 0; index <= SAMPLES; index++) {
-        const along = index / SAMPLES;
-        const phase = time * SPEED * Math.PI * 2 - along * WAVES * Math.PI * 2;
-        const lift = Math.sin(phase) * AMPLITUDE * along * strength;
-        const sag = Math.sin(phase - 0.6) * AMPLITUDE * along * strength;
-        top.push(
-          `${(topPole.x + (topTip.x - topPole.x) * along).toFixed(1)},${(topPole.y + (topTip.y - topPole.y) * along + lift).toFixed(1)}`,
-        );
-        bottom.unshift(
-          `${(bottomPole.x + (bottomTip.x - bottomPole.x) * along).toFixed(1)},${(bottomPole.y + (bottomTip.y - bottomPole.y) * along + sag).toFixed(1)}`,
-        );
+    /* The setting the pointer rests on turns to the accent, frame and
+       symbol, and glows. */
+    let lit = STILL;
+    const light = (index: number) => {
+      if (index === lit) return;
+      frames[lit]?.setAttribute("stroke", line);
+      symbols[lit]?.setAttribute("fill", ink);
+      lit = index;
+      const frame = frames[index];
+      symbols[index]?.setAttribute("fill", ACCENT);
+      if (frame) {
+        frame.setAttribute("stroke", ACCENT);
+        glow.setAttribute("cx", frame.getAttribute("cx") ?? "0");
+        glow.setAttribute("cy", frame.getAttribute("cy") ?? "0");
       }
-      const points = [...top, ...bottom].join(" ");
-      shapes.forEach((shape) => shape.setAttribute("points", points));
+      glow.setAttribute("opacity", frame ? "0.5" : "0");
     };
-    return {
-      start() {
-        if (running) return;
-        running = true;
-        observer.observe(shapes[0]);
-        gsap.ticker.add(draw);
-        if (halo) {
-          pulse = gsap.to(halo, {
-            opacity: 0.35,
-            duration: 1.4,
-            ease: "sine.inOut",
-            repeat: -1,
-            yoyo: true,
-            paused: !visible,
-          });
-        }
-      },
-      stop() {
-        running = false;
-        observer.disconnect();
-        gsap.ticker.remove(draw);
-        pulse?.kill();
-        pulse = null;
-        shapes.forEach((shape, index) => shape.setAttribute("points", original[index]));
-      },
+
+    const at = { angle: STILL * STEP };
+    const draw = () => {
+      knob.innerHTML = grip(at.angle);
+      light(settingAt(at.angle));
+    };
+    const timeline = gsap.timeline({ repeat: -1, paused: true });
+    let time = FIRST_REST;
+    for (const [to, duration, ease, rest] of TURNS) {
+      timeline.to(
+        at,
+        { angle: to * STEP, duration, ease, onUpdate: draw },
+        time,
+      );
+      time += duration + rest;
+    }
+
+    /* The intro: the knob comes out of the digital world, first as glyphs
+       that pop up and flicker, then dissolving away as the drawn knob
+       fades in underneath; the settings fade in round it right after, from
+       the top, clockwise. The knob starts turning once they're all in. */
+    const wrapper = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    wrapper.innerHTML = knobGlyphs(STILL * STEP);
+    const glyphLayer = wrapper.firstElementChild;
+    if (!glyphLayer) return;
+    holder.appendChild(glyphLayer);
+    const glyphs = [...glyphLayer.children] as SVGTextElement[];
+    const vector = [body, knob, glow, ...settings];
+    gsap.set(vector, { opacity: 0 });
+
+    /* Glyphs flicker to their neighbours on the ramp, so the knob's shape
+       holds while they do. */
+    const shades = glyphs.map((glyph) => RAMP.indexOf(glyph.textContent ?? ""));
+    const flicker = () => {
+      for (let i = 0; i < 24; i++) {
+        const index = Math.floor(Math.random() * glyphs.length);
+        const shade = shades[index] + Math.round(Math.random() * 2 - 1);
+        glyphs[index].textContent =
+          RAMP[Math.min(RAMP.length - 1, Math.max(1, shade))];
+      }
+    };
+    let ready = false;
+    let visible = false;
+    const intro = gsap
+      .timeline({
+        paused: true,
+        onStart: layer.hold,
+        onComplete: () => {
+          layer.release();
+          glyphLayer.remove();
+          gsap.set(vector, { clearProps: "opacity" });
+          ready = true;
+          /* Half the usual first rest, so the knob gets going soon after. */
+          timeline.seek(FIRST_REST / 2);
+          if (visible) timeline.play();
+        },
+      })
+      .to(glyphs, {
+        opacity: 1,
+        duration: 0.05,
+        stagger: { amount: 0.6, from: "random" },
+      })
+      .to({}, { duration: 0.9, onUpdate: flicker }, 0)
+      .to([body, knob], { opacity: 1, duration: 0.6, ease: "power1.out" }, 0.8)
+      .to(
+        glyphs,
+        {
+          opacity: 0,
+          duration: 0.12,
+          stagger: { amount: 0.6, from: "random" },
+        },
+        0.8,
+      )
+      .to(
+        settings,
+        { opacity: 1, duration: 0.45, ease: "power1.out", stagger: 0.07 },
+        1.35,
+      )
+      .to(glow, { opacity: 0.5, duration: 0.45 }, 1.35 + STILL * 0.07)
+      /* Twice as fast as the timings above. */
+      .timeScale(2);
+
+    const trigger = ScrollTrigger.create({
+      trigger: visual,
+      start: START,
+      once: true,
+      onEnter: () => intro.play(),
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      const now = entries[entries.length - 1].isIntersecting;
+      if (now === visible) return;
+      visible = now;
+      if (visible) {
+        layer.hold();
+        if (ready) timeline.play();
+      } else {
+        layer.release();
+        timeline.pause();
+      }
+    });
+    observer.observe(visual);
+
+    return () => {
+      observer.disconnect();
+      trigger.kill();
+      intro.kill();
+      timeline.kill();
+      if (visible) layer.release();
+      glyphLayer.remove();
+      gsap.set(vector, { clearProps: "opacity" });
+      knob.innerHTML = still;
+      light(STILL);
     };
   }
 
@@ -450,7 +467,7 @@ const total = String(Math.min(problems.length, visuals.length));
   }
 
   const setUps: ((visual: Element, layer: Layer) => (() => void) | void)[] = [
-    maze,
+    dial,
     gear,
     lamp,
   ];
@@ -460,7 +477,8 @@ const total = String(Math.min(problems.length, visuals.length));
     if (sections.length === 0) return;
     const mm = gsap.matchMedia();
     mm.add("(prefers-reduced-motion: no-preference)", () => {
-      if (document.documentElement.classList.contains("stacki-designer")) return;
+      if (document.documentElement.classList.contains("stacki-designer"))
+        return;
       const stops: (() => void)[] = [];
       sections.forEach((section) =>
         section
@@ -710,8 +728,10 @@ const total = String(Math.min(problems.length, visuals.length));
         }
       }
       @media (width >= 80rem) {
-        grid-template-columns:
-          minmax(0, 384fr) minmax(0, 568fr) minmax(0, 384fr);
+        grid-template-columns: minmax(0, 384fr) minmax(0, 568fr) minmax(
+            0,
+            384fr
+          );
         grid-template-areas: ". meta ." "intro visual costs";
         column-gap: calc(120 / 1576 * 100%);
         & .problems-main_body {
