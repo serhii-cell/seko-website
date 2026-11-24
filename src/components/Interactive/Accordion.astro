@@ -48,10 +48,11 @@ const items = (
 
 <script>
   const accordions = document.querySelectorAll<HTMLElement>(".accordion_wrap");
+  const root = document.documentElement;
+  let designing = root.classList.contains("stacki-designer");
 
   const sync = () => {
-    const designing =
-      document.documentElement.classList.contains("stacki-designer");
+    designing = root.classList.contains("stacki-designer");
 
     for (const accordion of accordions) {
       const preview = designing && accordion.classList.contains("preview");
@@ -79,10 +80,13 @@ const items = (
   if (accordions.length > 0) {
     sync();
 
-    const watcher = new MutationObserver(sync);
+    const watcher = new MutationObserver((records) => {
+      const changed = root.classList.contains("stacki-designer") !== designing;
+      if (changed || records.some((record) => record.target !== root)) sync();
+    });
     const settings = { attributes: true, attributeFilter: ["class"] };
 
-    watcher.observe(document.documentElement, settings);
+    watcher.observe(root, settings);
     for (const accordion of accordions) {
       watcher.observe(accordion, { ...settings, subtree: true });
     }

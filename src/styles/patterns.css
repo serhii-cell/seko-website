@@ -235,30 +235,25 @@ main > .section:last-child {
 }
 
 .section > .frame-rails {
+  --_rail-offset: max(var(--site-margin), (100% - var(--max-width-frame)) / 2);
   z-index: 2;
-  &::before {
+  &::before,
+  &::after {
     content: "";
-    display: block;
-    width: var(--site-width);
-    max-width: var(--max-width-frame);
-    height: 100%;
-    margin-inline: auto;
-    background-image:
-      repeating-linear-gradient(
-        to bottom,
-        var(--stroke) 0 var(--dash),
-        transparent 0 calc(var(--dash) * 2)
-      ),
-      repeating-linear-gradient(
-        to bottom,
-        var(--stroke) 0 var(--dash),
-        transparent 0 calc(var(--dash) * 2)
-      );
-    background-position:
-      left top,
-      right top;
-    background-size: var(--border-width) 100%;
-    background-repeat: no-repeat;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--_rail-offset);
+    width: var(--border-width);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      var(--stroke) 0 var(--dash),
+      transparent 0 calc(var(--dash) * 2)
+    );
+  }
+  &::after {
+    left: auto;
+    right: var(--_rail-offset);
   }
 }
 

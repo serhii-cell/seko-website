@@ -2,6 +2,7 @@
   import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
   import { createLines, isLineText, type Lines } from "@/utils/lines.ts";
+  import { createWave, isWaveText, type Wave } from "@/utils/wave.ts";
   import { onIntroStep, stepOf } from "@/utils/intro.ts";
 
   const blocks = [
@@ -10,21 +11,11 @@
     ".section > .container > :not(.layout, .grid)",
     "[data-fade]",
   ].join(", ");
-  const TEXT = ".heading, .text, [data-lines]";
-  /* The line-by-line text reveal is switched off for now: text is simply
-     there. Set to `true` to bring it back. */
-  const TEXT_REVEAL = false;
+  const TEXT = ".heading, .text, .eyebrow_text, .text-style-label, [data-lines]";
   /* Time between one item and the next within a step of the first screen. */
   const STAGGER = 0.06;
   /* First-screen items with no step of their own come after the rest. */
   const LAST_STEP = 7;
-
-  /* When the first line of `element` is fully on screen. */
-  const firstLine = (element: Element) => {
-    const style = getComputedStyle(element);
-    const height = parseFloat(style.lineHeight);
-    return `top+=${Number.isNaN(height) ? parseFloat(style.fontSize) * 1.2 : height} bottom`;
-  };
 
   /* Reading order: rows top to bottom, left to right within a row. */
   const byReadingOrder = (a: Element, b: Element) => {
@@ -47,14 +38,24 @@
         element.getClientRects().length > 0 &&
         getComputedStyle(element).visibility !== "hidden";
 
-      /* Every heading and paragraph rises in line by line; blocks with no
-         text of their own, the nav's parts and anything marked `data-fade`
-         fade in instead. */
-      const texts = TEXT_REVEAL
-        ? gsap.utils
-            .toArray<HTMLElement>(TEXT, main)
-            .filter((element) => isLineText(element) && shown(element))
-        : [];
+      /* Section headlines light up letter by letter as they scroll
+         through. The opening headline, the paragraphs under headings,
+         smaller headings, eyebrows and labels rise line by line from under
+         their own masks. Blocks with no text of their own, the nav's parts
+         and anything marked `data-fade` fade in instead. */
+      const waves = new Map<Element, Wave>(
+        gsap.utils
+          .toArray<HTMLElement>(".heading", main)
+          .filter((element) => isWaveText(element) && shown(element))
+          .map((element) => [element, createWave(element)]),
+      );
+      const texts = gsap.utils
+        .toArray<HTMLElement>(TEXT, main)
+        .filter(
+          (element) =>
+            isLineText(element) && !waves.has(element) && shown(element),
+        );
+
       const faders = [
         ...gsap.utils.toArray<HTMLElement>("[data-intro]"),
         ...gsap.utils
@@ -64,7 +65,9 @@
               block.hasAttribute("data-fade") ||
               (!isLineText(block) && !block.querySelector(TEXT)),
           ),
-      ].filter((block) => shown(block) && !texts.includes(block));
+      ].filter(
+        (block) => shown(block) && !texts.includes(block) && !waves.has(block),
+      );
 
       const lines = new Map<Element, Lines>(
         texts.map((element) => [element, createLines(element)]),
@@ -85,10 +88,10 @@
 
       /* What is on screen at load comes in step by step (each part's
          `data-step`, see src/utils/intro.ts), in reading order within a
-         step, once the first-load curtain is up far enough. */
-      const first = [...texts, ...faders]
+         step, once the first-load loader hands the page over. */
+      const first = [...texts, ...faders, ...waves.keys()]
         .filter((element) => ScrollTrigger.isInViewport(element))
-        .sort(byReadingOrder);
+        .sort(byReadingOrder) as HTMLElement[];
       const steps = new Map<number, HTMLElement[]>();
       first.forEach((element) => {
         const step = stepOf(element, LAST_STEP);
@@ -97,24 +100,28 @@
       const waits = [...steps].map(([step, group]) =>
         onIntroStep(step, () =>
           group.forEach((element, index) => {
-            const reveal = lines.get(element);
-            if (reveal) reveal.play(index * STAGGER);
-            else fadeIn([element], 0, index * STAGGER);
+            const delay = index * STAGGER;
+            const reveal = lines.get(element) ?? waves.get(element);
+            if (reveal) reveal.play(delay);
+            else fadeIn([element], 0, delay);
           }),
         ),
       );
 
-      /* The rest comes in as it scrolls into view: text once its first line
-         is fully on screen, blocks in batches. */
+      /* The rest comes in as it scrolls into view: text once its top is 20%
+         of the way up the screen, headlines tied to the scroll, blocks in
+         batches. */
       lines.forEach((reveal, element) => {
         if (first.includes(element as HTMLElement)) return;
         ScrollTrigger.create({
           trigger: element,
-          start: () => firstLine(element),
-          end: "max",
+          start: "clamp(top 80%)",
           once: true,
           onEnter: () => reveal.play(),
         });
+      });
+      waves.forEach((wave, element) => {
+        if (!first.includes(element as HTMLElement)) wave.scrub();
       });
 
       const reveal = context.add("reveal", (batch: Element[]) => {
@@ -137,6 +144,7 @@
       return () => {
         waits.forEach((stop) => stop());
         lines.forEach((lines) => lines.revert());
+        waves.forEach((wave) => wave.revert());
         gsap.set(faders, { clearProps: settle });
       };
     });

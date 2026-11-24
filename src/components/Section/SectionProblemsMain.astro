@@ -180,16 +180,56 @@ const total = String(Math.min(problems.length, visuals.length));
 }
 
 <script>
-  import { gsap } from "@/utils/gsap.ts";
+  import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
 
   const START = "top 75%";
+  /* Where ScrollReveal starts fading the drawing in. */
+  const REVEAL = "top 90%";
+
+  /* A drawing sits on a layer of its own only while it fades in or builds,
+     so those frames don't repaint all of it; the layer goes once it is
+     still. ScrollReveal clears the drawing's opacity when its fade ends. */
+  function layered(visual: HTMLElement) {
+    let holds = 0;
+    const hold = () => {
+      if (holds++ === 0) visual.style.willChange = "opacity";
+    };
+    const release = () => {
+      if (holds > 0 && --holds === 0) visual.style.willChange = "";
+    };
+    const faded = () => {
+      if (visual.style.opacity !== "") return;
+      gsap.ticker.remove(faded);
+      release();
+    };
+    ScrollTrigger.create({
+      trigger: visual,
+      start: REVEAL,
+      once: true,
+      onEnter: () => {
+        hold();
+        gsap.ticker.add(faded);
+      },
+    });
+    return {
+      hold,
+      release,
+      stop() {
+        gsap.ticker.remove(faded);
+        holds = 0;
+        visual.style.willChange = "";
+      },
+    };
+  }
+
+  type Layer = ReturnType<typeof layered>;
 
   /* A person walks in from beyond the card's edge and stops at the maze's
      entrance; the maze's edges then draw themselves outward from that
      point, the wall sides turn grey once the structure is drawn, and the
      flag at the exit goes up and keeps glowing. */
-  function maze(visual: Element) {
+  function maze(visual: Element, layer: Layer) {
     const person = visual.querySelector<SVGGElement>('[data-part="person"]');
     const flag = visual.querySelector<SVGGElement>('[data-part="flag"]');
     const lines = [...visual.querySelectorAll<SVGLineElement>(".maze-line")];
@@ -204,10 +244,13 @@ const total = String(Math.min(problems.length, visuals.length));
     const WALK = { x: -0.9002 * 380, y: -0.4359 * 380 };
     const STEPS = 4;
     const walk = { at: 0 };
+    const setX = gsap.quickSetter(person, "x", "px");
+    const setY = gsap.quickSetter(person, "y", "px");
     const place = () => {
       const left = 1 - walk.at;
       const bob = -Math.abs(Math.sin(walk.at * Math.PI * STEPS)) * 3 * left;
-      gsap.set(person, { x: WALK.x * left, y: WALK.y * left + bob });
+      setX(WALK.x * left);
+      setY(WALK.y * left + bob);
     };
 
     /* Each edge grows from its end nearest the entrance; data-at is how far
@@ -227,7 +270,7 @@ const total = String(Math.min(problems.length, visuals.length));
       ),
     );
 
-    place();
+    gsap.set(person, { x: WALK.x, y: WALK.y });
     lines.forEach((line, index) =>
       gsap.set(line, {
         strokeDasharray: lengths[index],
@@ -243,7 +286,11 @@ const total = String(Math.min(problems.length, visuals.length));
 
     const BUILD = 0.55;
     gsap
-      .timeline({ scrollTrigger: { trigger: visual, start: START, once: true } })
+      .timeline({
+        scrollTrigger: { trigger: visual, start: START, once: true },
+        onStart: layer.hold,
+        onComplete: layer.release,
+      })
       .to(walk, { at: 1, duration: 1.1, ease: "power2.out", onUpdate: place })
       .to(
         lines,
@@ -283,14 +330,7 @@ const total = String(Math.min(problems.length, visuals.length));
         },
         ">-0.05",
       )
-      .add(() => wind.start())
-      .to(halo, {
-        opacity: 0.35,
-        duration: 1.4,
-        ease: "sine.inOut",
-        repeat: -1,
-        yoyo: true,
-      });
+      .add(() => wind.start());
 
     return () => wind.stop();
   }
@@ -315,7 +355,12 @@ const total = String(Math.min(problems.length, visuals.length));
     let strength = 0;
     let visible = true;
     let running = false;
-    const observer = new IntersectionObserver(([entry]) => (visible = entry.isIntersecting));
+    let pulse: gsap.core.Tween | null = null;
+    const observer = new IntersectionObserver(([entry]) => {
+      visible = entry.isIntersecting;
+      if (visible) pulse?.resume();
+      else pulse?.pause();
+    });
     const draw = (time: number) => {
       if (!visible) return;
       strength = Math.min(1, strength + 0.02);
@@ -327,10 +372,10 @@ const total = String(Math.min(problems.length, visuals.length));
         const lift = Math.sin(phase) * AMPLITUDE * along * strength;
         const sag = Math.sin(phase - 0.6) * AMPLITUDE * along * strength;
         top.push(
-          `${topPole.x + (topTip.x - topPole.x) * along},${topPole.y + (topTip.y - topPole.y) * along + lift}`,
+          `${(topPole.x + (topTip.x - topPole.x) * along).toFixed(1)},${(topPole.y + (topTip.y - topPole.y) * along + lift).toFixed(1)}`,
         );
         bottom.unshift(
-          `${bottomPole.x + (bottomTip.x - bottomPole.x) * along},${bottomPole.y + (bottomTip.y - bottomPole.y) * along + sag}`,
+          `${(bottomPole.x + (bottomTip.x - bottomPole.x) * along).toFixed(1)},${(bottomPole.y + (bottomTip.y - bottomPole.y) * along + sag).toFixed(1)}`,
         );
       }
       const points = [...top, ...bottom].join(" ");
@@ -342,18 +387,30 @@ const total = String(Math.min(problems.length, visuals.length));
         running = true;
         observer.observe(shapes[0]);
         gsap.ticker.add(draw);
+        if (halo) {
+          pulse = gsap.to(halo, {
+            opacity: 0.35,
+            duration: 1.4,
+            ease: "sine.inOut",
+            repeat: -1,
+            yoyo: true,
+            paused: !visible,
+          });
+        }
       },
       stop() {
         running = false;
         observer.disconnect();
         gsap.ticker.remove(draw);
+        pulse?.kill();
+        pulse = null;
         shapes.forEach((shape, index) => shape.setAttribute("points", original[index]));
       },
     };
   }
 
   /* Light rises out of the gear's hub. */
-  function gear(visual: Element) {
+  function gear(visual: Element, layer: Layer) {
     const glow = visual.querySelector('[data-part="glow"]');
     if (!glow) return;
     gsap.from(glow, {
@@ -363,17 +420,21 @@ const total = String(Math.min(problems.length, visuals.length));
       duration: 1.4,
       delay: 0.3,
       scrollTrigger: { trigger: visual, start: START, once: true },
+      onStart: layer.hold,
+      onComplete: layer.release,
     });
   }
 
   /* The headlamp flickers on and throws its beam forward. */
-  function lamp(visual: Element) {
+  function lamp(visual: Element, layer: Layer) {
     const beam = visual.querySelector('[data-part="beam"]');
     if (!beam) return;
     gsap
       .timeline({
         delay: 0.3,
         scrollTrigger: { trigger: visual, start: START, once: true },
+        onStart: layer.hold,
+        onComplete: layer.release,
       })
       .fromTo(
         beam,
@@ -388,7 +449,11 @@ const total = String(Math.min(problems.length, visuals.length));
       .to(beam, { scaleX: 1, duration: 1 }, 0.2);
   }
 
-  const setUps: ((visual: Element) => (() => void) | void)[] = [maze, gear, lamp];
+  const setUps: ((visual: Element, layer: Layer) => (() => void) | void)[] = [
+    maze,
+    gear,
+    lamp,
+  ];
 
   onPage(() => {
     const sections = document.querySelectorAll(".problems-main_wrap");
@@ -399,9 +464,11 @@ const total = String(Math.min(problems.length, visuals.length));
       const stops: (() => void)[] = [];
       sections.forEach((section) =>
         section
-          .querySelectorAll(".problems-main_visual")
+          .querySelectorAll<HTMLElement>(".problems-main_visual")
           .forEach((visual, index) => {
-            const stop = setUps[index]?.(visual);
+            const layer = layered(visual);
+            stops.push(layer.stop);
+            const stop = setUps[index]?.(visual, layer);
             if (stop) stops.push(stop);
           }),
       );
@@ -447,6 +514,10 @@ const total = String(Math.min(problems.length, visuals.length));
        container rather than the viewport, so its panel can never spill past
        them (100vw counts the scrollbar). Only its two rules run full width. */
     .problems-main_band {
+      /* Stretched across the container rather than sized to its content, so
+         the line reveal (which splits the text into already-wrapped lines)
+         can't narrow it while it plays. */
+      align-self: stretch;
       position: relative;
       margin-inline: calc(var(--_frame-inset, var(--space-7)) * -1);
       padding-block: var(--border-width);

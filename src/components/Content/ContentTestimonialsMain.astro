@@ -1,0 +1,459 @@
+---
+import type { SvgComponent } from "astro/types";
+import Grid from "@/components/Wrapper/Grid.astro";
+import Eyebrow from "@/components/Typography/Eyebrow.astro";
+import Heading from "@/components/Typography/Heading.astro";
+import Paragraph from "@/components/Typography/Paragraph.astro";
+import Button from "@/components/Button.astro";
+import Img from "@/components/Media/Img.astro";
+import Icon from "@/components/Media/Icon.astro";
+
+type Testimonial = {
+  /** The client, as it reads in the list beside the quote. */
+  company: string;
+  /** What they said. */
+  quote: string;
+  /** Who said it. Unset, the company's name stands in. */
+  name?: string;
+  /** Their role, or what the company does. */
+  role?: string;
+  /** A photo of them, or the company's logo where there is none. */
+  avatar?: ImageMetadata | SvgComponent;
+};
+
+interface Props {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** The label above the heading. */
+  eyebrow?: string;
+  /** The heading above the testimonials. */
+  heading?: string;
+  /** The paragraph beside the heading. */
+  text?: string;
+  /** One item per testimonial. Nothing is output without them. */
+  testimonials?: Testimonial[];
+}
+
+const {
+  render = true,
+  eyebrow,
+  heading,
+  text,
+  testimonials = [],
+} = Astro.props;
+
+const isLogo = (avatar: Testimonial["avatar"]): avatar is SvgComponent =>
+  typeof avatar === "function";
+---
+
+{
+  render && testimonials.length > 0 && (
+    <Grid class="testimonials-main_wrap">
+      <Eyebrow
+        class="testimonials-main_eyebrow color-faded"
+        render={!!eyebrow}
+      >
+        {eyebrow}
+      </Eyebrow>
+      <Heading tag="h2" class="testimonials-main_title" render={!!heading}>
+        {heading}
+      </Heading>
+      <Paragraph class="testimonials-main_text color-faded" render={!!text}>
+        {text}
+      </Paragraph>
+      <div class="testimonials-main_body">
+        <ul class="testimonials-main_picks">
+          {testimonials.map((testimonial, index) => (
+            <li>
+              <button
+                type="button"
+                class="testimonials-main_pick"
+                aria-current={index === 0 ? "true" : undefined}
+              >
+                {testimonial.company}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div class="testimonials-main_list">
+          {testimonials.map((testimonial, index) => (
+            <figure
+              class:list={["testimonials-main_item", index === 0 && "is-active"]}
+            >
+              <blockquote class="testimonials-main_quote">
+                <Paragraph variant="h4">{testimonial.quote}</Paragraph>
+              </blockquote>
+              <figcaption class="testimonials-main_author">
+                {testimonial.avatar && (
+                  <div class="testimonials-main_avatar">
+                    {isLogo(testimonial.avatar) ? (
+                      <Icon src={testimonial.avatar} variant="full-width" />
+                    ) : (
+                      <Img
+                        src={testimonial.avatar}
+                        variant="densities"
+                        width={96}
+                        height={96}
+                      />
+                    )}
+                  </div>
+                )}
+                <div class="testimonials-main_person">
+                  <Paragraph variant="h5" class="testimonials-main_name">
+                    {testimonial.name ?? testimonial.company}
+                  </Paragraph>
+                  <Paragraph
+                    variant="small"
+                    class="testimonials-main_role"
+                    render={!!testimonial.role}
+                  >
+                    {testimonial.role}
+                  </Paragraph>
+                </div>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+        <div class="testimonials-main_steps">
+          <Button
+            variant="arrow"
+            emphasis="secondary"
+            direction="back"
+            label="Previous testimonial"
+            class="testimonials-main_step"
+            data-step="-1"
+          />
+          <Button
+            variant="arrow"
+            emphasis="secondary"
+            label="Next testimonial"
+            class="testimonials-main_step"
+            data-step="1"
+          />
+        </div>
+      </div>
+    </Grid>
+  )
+}
+
+<noscript>
+  <style>
+    .testimonials-main_picks,
+    .testimonials-main_steps {
+      display: none;
+    }
+    .testimonials-main_list {
+      row-gap: var(--section-space-small);
+    }
+    .testimonials-main_item {
+      grid-area: auto;
+      visibility: visible;
+    }
+  </style>
+</noscript>
+
+<script>
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  /* The arrows and the company names swap the quote in place. */
+  onPage(() => {
+    const listeners = new AbortController();
+    const { signal } = listeners;
+
+    for (const wrap of document.querySelectorAll<HTMLElement>(
+      ".testimonials-main_wrap",
+    )) {
+      const items = [
+        ...wrap.querySelectorAll<HTMLElement>(".testimonials-main_item"),
+      ];
+      const picks = [
+        ...wrap.querySelectorAll<HTMLElement>(".testimonials-main_pick"),
+      ];
+      if (items.length === 0) continue;
+
+      let active = Math.max(
+        0,
+        items.findIndex((item) => item.classList.contains("is-active")),
+      );
+
+      const show = (index: number) => {
+        active = (index + items.length) % items.length;
+        items.forEach((item, i) => {
+          item.classList.toggle("is-active", i === active);
+          item.setAttribute("aria-hidden", String(i !== active));
+        });
+        picks.forEach((pick, i) => {
+          if (i === active) pick.setAttribute("aria-current", "true");
+          else pick.removeAttribute("aria-current");
+        });
+      };
+
+      show(active);
+      picks.forEach((pick, i) =>
+        pick.addEventListener("click", () => show(i), { signal }),
+      );
+      wrap
+        .querySelectorAll<HTMLElement>("[data-step]")
+        .forEach((button) =>
+          button.addEventListener(
+            "click",
+            () => show(active + Number(button.dataset.step)),
+            { signal },
+          ),
+        );
+    }
+
+    return () => listeners.abort();
+  });
+</script>
+
+<style is:global>
+  @layer components {
+    /* One column on phones and tablets. From 64rem the label and heading sit
+       on the left with the paragraph beside the heading, and the testimonials
+       below share the same two columns. */
+    .testimonials-main_wrap {
+      --_cell: 4.5rem;
+      &.grid {
+        row-gap: var(--space-4);
+        @media (width >= 64rem) {
+          --_cell: 6rem;
+          grid-template-columns: var(--layout-split-reverse);
+          column-gap: var(--section-space-small);
+        }
+      }
+    }
+
+    /* A label in mono caps, small and tracked out, with no marker. */
+    .testimonials-main_eyebrow {
+      margin-block: 0;
+      & .eyebrow_marker {
+        display: none;
+      }
+      & .eyebrow_text {
+        font-family: var(--mono-family);
+        font-size: 0.75rem;
+        letter-spacing: var(--letter-spacing-wide);
+        text-transform: uppercase;
+      }
+      @media (width >= 64rem) {
+        grid-column: 1;
+      }
+    }
+
+    .testimonials-main_title,
+    .testimonials-main_text {
+      margin-block: 0;
+    }
+
+    .testimonials-main_title {
+      @media (width >= 64rem) {
+        grid-column: 1;
+      }
+    }
+
+    /* Level with the heading, which drops a row below the label. */
+    .testimonials-main_text {
+      @media (width >= 64rem) {
+        grid-column: 2;
+        grid-row: 1;
+        .testimonials-main_eyebrow ~ & {
+          grid-row: 2;
+        }
+      }
+    }
+
+    /* Ruled off from the heading, out to the page frame's lines. The company
+       list takes the top left, the arrows the bottom left, and the quotes
+       fill the right, so the arrows line up with the avatar beneath each
+       quote. */
+    .testimonials-main_body {
+      position: relative;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: var(--space-6);
+      margin-top: calc(var(--space-8) - var(--space-4));
+      padding-top: var(--section-space-small);
+      &::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        inset-inline: calc(var(--content-inset) * -1);
+        height: var(--border-width);
+        background-color: var(--border-faint);
+      }
+      @media (width >= 64rem) {
+        grid-column: 1 / -1;
+        grid-template-columns: var(--layout-split-reverse);
+        grid-template-rows: 1fr auto;
+        column-gap: var(--section-space-small);
+      }
+    }
+
+    .testimonials-main_picks {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-1) var(--space-4);
+      @media (width >= 64rem) {
+        flex-direction: column;
+        align-items: start;
+        gap: 0;
+      }
+    }
+
+    /* Faded until chosen; the chosen one takes the accent and a dot. */
+    .testimonials-main_pick {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-3);
+      color: var(--text-2);
+      transition: color var(--hover-duration) var(--hover-ease);
+      &::after {
+        content: "";
+        flex: none;
+        width: 0.375rem;
+        aspect-ratio: 1;
+        border-radius: var(--radius-round);
+        background-color: currentcolor;
+        box-shadow: 0 0 0 0.1875rem
+          color-mix(in lab, currentcolor 25%, transparent);
+        opacity: 0;
+      }
+      &[aria-current="true"] {
+        color: var(--heading-accent);
+        &::after {
+          opacity: 1;
+        }
+      }
+      @media (hover: hover) {
+        &:hover:not([aria-current="true"]) {
+          color: var(--text);
+        }
+      }
+    }
+
+    /* Every quote in one cell, only the chosen one showing. */
+    .testimonials-main_list {
+      display: grid;
+      @media (width >= 64rem) {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+      }
+    }
+
+    .testimonials-main_item {
+      grid-area: 1 / 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: var(--space-8);
+      visibility: hidden;
+      &.is-active {
+        visibility: visible;
+      }
+      @media (width < 48rem) {
+        gap: var(--space-6);
+      }
+    }
+
+    .testimonials-main_quote .text {
+      margin: 0;
+      line-height: var(--line-height-large);
+      @media (width < 48rem) {
+        font-size: var(--h5);
+      }
+    }
+
+    .testimonials-main_author {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+    }
+
+    .testimonials-main_person {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .testimonials-main_name,
+    .testimonials-main_role {
+      margin: 0;
+    }
+
+    /* Mono caps, small and tracked out like the label above the heading,
+       and fainter than it. */
+    .testimonials-main_role {
+      font-family: var(--mono-family);
+      font-size: 0.75rem;
+      letter-spacing: var(--letter-spacing-wide);
+      text-transform: uppercase;
+      color: color-mix(in lab, var(--text) 45%, transparent);
+    }
+
+    .testimonials-main_avatar {
+      flex: none;
+      display: grid;
+      place-items: center;
+      width: var(--_cell);
+      aspect-ratio: 1;
+      overflow: clip;
+      border: var(--border-width) solid var(--border-faint);
+      color: var(--text);
+      & .image {
+        width: 100%;
+        height: 100%;
+      }
+      /* A logo is drawn in the text colour, clear of the cell's edges. */
+      &:has(.icon) {
+        padding: calc(var(--_cell) / 5);
+      }
+    }
+
+    .testimonials-main_steps {
+      display: flex;
+      @media (width >= 64rem) {
+        grid-column: 1;
+        grid-row: 2;
+        align-self: end;
+      }
+    }
+
+    /* Two square cells sharing a line, each arrow in its outer corner. On
+       hover the cell fills with the brand green, the arrow turns black and
+       nudges the way it points. */
+    .testimonials-main_steps .testimonials-main_step.arrow {
+      --button-2-background: transparent;
+      --button-2-text: var(--heading-accent);
+      --button-2-border: var(--border-faint);
+      --button-2-background-hover: var(--brand-500);
+      --button-2-border-hover: var(--brand-500);
+      --button-2-text-hover: var(--brand-text);
+      position: relative;
+      justify-content: start;
+      align-items: end;
+      width: var(--_cell);
+      height: var(--_cell);
+      padding: var(--space-3);
+      border-radius: 0;
+      & .button_mark {
+        transition: translate var(--hover-duration) var(--hover-ease);
+      }
+      & + .testimonials-main_step {
+        justify-content: end;
+        margin-left: calc(var(--border-width) * -1);
+      }
+      @media (hover: hover) {
+        &:hover {
+          z-index: 1;
+          & .button_mark {
+            translate: 0.25rem 0;
+          }
+        }
+        &.back:hover .button_mark {
+          translate: -0.25rem 0;
+        }
+      }
+    }
+  }
+</style>

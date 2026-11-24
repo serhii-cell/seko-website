@@ -83,20 +83,31 @@ take no `render` prop; the layout decides where they appear.
 - **`SmoothScroll`** starts Lenis once per visit and drives it from GSAP's
   ticker, so ScrollTrigger reads the same scroll position. Its CSS is Lenis's
   own, class names included.
-- **`ScrollReveal`** runs on pages whose layout has `reveal`. Every heading,
-  paragraph and element marked `data-lines` rises in line by line (from
-  `src/utils/lines.ts`: each line slides up from its own mask while fading in);
-  `data-lines="off"` opts out. Blocks with no text of their own, and anything
-  marked `data-fade`, fade in from 0 opacity instead. Parts outside `<main>`
+- **`ScrollReveal`** runs on pages whose layout has `reveal`. Section
+  headlines (display or h2) light up letter by letter as they scroll through
+  (`src/utils/wave.ts`, from Osmo's Gradient Wave Text on Scroll): each
+  letter waits at 20% of its colour, switches on in reading order between
+  `top 90%` and `center 40%` with a 0.1 scrub, and passes through the brand
+  green on its way to its own colour; scrolling back switches them off. A
+  headline already on screen at load lights up once over time instead. The
+  page's opening headline, the paragraphs under headings, smaller headings
+  (h3), eyebrows, labels (`.text-style-label` on a `p`, `dt` or heading) and
+  anything marked `data-lines` rise line by line from under their own masks
+  (`src/utils/lines.ts`, from Osmo's Masked Text Reveal: `yPercent` 110 to
+  0, 0.8s, 0.08s apart, `expo.out`), once their top reaches `clamp(top
+  80%)`, then the text goes back to how it was. `data-lines="off"` opts out
+  of both. Blocks with no text of their own, and anything marked
+  `data-fade`, fade in from 0 opacity instead. Parts outside `<main>`
   that should join in, like the nav's, are marked `data-intro`. Whatever is on
   screen at load comes in in numbered steps, left to right and top to bottom:
-  each part carries `data-step`, step 1 starts when the first-load curtain's
-  edge reaches the first heading (`page-intro:content`) and each step follows
+  each part carries `data-step`, step 1 starts when the first-load loader
+  hands the page over (`page-intro:content`), a moment before its glyphs
+  land in the hero's ASCII panel, and each step follows
   0.1s later (`src/utils/intro.ts`). Items in the same step go in reading
   order, 0.06s apart; components with their own first-screen animation — the
   hero's ASCII container and guides, the logo strip — start on their step too. The rest comes in as
-  it scrolls into view: text once its first line is fully on screen, blocks in
-  batches. A block marked `data-reveal="own"` runs its own reveal and is
+  it scrolls into view: text once its top reaches `clamp(top 80%)`, section
+  headlines tied to the scroll, blocks in batches (`top 90%`). A block marked `data-reveal="own"` runs its own reveal and is
   skipped, like the cards of `SectionHelpMain`, which slide up into their
   columns while the section is pinned. `SectionObservationsMain` plays its
   chart once, by itself, when the chart scrolls into view — it is not pinned

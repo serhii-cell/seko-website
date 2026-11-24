@@ -1,0 +1,162 @@
+---
+import type { HTMLAttributes } from "astro/types";
+import { slotContent } from "@/utils/slots.ts";
+
+type Props = HTMLAttributes<"span"> & {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+};
+
+const { render = true, class: className, ...rest } = Astro.props;
+
+const content = await slotContent(Astro.slots);
+---
+
+{
+  render && content && (
+    <span class:list={["flip-text_wrap", className]} {...rest}>
+      <span class="flip-text_copy" aria-hidden="true">
+        <Fragment set:html={content} />
+      </span>
+      <span class="flip-text_copy flip-text_hover" aria-hidden="true">
+        <Fragment set:html={content} />
+      </span>
+      <span class="sr-only">
+        <Fragment set:html={content} />
+      </span>
+    </span>
+  )
+}
+
+<script>
+  import { SplitText } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  onPage(() => {
+    const root = document.documentElement;
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (still || root.classList.contains("stacki-designer")) return;
+
+    const wraps = [
+      ...document.querySelectorAll<HTMLElement>(
+        ".flip-text_wrap:not([data-split])",
+      ),
+    ];
+    if (wraps.length === 0) return;
+
+    const splits = wraps.flatMap((wrap) => {
+      wrap.dataset.split = "";
+      return [...wrap.querySelectorAll<HTMLElement>(".flip-text_copy")].map(
+        (copy) => {
+          const split = SplitText.create(copy, {
+            type: "chars",
+            tag: "span",
+            charsClass: "flip-text_char",
+            aria: "none",
+          });
+          const chars = split.chars as HTMLElement[];
+          const center = (chars.length - 1) / 2;
+          copy.style.setProperty("--max-index", String(Math.floor(center)));
+          chars.forEach((char, index) => {
+            const distance = Math.floor(Math.abs(index - center));
+            const signed = index < center ? distance : index > center ? -distance : 0;
+            char.style.setProperty("--index", String(distance));
+            char.style.setProperty("--signed-index", String(signed));
+          });
+          return split;
+        },
+      );
+    });
+
+    return () => {
+      splits.forEach((split) => split.revert());
+      wraps.forEach((wrap) => delete wrap.dataset.split);
+    };
+  });
+</script>
+
+<style is:global>
+  @layer components {
+    .flip-text_wrap {
+      --_ease: cubic-bezier(0.675, 0.15, 0.1, 1);
+      --_rise: 1.25em;
+      display: inline-grid;
+    }
+
+    .flip-text_copy {
+      grid-area: 1 / 1;
+      perspective: 10em;
+      transform-style: preserve-3d;
+    }
+
+    .flip-text_wrap:not([data-split]) .flip-text_hover {
+      visibility: hidden;
+    }
+
+    /* Each letter's pose is set through custom properties, so a minifier
+       can't fold rotate, translate and transform into one another. */
+    .flip-text_char {
+      --_t: calc(var(--index) / max(var(--max-index), 1));
+      --_delay: calc(0.05s + sin(calc(var(--_t) * 1.5deg)) * 2.9s);
+      --_tilt: calc(
+        clamp(-1, var(--signed-index), 1) * sin(calc(var(--_t) * 30deg)) *
+          -36deg
+      );
+      --_spread: calc(var(--signed-index) * 0.125em);
+      display: inline-block;
+      rotate: x var(--_turn, 0deg);
+      translate: var(--_x, 0em) var(--_y, 0em) 0;
+      transform: rotateZ(var(--_twist, 0deg)) scale(var(--_size, 1));
+      opacity: var(--_shown, 1);
+      transition:
+        transform 0.325s var(--_ease),
+        translate 0.425s var(--_ease),
+        rotate 0.45s var(--_ease),
+        opacity 0.15s ease-out;
+    }
+
+    .flip-text_hover .flip-text_char {
+      --_turn: -72deg;
+      --_twist: var(--_tilt);
+      --_size: 0.65;
+      --_x: var(--_spread);
+      --_y: var(--_rise);
+      --_shown: 0;
+      transition:
+        transform 0.35s var(--_ease),
+        translate 0.35s var(--_ease),
+        rotate 0.35s var(--_ease),
+        opacity 0.15s 0.1s ease-out;
+    }
+
+    @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+      :is(a, button, [data-hover]):is(:hover, :focus-visible) .flip-text_copy:not(.flip-text_hover) .flip-text_char {
+        --_turn: 72deg;
+        --_twist: var(--_tilt);
+        --_size: 0.65;
+        --_x: var(--_spread);
+        --_y: calc(var(--_rise) * -1);
+        --_shown: 0;
+        transition:
+          transform 0.35s var(--_delay) var(--_ease),
+          translate 0.35s var(--_delay) var(--_ease),
+          rotate 0.35s var(--_delay) var(--_ease),
+          opacity 0.15s calc(var(--_delay) + 0.1s) ease-out;
+      }
+
+      :is(a, button, [data-hover]):is(:hover, :focus-visible) .flip-text_hover .flip-text_char {
+        --_turn: 0deg;
+        --_twist: 0deg;
+        --_size: 1;
+        --_x: 0em;
+        --_y: 0em;
+        --_shown: 1;
+        transition:
+          transform 0.325s calc(var(--_delay) + 0.05s) var(--_ease),
+          translate 0.425s calc(var(--_delay) + 0.05s) var(--_ease),
+          rotate 0.45s calc(var(--_delay) + 0.05s) var(--_ease),
+          opacity 0.15s calc(var(--_delay) + 0.075s) ease-out;
+      }
+    }
+  }
+</style>

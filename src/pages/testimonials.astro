@@ -1,0 +1,50 @@
+---
+import Layout from "@/layouts/BaseLayout.astro";
+import Section from "@/components/Wrapper/Section.astro";
+import ContentTestimonialsMain from "@/components/Content/ContentTestimonialsMain.astro";
+import productPhotography from "@/assets/testimonials/product-photography.svg";
+import smartValor from "@/assets/testimonials/smart-valor.svg";
+import nokia from "@/assets/testimonials/nokia.svg";
+import nftPort from "@/assets/testimonials/nft-port.svg";
+---
+
+<Layout theme="dark" title="Testimonials" noindex={true} reveal={true}>
+  {/* Testimonials */}
+  <Section paddingTop="small">
+    <ContentTestimonialsMain
+      eyebrow="What people think of our work"
+      heading="Client stories"
+      text="Great work is built through partnership. Here's what our clients say."
+      testimonials={[
+        {
+          company: "Product Photography",
+          quote:
+            "Serhi did an amazing job with the relaunch of our website. He understood the brief fully and over exceeded my expectations. I'm really happy with what he's designed and will be using him again in the future.",
+          role: "Leading Product Photography company in United Kingdom",
+          avatar: productPhotography,
+        },
+        {
+          company: "Smart Valor",
+          quote:
+            "It was easy to work with such a professional! During the process, Sergii have been always in touch and offered creative ideas which have been included in the design. As a result, I've received the quality work. I will highly recommend for everyone!",
+          role: "Europe's trusted digital asset exchange",
+          avatar: smartValor,
+        },
+        {
+          company: "Nokia",
+          quote:
+            "Very professional and great to work with. He is full of creative ideas that helped shaped the direction of the project. Looking forward to working on more projects together.",
+          role: "Consumer Electronics Corporation",
+          avatar: nokia,
+        },
+        {
+          company: "NFT Port",
+          quote:
+            "Serhii is awesome. He is excellent on all fronts. Creative. Technical. Professional. Fun to work with. Beautiful work done efficiently and responsively. We couldn't ask for more. Thanks Serhii!",
+          role: "NFT Infrastructure & APIs for Devs",
+          avatar: nftPort,
+        },
+      ]}
+    />
+  </Section>
+</Layout>

@@ -117,6 +117,8 @@ const { render = true, class: className, ...rest } = Astro.props;
     let hit = new Uint8Array(0);
     let alpha = new Float32Array(0);
     let slot = new Int8Array(0);
+    let queue = new Float64Array(0);
+    let glyphs: string[] = [];
 
     let R = [1, 0, 0, 0, 1, 0, 0, 0, 1];
     function sdBox(
@@ -148,6 +150,7 @@ const { render = true, class: className, ...rest } = Astro.props;
     let offsetZ = 0;
     let cubes: number[][] = [];
     let hitCube: number[] | null = null;
+    const bounds = new Float64Array(SLOTS.length * 3);
     function sdf(x: number, y: number, z: number) {
       const wx = R[0] * x + R[3] * y + R[6] * z;
       const wy = R[1] * x + R[4] * y + R[7] * z;
@@ -227,6 +230,19 @@ const { render = true, class: className, ...rest } = Astro.props;
         cubes.push([first[0], first[1], first[2], 1, 0]);
       }
 
+      /* Each cube lies within √3/2 + 0.02 of its centre. A ray that passes
+         further than that from every cube can't hit one, so it isn't marched,
+         and a march stops once it has passed them all. */
+      const reach = zoom * 0.9 + 0.01;
+      for (let k = 0; k < cubes.length; k++) {
+        const wx = zoom * cubes[k][0] + offsetX;
+        const wy = zoom * cubes[k][1] + offsetY;
+        const wz = zoom * cubes[k][2] + offsetZ;
+        bounds[k * 3] = R[0] * wx + R[1] * wy + R[2] * wz;
+        bounds[k * 3 + 1] = R[3] * wx + R[4] * wy + R[5] * wz;
+        bounds[k * 3 + 2] = R[6] * wx + R[7] * wy + R[8] * wz - CAM;
+      }
+
       brightness.fill(0);
       hit.fill(0);
       for (let gy = 0; gy < rows; gy++) {
@@ -238,6 +254,17 @@ const { render = true, class: className, ...rest } = Astro.props;
           const rx = X / rl;
           const ry = Y / rl;
           const rz = -CAM / rl;
+          let far = -1;
+          for (let k = 0; k < cubes.length; k++) {
+            const bx = bounds[k * 3];
+            const by = bounds[k * 3 + 1];
+            const bz = bounds[k * 3 + 2];
+            const along = bx * rx + by * ry + bz * rz;
+            const aside = bx * bx + by * by + bz * bz - along * along;
+            if (aside < reach * reach)
+              far = Math.max(far, along + Math.sqrt(reach * reach - aside));
+          }
+          if (far < 0) continue;
           let t = CAM - 3.4;
           let found = false;
           let px = 0;
@@ -252,7 +279,7 @@ const { render = true, class: className, ...rest } = Astro.props;
               found = true;
               break;
             }
-            if (t > CAM + 3.4) break;
+            if (t > CAM + 3.4 || t > far) break;
             t += Math.max(d * 0.95, 0.006);
           }
           const cube = hitCube as number[] | null;
@@ -322,6 +349,8 @@ const { render = true, class: className, ...rest } = Astro.props;
       context.font = font;
       context.textBaseline = "top";
       const lit = torch.lit();
+      const total = cols * rows;
+      let count = 0;
       for (let gy = 0; gy < rows; gy++) {
         for (let gx = 0; gx < cols; gx++) {
           const i = gy * cols + gx;
@@ -356,9 +385,31 @@ const { render = true, class: className, ...rest } = Astro.props;
           const lum = Math.min(1.25, 0.55 + 0.45 * b + boost);
           const glyphChar = pickGlyph(ramp, coverage, b, gx, gy);
           if (glyphChar === " ") continue;
-          context.fillStyle = `rgb(${Math.min(255, color[0] * lum) | 0},${Math.min(255, color[1] * lum) | 0},${Math.min(255, color[2] * lum) | 0})`;
-          context.fillText(glyphChar, ox + gx * cw, oy + gy * ch);
+          const rgb =
+            ((Math.min(255, color[0] * lum) | 0) << 16) |
+            ((Math.min(255, color[1] * lum) | 0) << 8) |
+            (Math.min(255, color[2] * lum) | 0);
+          glyphs[i] = glyphChar;
+          queue[count++] = rgb * total + i;
         }
+      }
+
+      /* Glyphs are filled grouped by colour, in reading order within each,
+         so the fill changes once per colour rather than once per glyph. */
+      const order = queue.subarray(0, count).sort();
+      let fill = -1;
+      for (let k = 0; k < count; k++) {
+        const rgb = Math.floor(order[k] / total);
+        const i = order[k] - rgb * total;
+        if (rgb !== fill) {
+          fill = rgb;
+          context.fillStyle = `rgb(${rgb >> 16},${(rgb >> 8) & 255},${rgb & 255})`;
+        }
+        context.fillText(
+          glyphs[i],
+          ox + (i % cols) * cw,
+          oy + Math.floor(i / cols) * ch,
+        );
       }
     }
 
@@ -386,6 +437,8 @@ const { render = true, class: className, ...rest } = Astro.props;
       hit = new Uint8Array(n);
       alpha = new Float32Array(n);
       slot = new Int8Array(n);
+      queue = new Float64Array(n);
+      glyphs = new Array<string>(n);
       scale = Math.min(0.21 * height, (width / 2 - 12) / 2.75);
       cx = width / 2;
       cy = height / 2 + 2;
@@ -409,28 +462,35 @@ const { render = true, class: className, ...rest } = Astro.props;
     }
 
     /* Its own clock: after a pause the cubes carry on from the same moment.
-       It holds at the start until the cubes are revealed. */
+       It holds at the start, and doesn't run, until the cubes are revealed.
+       Each step works out the scene in one frame and draws it in the next,
+       so the two share a frame only when frames come slower than the step. */
     let revealed = false;
     let frame = 0;
     let simTime = motion ? 0 : STILL_TIME;
     let clock = 0;
     let lastNow = 0;
     let lastStep = -1e9;
+    let pending = false;
     function loop(now: number) {
       frame = requestAnimationFrame(loop);
       const delta = Math.min(100, now - lastNow);
       lastNow = now;
       clock += delta;
-      if (revealed) simTime += delta;
+      simTime += delta;
+      if (pending) {
+        pending = false;
+        draw();
+      }
       if (clock - lastStep < 33) return;
       const dt = Math.min(0.1, (clock - lastStep) / 1000);
       lastStep = clock;
       torch.step(dt);
       scene(simTime / 1000);
-      draw();
+      pending = true;
     }
     function play() {
-      if (!motion || frame || !controller.running()) return;
+      if (!motion || !revealed || frame || !controller.running()) return;
       lastNow = performance.now();
       frame = requestAnimationFrame(loop);
     }
@@ -442,6 +502,7 @@ const { render = true, class: className, ...rest } = Astro.props;
       if (frame) return;
       scene(simTime / 1000);
       draw();
+      pending = false;
     }
 
     canvas.style.opacity = "0";
@@ -464,7 +525,13 @@ const { render = true, class: className, ...rest } = Astro.props;
           return;
         }
         flicker = gsap
-          .timeline({ delay, onStart: () => (revealed = true) })
+          .timeline({
+            delay,
+            onStart: () => {
+              revealed = true;
+              play();
+            },
+          })
           .set(canvas, { opacity: 1 })
           .set(canvas, { opacity: 0.12 }, 0.07)
           .set(canvas, { opacity: 1 }, 0.12)
@@ -496,6 +563,9 @@ const { render = true, class: className, ...rest } = Astro.props;
     const look = readLook(stage);
     const motion = allowsMotion();
     const controller = createController(stage);
+    controller.onChange(() => {
+      stage.dataset.state = controller.visible() ? "playing" : "paused";
+    });
     let cubes: Cubes | null = null;
     let revealAt: number | null = null;
     let stopped = false;
@@ -587,7 +657,8 @@ const { render = true, class: className, ...rest } = Astro.props;
       background-color: var(--background-2);
     }
 
-    /* CRT lines: 1px every 8px, drifting down once the container is open. */
+    /* CRT lines: 1px every 8px, drifting down once the container is open, a
+       device pixel per step on a 2× screen, and held while off screen. */
     .ascii-stage_lines {
       position: absolute;
       inset: 0;
@@ -599,7 +670,10 @@ const { render = true, class: className, ...rest } = Astro.props;
         transparent 1px 0.5rem
       );
       .ascii-stage_wrap.open & {
-        animation: ascii-stage-lines 1.15s linear infinite;
+        animation: ascii-stage-lines 1.15s steps(16) infinite;
+      }
+      .ascii-stage_wrap[data-state="paused"] & {
+        animation-play-state: paused;
       }
       @media (prefers-reduced-motion: reduce) {
         animation: none !important;

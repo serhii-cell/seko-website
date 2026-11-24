@@ -1,12 +1,25 @@
 /**
- * The line reveal for text: each line rises into place from under its own
- * mask while fading in, line after line. Small supporting lines that should
- * not move opt out with `data-lines="off"`.
+ * The masked line reveal, from Osmo's Masked Text Reveal: the text splits
+ * into lines, each line sits in its own clip and rises into it from below.
+ * It takes the page's opening headline, the paragraphs under headings,
+ * smaller headings, eyebrows and labels, and anything marked `data-lines`;
+ * `data-lines="off"` opts out, and `data-fade` fades instead. Once every line
+ * is in, the text goes back to how it was.
  */
 import { gsap, SplitText } from "@/utils/gsap.ts";
 
+const TARGETS = [
+  ".heading.text-style-h1",
+  ".heading.text-style-h3",
+  "p.text:not(.text-style-label, .text-style-display, .text-style-h1, .text-style-h2, .text-style-h3, .text-style-h4)",
+  ".eyebrow_text",
+  ":is(p, dt, h1, h2, h3, h4, h5, h6).text-style-label",
+  "[data-lines]",
+].join(", ");
+
 export const isLineText = (element: Element) =>
-  element.matches(".heading, .text, [data-lines]") &&
+  element.matches(TARGETS) &&
+  !element.hasAttribute("data-fade") &&
   !element.closest('[data-lines="off"]');
 
 export type Lines = {
@@ -22,22 +35,18 @@ export function createLines(element: HTMLElement): Lines {
   let tween: gsap.core.Tween | undefined;
 
   const rise = (delay: number) => {
-    tween = gsap.fromTo(
-      lines,
-      { yPercent: 105, opacity: 0 },
-      {
-        yPercent: 0,
-        opacity: 1,
-        duration: 0.9,
-        ease: "power3.out",
-        stagger: 0.08,
-        delay,
-        onComplete: () => {
-          state = "done";
-          split.revert();
-        },
+    tween?.kill();
+    tween = gsap.to(lines, {
+      yPercent: 0,
+      duration: 0.8,
+      stagger: 0.08,
+      ease: "expo.out",
+      delay,
+      onComplete: () => {
+        state = "done";
+        split.revert();
       },
-    );
+    });
     return tween;
   };
 
@@ -46,12 +55,17 @@ export function createLines(element: HTMLElement): Lines {
   const split = SplitText.create(element, {
     type: "lines",
     mask: "lines",
+    aria: "none",
+    linesClass: "scroll-reveal_line",
     autoSplit: true,
     onSplit(self) {
       if (state === "done") return;
       lines = self.lines as HTMLElement[];
-      if (state === "playing") return rise(0);
-      gsap.set(lines, { yPercent: 105, opacity: 0 });
+      gsap.set(lines, { yPercent: 110 });
+      if (state === "playing") {
+        const time = tween?.totalTime() ?? 0;
+        return rise(0).totalTime(time);
+      }
     },
   });
 

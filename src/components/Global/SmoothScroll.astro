@@ -41,7 +41,7 @@
       window.scrollTo(0, y);
       lenis.scrollTo(y, { immediate: true, force: true });
     });
-    gsap.ticker.add((time) => lenis.raf(time * 1000));
+    gsap.ticker.add((time) => lenis.raf(time * 1000), false, true);
     gsap.ticker.lagSmoothing(0);
   }
 </script>
