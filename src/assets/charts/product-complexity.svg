@@ -197,7 +197,6 @@
 <line x1="813.035" y1="952.455" x2="1377.34" y2="-24.9434" stroke="#121212"/>
 <line x1="819.964" y1="956.455" x2="1384.26" y2="-20.9433" stroke="#121212"/>
 </g>
-<path d="M950 53L729.5 88.3333L476.5 96.3333L239 120L1 129" stroke="#7BD52D" stroke-dasharray="2 2"/>
 </g>
 <defs>
 <clipPath id="observations-chart-clip">
