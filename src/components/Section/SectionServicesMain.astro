@@ -421,7 +421,7 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
             .to(order[step], { yPercent: 110, ease: "power1.in" }, step)
             /* The dissolve (below) takes the card away well before this;
                the fade only makes sure it is gone where it can't run. */
-            .to(order[step], { autoAlpha: 0, duration: 0.15, ease: "none" }, step + 0.85);
+            .to(order[step], { autoAlpha: 0, duration: 0.1, ease: "none" }, step + 0.9);
           for (let next = step + 1; next < total; next++) {
             const depth = next - step - 1;
             /* The clip's start is given in full: read back from the page it
