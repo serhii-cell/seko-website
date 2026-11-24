@@ -224,6 +224,10 @@ const cards = await slotContent(Astro.slots);
     return height <= room ? nav + (room - height) / 2 : innerHeight - height;
   }
 
+  /* Share of the held scroll spent on the first card before the row starts
+     to move, so it settles there for a moment. */
+  const HOLD = 0.1;
+
   /* Distance a press has to travel before it counts as a drag, not a click. */
   const THRESHOLD = 6;
   /* How far a flick carries on, in ms of its release speed. */
@@ -355,9 +359,13 @@ const cards = await slotContent(Astro.slots);
         /* The row itself never scrolls while pinned; scroll the page to
            where the row shows that card. */
         row.scrollLeft = 0;
-        const shift = pinned.end - pinned.start;
+        const held = pinned.end - pinned.start;
+        const shift = held * (1 - HOLD);
         const to = Math.min(snapPoints()[index], shift);
-        window.scrollTo({ top: pinned.start + to, behavior: reduce.matches ? "auto" : "smooth" });
+        window.scrollTo({
+          top: pinned.start + held * HOLD + to,
+          behavior: reduce.matches ? "auto" : "smooth",
+        });
         return;
       }
       stopGlide();
@@ -392,14 +400,13 @@ const cards = await slotContent(Astro.slots);
         row.scrollLeft = 0;
         row.classList.add("is-pinned");
         const shift = () => Math.max(0, row.scrollWidth - row.clientWidth);
-        const tween = gsap.to(list, {
-          x: () => -shift(),
-          ease: "none",
-          force3D: true,
+        /* A short rest on the first card, then the row moves the rest of
+           the way. */
+        const tween = gsap.timeline({
           scrollTrigger: {
             trigger: viewport,
             start: () => `top ${holdAt(viewport)}`,
-            end: () => `+=${shift()}`,
+            end: () => `+=${shift() / (1 - HOLD)}`,
             pin: section,
             /* Off by default inside a flex parent like <main>. */
             pinSpacing: true,
@@ -409,6 +416,11 @@ const cards = await slotContent(Astro.slots);
             refreshPriority: 1,
           },
         });
+        tween.to(
+          list,
+          { x: () => -shift(), ease: "none", force3D: true, duration: 1 - HOLD },
+          HOLD,
+        );
         pinned = tween.scrollTrigger ?? null;
         /* Focus, find-in-page or a selection drag can still scroll a hidden
            overflow; keep the row's own scroll at the start. */
