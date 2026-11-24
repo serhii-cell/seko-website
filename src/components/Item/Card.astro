@@ -7,6 +7,7 @@ import Button from "@/components/Button.astro";
 import ButtonWrapper from "@/components/Wrapper/ButtonWrapper.astro";
 import Img from "@/components/Media/Img.astro";
 import Overlay from "@/components/Media/Overlay.astro";
+import ProgressiveBlur from "@/components/Media/ProgressiveBlur.astro";
 import { slotContent } from "@/utils/slots.ts";
 
 type CardVariant = "default" | "cover" | "stacked" | "work";
@@ -38,8 +39,9 @@ type Base = HTMLAttributes<"div"> & {
    * - `default` — no image, text only (default)
    * - `cover` — image fills the card, text over it
    * - `stacked` — image above the text, bleeding to the edges
-   * - `work` — a case study: tags, a wide visual, then title, subtitle and
-   *   text side by side; the whole card links to `href`
+   * - `work` — a case study: a visual that fills the screen's height, its
+   *   tags in the top corner and its title and subtitle along the bottom
+   *   over a progressive blur; the whole card links to `href`
    */
   variant?: CardVariant;
   /** Colors the card carries with it, whatever section it sits in. */
@@ -85,6 +87,8 @@ type Props = Base &
         variant: "work";
         /** A work card sits on the section's own surface, so it keeps the theme around it. */
         theme?: never;
+        /** A work card says what it is through its hover facts, not body text. */
+        text?: never;
         buttonLabel?: never;
         buttonHref?: never;
         /**
@@ -174,16 +178,9 @@ if (import.meta.env.DEV && render) {
       data-cursor-text={cursor.length > 0 ? cursor.join("|") : undefined}
       {...rest}
     >
-      <div class="card_media">
-        {tags.length > 0 && (
-          <ul class="card_tags" role="list">
-            {tags.map((tag) => (
-              <li class="card_tag text-style-label">{tag}</li>
-            ))}
-          </ul>
-        )}
-        {hasImage && (
-          <div class="card_visual">
+      {hasImage && (
+        <div class="card_visual">
+          <div class="card_media">
             {media ? (
               <Fragment set:html={media} />
             ) : (
@@ -191,31 +188,35 @@ if (import.meta.env.DEV && render) {
                 src={image!}
                 alt={imageAlt}
                 variant="constrained"
-                sizes="(min-width: 64rem) 65vw, 90vw"
+                sizes="(min-width: 64rem) 80vw, 90vw"
               />
             )}
           </div>
-        )}
-      </div>
-      <div class="card_content dashed dashed-inline dashed-bottom" data-lines="off">
-        <div class="card_title">
-          <Heading tag={headingTag} variant="h3">
-            {href ? (
-              <a class="card_link" href={href}>
+          <ProgressiveBlur class="card_blur" />
+          <span class="card_shade" aria-hidden="true" />
+          {tags.length > 0 && (
+            <ul class="card_tags" role="list">
+              {tags.map((tag) => (
+                <li class="card_tag text-style-label">{tag}</li>
+              ))}
+            </ul>
+          )}
+          <div class="card_caption" data-lines="off">
+            <Heading tag={headingTag} variant="h3">
+              {href ? (
+                <a class="card_link" href={href}>
+                  <Fragment set:html={heading} />
+                </a>
+              ) : (
                 <Fragment set:html={heading} />
-              </a>
-            ) : (
-              <Fragment set:html={heading} />
-            )}
-          </Heading>
-          <Paragraph class="card_subtitle" variant="label">
-            <Fragment set:html={subtitle} />
-          </Paragraph>
+              )}
+            </Heading>
+            <Paragraph class="card_subtitle" variant="label">
+              <Fragment set:html={subtitle} />
+            </Paragraph>
+          </div>
         </div>
-        <Paragraph class="card_text" variant="main">
-          <Fragment set:html={text} />
-        </Paragraph>
-      </div>
+      )}
     </div>
   )
 }
@@ -346,15 +347,14 @@ if (import.meta.env.DEV && render) {
       }
     }
 
-    /* Work: a case study, the whole card one link. Tags and the visual sit in
-       the media column; title and text share a row under it. */
-    /* The card fits the screen's height: what's left after the nav and the
-       box under the visual is the visual's height, and its ratio sets the
-       card's width from that. */
+    /* Work: a case study, the whole card one link. The card is its visual,
+       which fills the room under the nav (less a margin above and below)
+       while the row is held, so nothing of the section above shows. Its
+       ratio caps the width; where the row is narrower than that, the image
+       fills the taller box and crops at the sides. */
     .card_wrap.work {
       --_visual-ratio: 1249 / 725;
-      --_chrome: 22rem;
-      max-width: max(20rem, calc((100svh - var(--_chrome)) * var(--_visual-ratio)));
+      --_fill: calc(100svh - var(--nav-height) - var(--space-5) * 2);
       container: card / inline-size;
       gap: 0;
       background-color: transparent;
@@ -367,17 +367,65 @@ if (import.meta.env.DEV && render) {
       &:has(.card_link:focus-visible) {
         outline-color: var(--brand-500);
       }
+
+      @media (width >= 48rem) {
+        max-width: max(20rem, calc(var(--_fill) * var(--_visual-ratio)));
+      }
+    }
+
+    /* The media, blur and shade are stacked layers; the caption is the one
+       grid item, so its link's cover reaches the whole visual. */
+    /* On phones the card stands upright, so its tags and name have room;
+       the picture crops at the sides. */
+    .work > .card_visual {
+      display: grid;
+      aspect-ratio: 4 / 5;
+      border-radius: 0;
+      isolation: isolate;
+
+      @media (width >= 48rem) {
+        aspect-ratio: auto;
+        height: max(18rem, min(var(--_fill), calc(100cqw / 1.2)));
+      }
     }
 
     .card_media {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      width: 100%;
+      position: absolute;
+      inset: 0;
+      transition: scale calc(var(--hover-duration) * 3) var(--hover-ease);
+
+      > * {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
     }
 
-    /* The tags sit on the visual's top-left corner, so they take no height
-       of their own. Clicks pass through to the card's link. */
+    .card_blur {
+      height: 80%;
+    }
+
+    /* A soft, eased darkening under the name, so it reads on bright images
+       and shows no top edge. */
+    .card_shade {
+      position: absolute;
+      inset-inline: 0;
+      bottom: 0;
+      height: 75%;
+      pointer-events: none;
+      background-image: linear-gradient(
+        to bottom,
+        transparent 0%,
+        color-mix(in srgb, var(--dark-950) 2%, transparent) 20%,
+        color-mix(in srgb, var(--dark-950) 8%, transparent) 40%,
+        color-mix(in srgb, var(--dark-950) 19%, transparent) 60%,
+        color-mix(in srgb, var(--dark-950) 33%, transparent) 80%,
+        color-mix(in srgb, var(--dark-950) 48%, transparent) 100%
+      );
+    }
+
+    /* Tags in the top corner, the name in the bottom one, both inset the
+       same. Clicks pass through the tags to the card's link. */
     .card_tags {
       position: absolute;
       top: var(--space-4);
@@ -403,70 +451,29 @@ if (import.meta.env.DEV && render) {
       line-height: 1;
     }
 
-
-    /* Body text in a work card keeps its full line box, as in the design;
-       only the heading is trimmed to its caps. */
-    :is(.card_subtitle, .work .card_text) {
-      --_trim-top: 0.5lh;
-      --_trim-bottom: 0.5lh;
-    }
-
-    .work > .card_media > .card_visual {
-      aspect-ratio: var(--_visual-ratio);
-      border-radius: 0;
-
-      > * {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        transition: scale calc(var(--hover-duration) * 3) var(--hover-ease);
-      }
-    }
-
-    /* Name and description sit in a dashed box hung from the visual's
-       bottom edge, so the card joins the page's frame. */
-    .work > .card_content {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
-      gap: var(--space-4);
-      align-items: start;
-      padding: var(--space-5);
-      text-align: start;
-
-      @media (width >= 64rem) {
-        grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
-        gap: var(--space-5);
-      }
-
-      /* A wide card keeps the design's split; a narrow one, on a short
-         screen, gives the description more room so it wraps less. */
-      @container card (width >= 54rem) {
-        grid-template-columns: minmax(0, 1fr) calc(568 / 1249 * 100%);
-      }
-    }
-
-    .work > .card_content :is(.heading, .text) {
-      margin: 0;
-    }
-
-    .card_title {
+    .card_caption {
+      z-index: 1;
+      align-self: end;
       display: flex;
       flex-direction: column;
       gap: var(--space-3);
-      min-width: 0;
+      padding: var(--space-4);
+      color: var(--light-100);
+      text-align: start;
 
       > .heading {
+        margin: 0;
         transition: color var(--hover-duration) var(--hover-ease);
       }
     }
 
+    /* The subtitle keeps its full line box; only the heading is trimmed to
+       its caps. */
     .card_subtitle {
+      --_trim-top: 0.5lh;
+      --_trim-bottom: 0.5lh;
       margin: 0;
-      color: color-mix(in srgb, var(--text) 55%, transparent);
-    }
-
-    .work .card_text {
-      color: color-mix(in srgb, var(--text) 50%, transparent);
+      color: color-mix(in srgb, var(--light-100) 70%, transparent);
     }
 
     .card_link {
@@ -482,12 +489,12 @@ if (import.meta.env.DEV && render) {
       }
     }
 
-    .work:has(.card_link:focus-visible) .card_title > .heading {
+    .work:has(.card_link:focus-visible) .card_caption > .heading {
       color: var(--brand-500);
     }
 
     @media (hover: hover) {
-      .work:has(.card_link):hover > .card_media > .card_visual > * {
+      .work:has(.card_link):hover .card_media {
         scale: 1.04;
       }
     }
