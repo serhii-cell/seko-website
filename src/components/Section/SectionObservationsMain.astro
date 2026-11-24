@@ -4,6 +4,7 @@ import Heading from "@/components/Typography/Heading.astro";
 import Paragraph from "@/components/Typography/Paragraph.astro";
 import Chart from "@/assets/charts/product-complexity.svg";
 import Point from "@/assets/charts/point.svg";
+import { smoothCurve, type Point as CurvePoint } from "@/utils/curve.ts";
 
 interface Props {
   /** Set to `false` to skip rendering this component and its children. */
@@ -26,7 +27,8 @@ const { render = true, label, heading, text, chartLabel } = Astro.props;
 /* Positions on the 861 × 200 chart, as drawn: the time axis along the top
    40px, and below it an 861 × 160 plot with a divider at each 215px period,
    an issue tag over a point on the curve in the middle of each, and the
-   curve itself. */
+   curve itself: a smooth line through the four issues that steepens past
+   the last one and runs on beyond the right edge. */
 const WIDTH = 861;
 const ticks = [
   { text: "Product launch", x: 0, anchor: "start" },
@@ -36,12 +38,21 @@ const ticks = [
   { text: "24 months", x: WIDTH, anchor: "end" },
 ];
 const dividers = [0, 215, 430, 645, 860];
-const issues = [
-  { text: "Incoherent design system", x: 108, y: 125 },
-  { text: "UI errors", x: 323, y: 112 },
-  { text: "Different UX patterns", x: 538, y: 94 },
-  { text: "Growing design debt", x: 753, y: 84 },
+const curvePoints: CurvePoint[] = [
+  [1, 129],
+  [108, 125],
+  [323, 112],
+  [538, 94],
+  [753, 84],
+  [950, 53],
 ];
+const curve = smoothCurve(curvePoints);
+const issues = [
+  { text: "Incoherent design system", x: 108 },
+  { text: "UI errors", x: 323 },
+  { text: "Different UX patterns", x: 538 },
+  { text: "Growing design debt", x: 753 },
+].map((issue) => ({ ...issue, y: curve.y(issue.x) }));
 const at = (x: number, y: number) =>
   `left: ${(x / WIDTH) * 100}%; top: ${(y / 160) * 100}%`;
 ---
@@ -99,8 +110,19 @@ const at = (x: number, y: number) =>
                     </span>
                   ))}
                 </div>
-                <div class="observations-main_plot">
+                <div
+                  class="observations-main_plot"
+                  data-curve={JSON.stringify(curvePoints)}
+                >
                   <Chart class="observations-main_graph" />
+                  <svg
+                    class="observations-main_curve"
+                    viewBox={`0 0 ${WIDTH} 160`}
+                    preserveAspectRatio="none"
+                    aria-hidden="true"
+                  >
+                    <path d={curve.path} />
+                  </svg>
                   <svg
                     class="observations-main_dividers"
                     viewBox={`0 0 ${WIDTH} 160`}
@@ -147,83 +169,113 @@ const at = (x: number, y: number) =>
 }
 
 <script>
-  import { gsap } from "@/utils/gsap.ts";
+  import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
+  import { smoothCurve, type Point } from "@/utils/curve.ts";
 
-  /* The visible plot is 861 × 160; the curve, in those coordinates, left to
-     right, runs on past the right edge. */
+  /* The visible plot is 861 × 160. The runner goes on past the right edge,
+     where its track clips it. */
   const WIDTH = 861;
-  const CURVE: [number, number][] = [
-    [1, 129],
-    [239, 120],
-    [476.5, 96.33],
-    [729.5, 88.33],
-    [950, 53],
-  ];
-  /* The runner goes on past the right edge, where its track clips it. */
   const END = WIDTH + 40;
-
-  const curveY = (x: number) => {
-    for (let i = 1; i < CURVE.length; i++) {
-      const [x1, y1] = CURVE[i];
-      if (x <= x1 || i === CURVE.length - 1) {
-        const [x0, y0] = CURVE[i - 1];
-        return y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
-      }
-    }
-    return CURVE[0][1];
-  };
+  /* The dot moves in stages, one issue at a time: each leg eases in and
+     out, taking longer the further it goes, and it rests at each issue
+     while that issue's point and tag pop up. */
+  const SPEED = 520;
+  const MIN_LEG = 0.45;
+  const REST = 0.45;
+  const LEG_EASE = "power2.inOut";
+  /* The whole sequence plays at this speed, keeping the proportions of the
+     timings above: 1.5 runs it half as fast again. */
+  const PACE = 1.5;
 
   /* A glowing dot runs along the curve from left to right, drawing it as it
-     goes; each issue's point pops in as the dot passes it, then its tag. The
-     dot leaves through the right edge, and what remains is the chart as
-     drawn. */
+     goes. It stops at each issue: the point pops in and its tag springs up
+     out of it, then the dot moves on. It leaves through the right edge, and
+     what remains is the chart as drawn. */
   function buildTimeline(chart: HTMLElement) {
     const plot = chart.querySelector<HTMLElement>(".observations-main_plot");
-    const runner = chart.querySelector<HTMLElement>(".observations-main_runner");
-    const points = gsap.utils.toArray<SVGElement>(".observations-main_point", chart);
-    const issues = gsap.utils.toArray<HTMLElement>(".observations-main_issue", chart);
+    const runner = chart.querySelector<HTMLElement>(
+      ".observations-main_runner",
+    );
+    const points = gsap.utils.toArray<SVGElement>(
+      ".observations-main_point",
+      chart,
+    );
+    const issues = gsap.utils.toArray<HTMLElement>(
+      ".observations-main_issue",
+      chart,
+    );
     if (!plot || !runner) return null;
+    const curve = smoothCurve(
+      JSON.parse(plot.dataset.curve ?? "[]") as Point[],
+    );
 
     const travel = { x: 0 };
     const place = () => {
       runner.style.left = `${(travel.x / WIDTH) * 100}%`;
-      runner.style.top = `${(curveY(travel.x) / 160) * 100}%`;
+      runner.style.top = `${(curve.y(travel.x) / 160) * 100}%`;
       plot.style.setProperty("--_drawn", String(Math.min(1, travel.x / WIDTH)));
     };
 
     const timeline = gsap.timeline({ paused: true });
-    timeline
-      .fromTo(runner, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.03 }, 0)
-      .fromTo(
+    timeline.fromTo(
+      runner,
+      { autoAlpha: 0 },
+      { autoAlpha: 1, duration: 0.15 },
+      0,
+    );
+    /* `at` is when the next leg starts, in seconds. */
+    let at = 0;
+    let from = 0;
+    const leg = (to: number, ease = LEG_EASE) => {
+      const duration = Math.max(MIN_LEG, (to - from) / SPEED);
+      timeline.fromTo(
         travel,
-        { x: 0 },
-        { x: END, duration: 1, ease: "none", onUpdate: place },
-        0,
+        { x: from },
+        { x: to, duration, ease, onUpdate: place, immediateRender: false },
+        at,
       );
+      from = to;
+      at += duration;
+    };
     points.forEach((point, index) => {
-      const x = Number(point.dataset.x) || 0;
-      const time = x / END;
-      timeline
-        .fromTo(
-          point,
-          { scale: 0, autoAlpha: 0 },
-          { scale: 1, autoAlpha: 1, duration: 0.05, ease: "back.out(3)" },
-          time,
-        )
-        .fromTo(
-          issues[index],
-          { autoAlpha: 0, y: 6 },
-          { autoAlpha: 1, y: 0, duration: 0.06, ease: "power2.out" },
-          time + 0.015,
-        );
+      leg(Number(point.dataset.x) || 0);
+      const issue = issues[index];
+      const tag = issue?.querySelector(".observations-main_tag");
+      timeline.fromTo(
+        point,
+        { scale: 0, autoAlpha: 0 },
+        { scale: 1, autoAlpha: 1, duration: 0.45, ease: "back.out(3)" },
+        at - 0.08,
+      );
+      if (issue && tag) {
+        timeline
+          .fromTo(
+            issue,
+            { autoAlpha: 0 },
+            { autoAlpha: 1, duration: 0.2, ease: "power1.out" },
+            at,
+          )
+          .fromTo(
+            tag,
+            { scale: 0.6, y: 10, transformOrigin: "50% 100%" },
+            { scale: 1, y: 0, duration: 0.6, ease: "back.out(2.2)" },
+            at,
+          );
+      }
+      at += REST;
     });
+    /* Off through the right edge, picking up speed as it goes. */
+    leg(END, "power2.in");
     place();
+    timeline.timeScale(PACE);
     return timeline;
   }
 
   function setUp(section: HTMLElement) {
-    const chart = section.querySelector<HTMLElement>(".observations-main_chart");
+    const chart = section.querySelector<HTMLElement>(
+      ".observations-main_chart",
+    );
     if (!chart) return () => {};
 
     /* When the chart comes into view the dot runs once by itself; scrolling
@@ -232,15 +284,16 @@ const at = (x: number, y: number) =>
     mm.add("(prefers-reduced-motion: no-preference)", () => {
       const timeline = buildTimeline(chart);
       if (!timeline) return;
-      const play = gsap.to(timeline, {
-        progress: 1,
-        duration: 1.3,
-        ease: "power1.inOut",
-        paused: true,
-        scrollTrigger: { trigger: chart, start: "top 80%", once: true },
+      const trigger = ScrollTrigger.create({
+        trigger: chart,
+        start: "top 80%",
+        once: true,
+        onEnter: () => {
+          timeline.play();
+        },
       });
       return () => {
-        play.kill();
+        trigger.kill();
         timeline.progress(1).kill();
       };
     });
@@ -281,7 +334,10 @@ const at = (x: number, y: number) =>
       gap: var(--space-4);
       color: var(--dark-900);
       @media (width >= 64rem) {
-        grid-template-columns: minmax(0, 228fr) minmax(0, 162fr) minmax(0, 1250fr);
+        grid-template-columns: minmax(0, 228fr) minmax(0, 162fr) minmax(
+            0,
+            1250fr
+          );
         column-gap: 0;
         & > :nth-child(2) {
           grid-column: 3;
@@ -395,14 +451,23 @@ const at = (x: number, y: number) =>
       pointer-events: none;
     }
 
-    .observations-main_graph {
+    .observations-main_graph,
+    .observations-main_curve {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
-      /* The curve is drawn up to the running dot. */
+    }
+
+    /* A dotted accent line, drawn up to the running dot. The clip is on the
+       svg, which spans the plot exactly; on the path it would be measured
+       from the path's own box, which runs on past the right edge. */
+    .observations-main_curve {
+      clip-path: inset(0 calc((1 - var(--_drawn)) * 100%) 0 0);
       & path {
-        clip-path: inset(0 calc((1 - var(--_drawn)) * 100%) 0 0);
+        fill: none;
+        stroke: var(--brand-500);
+        stroke-dasharray: 2 2;
       }
     }
 
@@ -436,7 +501,7 @@ const at = (x: number, y: number) =>
       translate: -50% 0;
       padding: 0.25rem 0.625rem;
       background-color: var(--stroke);
-      border-radius: 999rem;
+      border-radius: var(--radius-small);
       font-size: 0.75rem;
       font-weight: var(--primary-medium);
       line-height: var(--line-height-huge);

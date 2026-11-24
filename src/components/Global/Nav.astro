@@ -188,8 +188,8 @@ const links = [
       current = active;
     };
 
-    /* Off the top of the page the bar stays, shorter and on a solid
-       backdrop, so it never sits on the content. */
+    /* Off the top of the page the bar stays, on a solid backdrop, so it
+       never sits on the content. */
     let frame = 0;
     const onScroll = () => {
       nav.classList.toggle("solid", scrollY > 0);
@@ -313,24 +313,20 @@ const links = [
       height: 100%;
     }
 
-    .nav_wrap.solid {
-      & .nav_backdrop {
-        opacity: 1;
-        visibility: visible;
-        pointer-events: auto;
-      }
-      & .nav_inner {
-        min-height: var(--nav-height-compact);
-      }
+    .nav_wrap.solid .nav_backdrop {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
     }
 
-    /* Inset from inside the rails, as Figma counts them. */
+    /* Inset from inside the rails, as Figma counts them. One height at the
+       top of the page and scrolled, so the bar always lines up with the rule
+       under it. */
     .nav_inner {
       position: relative;
       width: var(--site-width);
       max-width: var(--max-width-frame);
       min-height: var(--nav-height);
-      transition: min-height var(--open-duration) var(--open-ease);
       padding-inline: calc(var(--_inset) + var(--border-width));
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto auto;
