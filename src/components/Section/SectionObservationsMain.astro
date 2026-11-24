@@ -154,7 +154,9 @@ const at = (x: number, y: number) =>
                         style={at(issue.x, issue.y)}
                       >
                         <span class="observations-main_tag text-style-label">
-                          {issue.text}
+                          <span class="observations-main_tag_text">
+                            {issue.text}
+                          </span>
                         </span>
                       </span>
                     </>
@@ -186,7 +188,9 @@ const at = (x: number, y: number) =>
      single eased pass and each issue rises as the dot reaches it. */
   const FRAME = { duration: 1.2, stagger: 0.08 };
   const RUN = { start: 0.5, duration: 2.6, ease: "power2.inOut" };
-  const TAG = { duration: 0.9, lead: 0.05 };
+  /* A tag opens from its centre first, then its words fade up inside, so
+     the box and the text never move together. */
+  const TAG = { open: 0.7, text: 0.6, gap: 0.3, lead: 0.05 };
 
   /* When, within the run, an eased pass from 0 to END reaches x. */
   function reach(x: number) {
@@ -277,19 +281,30 @@ const at = (x: number, y: number) =>
         at - TAG.lead,
       );
       const tag = tags[index];
-      if (tag) {
-        timeline.fromTo(
-          tag,
-          { clipPath: "inset(100% 0% 0% 0%)", y: 8, autoAlpha: 0 },
-          {
-            clipPath: "inset(0% 0% 0% 0%)",
-            y: 0,
-            autoAlpha: 1,
-            duration: TAG.duration,
-            ease: "osmo",
-          },
-          at,
-        );
+      const words = tag?.querySelector(".observations-main_tag_text");
+      if (tag && words) {
+        timeline
+          .fromTo(
+            tag,
+            { clipPath: "inset(0% 50% 0% 50%)" },
+            {
+              clipPath: "inset(0% 0% 0% 0%)",
+              duration: TAG.open,
+              ease: "osmo",
+            },
+            at,
+          )
+          .fromTo(
+            words,
+            { autoAlpha: 0, yPercent: 40 },
+            {
+              autoAlpha: 1,
+              yPercent: 0,
+              duration: TAG.text,
+              ease: "power2.out",
+            },
+            at + TAG.gap,
+          );
       }
     });
     place();
@@ -461,6 +476,10 @@ const at = (x: number, y: number) =>
       &.end {
         translate: -100% 0;
       }
+    }
+
+    .observations-main_tag_text {
+      display: block;
     }
 
     /* Each time rises into view through its own box. */

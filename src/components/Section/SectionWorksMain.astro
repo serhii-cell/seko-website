@@ -183,8 +183,10 @@ const cards = await slotContent(Astro.slots);
         --_gap: var(--space-8);
       }
 
+      /* Wide enough that a card filling the screen's height keeps most of
+         its picture, with the next one still peeking in. */
       @media (width >= 64rem) {
-        --_share: calc(1249 / 1640);
+        --_share: 0.86;
         --_gap: var(--section-space-small);
       }
     }
