@@ -245,6 +245,8 @@ main > .section:last-child {
     bottom: 0;
     left: var(--_rail-offset);
     width: var(--border-width);
+    transform-origin: top;
+    scale: 1 var(--draw, 1);
     background-image: repeating-linear-gradient(
       to bottom,
       var(--stroke) 0 var(--dash),
@@ -281,11 +283,13 @@ main > .section:last-child {
     left bottom,
     left top,
     right top;
+  /* --draw (0 to 1) lets the rules draw themselves in: across from the
+     left, down from the top. */
   background-size:
-    100% var(--_dash-top),
-    100% var(--_dash-bottom),
-    var(--_dash-left) 100%,
-    var(--_dash-right) 100%;
+    calc(var(--draw, 1) * 100%) var(--_dash-top),
+    calc(var(--draw, 1) * 100%) var(--_dash-bottom),
+    var(--_dash-left) calc(var(--draw, 1) * 100%),
+    var(--_dash-right) calc(var(--draw, 1) * 100%);
   background-repeat: no-repeat;
 }
 .dashed-top,

@@ -55,6 +55,7 @@ type Props = Base &
         tags?: never;
         subtitle?: never;
         href?: never;
+        cursor?: never;
       }
     | {
         variant: "cover";
@@ -65,6 +66,7 @@ type Props = Base &
         tags?: never;
         subtitle?: never;
         href?: never;
+        cursor?: never;
       }
     | {
         variant: "stacked";
@@ -77,6 +79,7 @@ type Props = Base &
         tags?: never;
         subtitle?: never;
         href?: never;
+        cursor?: never;
       }
     | {
         variant: "work";
@@ -91,12 +94,14 @@ type Props = Base &
         image?: ImageSource;
         /** Leave unset on decorative images — renders `alt=""`. */
         imageAlt?: string;
-        /** Short labels in pills above the visual. */
+        /** Short labels in hairline tags above the visual. */
         tags?: string[];
         /** Line under the heading, such as the kind of work done. */
         subtitle?: string;
         /** The case study the card leads to. */
         href?: string;
+        /** Short facts the scramble cursor cycles through while the card is hovered, such as a result, the platform and "Open case". `BaseLayout` renders the cursor. */
+        cursor?: string[];
       }
   );
 
@@ -106,6 +111,7 @@ type AllProps = Base & {
   tags?: string[];
   subtitle?: string;
   href?: string;
+  cursor?: string[];
 };
 
 const {
@@ -123,6 +129,7 @@ const {
   tags = [],
   subtitle,
   href,
+  cursor = [],
   class: className,
   ...rest
 } = Astro.props as AllProps;
@@ -161,12 +168,17 @@ if (import.meta.env.DEV && render) {
 
 {
   render && isWork && heading && (
-    <div class:list={["card_wrap", "work", className]} {...rest}>
+    <div
+      class:list={["card_wrap", "work", className]}
+      data-cursor-hover={cursor.length > 0 ? "" : undefined}
+      data-cursor-text={cursor.length > 0 ? cursor.join("|") : undefined}
+      {...rest}
+    >
       <div class="card_media">
         {tags.length > 0 && (
           <ul class="card_tags" role="list">
             {tags.map((tag) => (
-              <li class="card_tag text-style-main">{tag}</li>
+              <li class="card_tag text-style-label">{tag}</li>
             ))}
           </ul>
         )}
@@ -185,7 +197,7 @@ if (import.meta.env.DEV && render) {
           </div>
         )}
       </div>
-      <div class="card_content">
+      <div class="card_content dashed dashed-inline dashed-bottom" data-lines="off">
         <div class="card_title">
           <Heading tag={headingTag} variant="h3">
             {href ? (
@@ -196,7 +208,7 @@ if (import.meta.env.DEV && render) {
               <Fragment set:html={heading} />
             )}
           </Heading>
-          <Paragraph class="card_subtitle" variant="main">
+          <Paragraph class="card_subtitle" variant="label">
             <Fragment set:html={subtitle} />
           </Paragraph>
         </div>
@@ -336,9 +348,15 @@ if (import.meta.env.DEV && render) {
 
     /* Work: a case study, the whole card one link. Tags and the visual sit in
        the media column; title and text share a row under it. */
+    /* The card fits the screen's height: what's left after the nav, the tags
+       and the box under the visual is the visual's height, and its ratio
+       sets the card's width from that. */
     .card_wrap.work {
       --_visual-ratio: 1249 / 725;
-      gap: var(--space-7);
+      --_chrome: 24rem;
+      max-width: max(20rem, calc((100svh - var(--_chrome)) * var(--_visual-ratio)));
+      container: card / inline-size;
+      gap: 0;
       background-color: transparent;
       border-radius: 0.125rem;
       overflow: visible;
@@ -361,22 +379,25 @@ if (import.meta.env.DEV && render) {
     .card_tags {
       display: flex;
       flex-wrap: wrap;
-      gap: var(--space-1);
+      gap: 0.375rem;
       margin: 0;
       padding: 0;
       list-style: none;
     }
 
+    /* Hairline tags, square like the rest of the frame. */
     .card_tag {
-      padding: 0.25rem 0.75rem;
-      border-radius: var(--radius-round);
-      background-color: var(--stroke);
-      color: color-mix(in srgb, var(--text) 70%, transparent);
+      padding: 0.4em 0.6em;
+      border: var(--border-width) solid
+        color-mix(in srgb, var(--text) 22%, transparent);
+      color: color-mix(in srgb, var(--text) 60%, transparent);
+      line-height: 1;
     }
+
 
     /* Body text in a work card keeps its full line box, as in the design;
        only the heading is trimmed to its caps. */
-    :is(.card_tag, .card_subtitle, .work .card_text) {
+    :is(.card_subtitle, .work .card_text) {
       --_trim-top: 0.5lh;
       --_trim-bottom: 0.5lh;
     }
@@ -393,17 +414,25 @@ if (import.meta.env.DEV && render) {
       }
     }
 
+    /* Name and description sit in a dashed box hung from the visual's
+       bottom edge, so the card joins the page's frame. */
     .work > .card_content {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
       gap: var(--space-4);
       align-items: start;
-      padding: 0;
+      padding: var(--space-5);
       text-align: start;
 
       @media (width >= 64rem) {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+        gap: var(--space-5);
+      }
+
+      /* A wide card keeps the design's split; a narrow one, on a short
+         screen, gives the description more room so it wraps less. */
+      @container card (width >= 54rem) {
         grid-template-columns: minmax(0, 1fr) calc(568 / 1249 * 100%);
-        gap: 0;
       }
     }
 
@@ -423,7 +452,8 @@ if (import.meta.env.DEV && render) {
     }
 
     .card_subtitle {
-      color: color-mix(in srgb, var(--text) 70%, transparent);
+      margin: 0;
+      color: color-mix(in srgb, var(--text) 55%, transparent);
     }
 
     .work .card_text {

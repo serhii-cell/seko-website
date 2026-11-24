@@ -341,7 +341,7 @@ const links = [
       }
     }
 
-    /* The wordmark: 30% at rest, 60% on hover and focus, full when pressed. */
+    /* The wordmark, in full white. */
     .nav_logo {
       display: flex;
       align-items: center;
@@ -349,19 +349,9 @@ const links = [
       width: 4.75rem;
       max-width: 100%;
       border-radius: 0.125rem;
-      opacity: 0.3;
-      @media (hover: hover) {
-        &:hover {
-          opacity: 0.6;
-        }
-      }
       &:focus-visible {
-        opacity: 0.6;
         outline: var(--focus-width) solid var(--brand-500);
         outline-offset: 0;
-      }
-      &:active {
-        opacity: 1;
       }
     }
 

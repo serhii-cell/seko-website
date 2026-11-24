@@ -7,6 +7,7 @@ import Footer from "@/components/Global/Footer.astro";
 import SmoothScroll from "@/components/Global/SmoothScroll.astro";
 import ScrollReveal from "@/components/Global/ScrollReveal.astro";
 import PageTransition from "@/components/Global/PageTransition.astro";
+import ScrambleCursor from "@/components/Interactive/ScrambleCursor.astro";
 import type { SeoProps } from "@/types.ts";
 
 type Props = SeoProps & {
@@ -41,6 +42,7 @@ const {
     </main>
     <Footer />
     <SmoothScroll />
+    <ScrambleCursor />
     {reveal && <ScrollReveal />}
   </body>
 </html>

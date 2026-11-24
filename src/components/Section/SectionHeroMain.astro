@@ -60,7 +60,7 @@ const { render = true, heading, text, facts = [], stats = [] } = Astro.props;
             )}
           </div>
         </div>
-        <div class="hero-main_visual">
+        <div class="hero-main_visual" data-draw>
           <AsciiStage class="hero-main_stage" />
         </div>
       </div>
@@ -178,6 +178,8 @@ const { render = true, heading, text, facts = [], stats = [] } = Astro.props;
         inset: 0 0 auto;
         height: var(--border-width);
         pointer-events: none;
+        transform-origin: top left;
+        scale: var(--draw, 1) 1;
         background-image: repeating-linear-gradient(
           to right,
           var(--stroke) 0 var(--dash),
@@ -187,6 +189,7 @@ const { render = true, heading, text, facts = [], stats = [] } = Astro.props;
           inset: 0 auto 0 0;
           width: var(--border-width);
           height: auto;
+          scale: 1 var(--draw, 1);
           background-image: repeating-linear-gradient(
             to bottom,
             var(--stroke) 0 var(--dash),
