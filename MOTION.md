@@ -18,6 +18,13 @@ and CSS; this covers what changes once JavaScript is involved.
   while Lumos locks the page for an open modal, lets inner scroll areas scroll
   natively, and turns itself off for reduced motion. It leaves in-page links to
   the browser, so the skip link still moves focus.
+- **Named ease:** `osmo` (Osmo's `0.625, 0.05, 0, 1`, through CustomEase in
+  `src/utils/gsap.ts`): a slow start, a quick middle and a long, soft landing.
+  Lines drawing in and tags rising use it by name.
+- **Counters:** `Odometer` (from Osmo's Number Odometer) rolls each digit of a
+  figure through 0–9 and fades it up from nothing. Figures inside one
+  `data-odometer-group` roll together, one after another; on the first screen
+  they wait for their intro step and `LEAD`, further down for the scroll.
 - CSS stays the first choice for hovers and simple state changes, on the
   `--hover-*` and `--open-*` tokens in `src/styles/base.css`. GSAP is for
   anything sequenced, scroll-driven or split into parts.

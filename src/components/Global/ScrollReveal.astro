@@ -3,7 +3,7 @@
   import { onPage } from "@/utils/lifecycle.ts";
   import { createLines, isLineText, type Lines } from "@/utils/lines.ts";
   import { createWave, isWaveText, type Wave } from "@/utils/wave.ts";
-  import { onIntroStep, stepOf } from "@/utils/intro.ts";
+  import { LEAD, onIntroStep, stepOf } from "@/utils/intro.ts";
 
   const blocks = [
     ".section > .container > .layout > * > *",
@@ -18,7 +18,7 @@
   const LAST_STEP = 7;
   /* The first screen's rules draw in first; the page's content starts once
      they are this far along, in seconds. */
-  const RULES = { duration: 1.6, stagger: 0.05, lead: 0.7 };
+  const RULES = { duration: 1.6, stagger: 0.05, lead: LEAD };
 
   /* Reading order: rows top to bottom, left to right within a row. */
   const byReadingOrder = (a: Element, b: Element) => {

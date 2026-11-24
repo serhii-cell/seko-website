@@ -11,6 +11,11 @@
  */
 export const STEP_GAP = 0.1;
 
+/** Seconds the first screen's content waits after its step while the frame's
+ *  rules draw in. ScrollReveal holds text and blocks back by it; anything
+ *  else on the first screen that animates in waits the same. */
+export const LEAD = 0.7;
+
 /** The step of `element`, from the nearest `data-step` around it. */
 export const stepOf = (element: Element, fallback = 1) =>
   Number(element.closest<HTMLElement>("[data-step]")?.dataset.step) ||
