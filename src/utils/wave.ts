@@ -7,8 +7,8 @@
  */
 import { gsap, SplitText } from "@/utils/gsap.ts";
 
-const SCROLL_START = "top 90%";
-const SCROLL_END = "center 40%";
+const SCROLL_START = "top 95%";
+const SCROLL_END = "bottom 75%";
 const SCRUB = 0.1;
 const WAVE_DURATION = 0.4;
 

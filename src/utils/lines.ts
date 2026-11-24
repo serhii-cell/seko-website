@@ -1,6 +1,7 @@
 /**
  * The masked line reveal, from Osmo's Masked Text Reveal: the text splits
- * into lines, each line sits in its own clip and rises into it from below.
+ * into lines, each line sits in its own clip and rises into it from below
+ * (1.4s) while it fades in more slowly (2s), softer than Osmo's original.
  * It takes the page's opening headline, the paragraphs under headings,
  * smaller headings, eyebrows and labels, and anything marked `data-lines`;
  * `data-lines="off"` opts out, and `data-fade` fades instead. Once every line
@@ -32,21 +33,20 @@ export type Lines = {
 export function createLines(element: HTMLElement): Lines {
   let lines: HTMLElement[] = [];
   let state: "waiting" | "playing" | "done" = "waiting";
-  let tween: gsap.core.Tween | undefined;
+  let tween: gsap.core.Timeline | undefined;
 
   const rise = (delay: number) => {
     tween?.kill();
-    tween = gsap.to(lines, {
-      yPercent: 0,
-      duration: 0.8,
-      stagger: 0.08,
-      ease: "expo.out",
-      delay,
-      onComplete: () => {
-        state = "done";
-        split.revert();
-      },
-    });
+    tween = gsap
+      .timeline({
+        delay,
+        onComplete: () => {
+          state = "done";
+          split.revert();
+        },
+      })
+      .to(lines, { yPercent: 0, duration: 1.4, stagger: 0.12, ease: "power3.out" }, 0)
+      .to(lines, { opacity: 1, duration: 2, stagger: 0.12, ease: "power1.out" }, 0);
     return tween;
   };
 
@@ -61,7 +61,7 @@ export function createLines(element: HTMLElement): Lines {
     onSplit(self) {
       if (state === "done") return;
       lines = self.lines as HTMLElement[];
-      gsap.set(lines, { yPercent: 110 });
+      gsap.set(lines, { yPercent: 110, opacity: 0 });
       if (state === "playing") {
         const time = tween?.totalTime() ?? 0;
         return rise(0).totalTime(time);

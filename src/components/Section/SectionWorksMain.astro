@@ -189,9 +189,11 @@ const cards = await slotContent(Astro.slots);
       }
     }
 
+    /* Cards stretch to the tallest, so every box under a visual ends on
+       one line however long its description runs. */
     .works-main_list {
       display: flex;
-      align-items: start;
+      align-items: stretch;
       gap: var(--_gap);
       width: max-content;
       padding-inline: var(--border-width);

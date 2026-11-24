@@ -16,6 +16,9 @@
   const STAGGER = 0.06;
   /* First-screen items with no step of their own come after the rest. */
   const LAST_STEP = 7;
+  /* The first screen's rules draw in first; the page's content starts once
+     they are this far along, in seconds. */
+  const RULES = { duration: 1.6, stagger: 0.05, lead: 0.7 };
 
   /* Reading order: rows top to bottom, left to right within a row. */
   const byReadingOrder = (a: Element, b: Element) => {
@@ -86,9 +89,60 @@
           clearProps: settle,
         });
 
+      /* The rules on screen at load draw themselves in as the loader hands
+         the page over: across from the left, down from the top. */
+      const rules = gsap.utils
+        .toArray<HTMLElement>(".dashed, .frame-rails, [data-draw]")
+        .filter(
+          (rule) =>
+            rule.getClientRects().length > 0 &&
+            ScrollTrigger.isInViewport(rule),
+        )
+        .sort(byReadingOrder);
+      gsap.set(rules, { "--draw": 0 });
+      const settleRules = () =>
+        rules.forEach((rule) => rule.style.removeProperty("--draw"));
+      const drawing = onIntroStep(1, () =>
+        gsap.to(rules, {
+          "--draw": 1,
+          duration: RULES.duration,
+          stagger: RULES.stagger,
+          ease: "power3.inOut",
+          onComplete: settleRules,
+        }),
+      );
+      const lead = (element: Element) =>
+        rules.length > 0 && main.contains(element) ? RULES.lead : 0;
+
+      /* First-screen blocks rise a little as they fade in. */
+      const riseIn = (block: Element, delay: number) =>
+        gsap
+          .timeline({
+            delay,
+            onComplete: () =>
+              gsap.set(block, { clearProps: `${settle},transform` }),
+          })
+          .fromTo(
+            block,
+            { y: "1.125rem" },
+            { y: 0, duration: 1, ease: "power3.out" },
+            0,
+          )
+          .fromTo(
+            block,
+            { autoAlpha: 0 },
+            {
+              autoAlpha: Number(opacity.get(block)),
+              duration: 1.6,
+              ease: "power1.out",
+            },
+            0,
+          );
+
       /* What is on screen at load comes in step by step (each part's
          `data-step`, see src/utils/intro.ts), in reading order within a
-         step, once the first-load loader hands the page over. */
+         step, once the first-load loader hands the page over and the rules
+         are mostly drawn. */
       const first = [...texts, ...faders, ...waves.keys()]
         .filter((element) => ScrollTrigger.isInViewport(element))
         .sort(byReadingOrder) as HTMLElement[];
@@ -100,9 +154,10 @@
       const waits = [...steps].map(([step, group]) =>
         onIntroStep(step, () =>
           group.forEach((element, index) => {
-            const delay = index * STAGGER;
+            const delay = lead(element) + index * STAGGER;
             const reveal = lines.get(element) ?? waves.get(element);
             if (reveal) reveal.play(delay);
+            else if (main.contains(element)) riseIn(element, delay);
             else fadeIn([element], 0, delay);
           }),
         ),
@@ -142,6 +197,8 @@
       }
 
       return () => {
+        drawing();
+        settleRules();
         waits.forEach((stop) => stop());
         lines.forEach((lines) => lines.revert());
         waves.forEach((wave) => wave.revert());
