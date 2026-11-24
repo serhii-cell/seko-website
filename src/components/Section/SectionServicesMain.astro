@@ -2,6 +2,7 @@
 import Section from "@/components/Wrapper/Section.astro";
 import Heading from "@/components/Typography/Heading.astro";
 import Paragraph from "@/components/Typography/Paragraph.astro";
+import Odometer from "@/components/Typography/Odometer.astro";
 
 type Stat = {
   /** The figure, as written. */
@@ -65,11 +66,11 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           </Heading>
         </div>
         {stats.length > 0 && (
-          <ul class="services-main_stats" role="list">
+          <ul class="services-main_stats" role="list" data-odometer-group>
             {stats.map((stat) => (
               <li class="services-main_stat">
                 <Paragraph variant="h3" class="services-main_value">
-                  {stat.value}{" "}
+                  <Odometer value={stat.value} />{" "}
                   {stat.total && (
                     <span class="services-main_total">/ {stat.total}</span>
                   )}
