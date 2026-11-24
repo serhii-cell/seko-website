@@ -16,14 +16,9 @@ const { render = true, class: className, ...rest } = Astro.props;
       aria-hidden="true"
       {...rest}
     >
-      <div class="ascii-stage_lines" />
       <div class="ascii-stage_visual">
         <canvas class="ascii-stage_cubes" />
       </div>
-      <span class="ascii-stage_corner top-left" />
-      <span class="ascii-stage_corner top-right" />
-      <span class="ascii-stage_corner bottom-left" />
-      <span class="ascii-stage_corner bottom-right" />
     </div>
   )
 }
@@ -549,8 +544,7 @@ const { render = true, class: className, ...rest } = Astro.props;
 
   /* The container opens from its centre like a window, from 1px and
      transparent to full size, on its step of the first-screen sequence
-     (src/utils/intro.ts). Then the CRT lines start drifting and, half a
-     second later, the cubes flicker on. */
+     (src/utils/intro.ts). Half a second later the cubes flicker on. */
   const OPEN = 0.7;
   const AFTER_OPEN = 0.5;
 
@@ -563,9 +557,6 @@ const { render = true, class: className, ...rest } = Astro.props;
     const look = readLook(stage);
     const motion = allowsMotion();
     const controller = createController(stage);
-    controller.onChange(() => {
-      stage.dataset.state = controller.visible() ? "playing" : "paused";
-    });
     let cubes: Cubes | null = null;
     let revealAt: number | null = null;
     let stopped = false;
@@ -645,7 +636,6 @@ const { render = true, class: className, ...rest } = Astro.props;
       --_glyph: var(--dark-700);
       --_accent: var(--brand-500);
       --_glyph-font: var(--font-jetbrains-mono, monospace);
-      --_line: color-mix(in lab, var(--light-100) 2%, transparent);
       position: relative;
       display: grid;
       place-items: center;
@@ -654,36 +644,6 @@ const { render = true, class: className, ...rest } = Astro.props;
       min-height: 15rem;
       isolation: isolate;
       container-type: size;
-      background-color: var(--background-2);
-    }
-
-    /* CRT lines: 1px every 8px, drifting down once the container is open, a
-       device pixel per step on a 2× screen, and held while off screen. */
-    .ascii-stage_lines {
-      position: absolute;
-      inset: 0;
-      z-index: -1;
-      overflow: hidden;
-      background: repeating-linear-gradient(
-        to bottom,
-        var(--_line) 0 1px,
-        transparent 1px 0.5rem
-      );
-      .ascii-stage_wrap.open & {
-        animation: ascii-stage-lines 1.15s steps(16) infinite;
-      }
-      .ascii-stage_wrap[data-state="paused"] & {
-        animation-play-state: paused;
-      }
-      @media (prefers-reduced-motion: reduce) {
-        animation: none !important;
-      }
-    }
-
-    @keyframes ascii-stage-lines {
-      to {
-        background-position: 0 0.5rem;
-      }
     }
 
     .ascii-stage_visual {
@@ -695,37 +655,6 @@ const { render = true, class: className, ...rest } = Astro.props;
       display: block;
       width: 100%;
       height: 100%;
-    }
-
-    /* Corner brackets, 16px L-shapes inset 20px from each edge. */
-    .ascii-stage_corner {
-      --_inset: 1.25rem;
-      position: absolute;
-      width: 1rem;
-      height: 1rem;
-      border-top: var(--border-width) solid var(--light-100);
-      border-left: var(--border-width) solid var(--light-100);
-      opacity: 0.2;
-      pointer-events: none;
-      &.top-left {
-        top: var(--_inset);
-        left: var(--_inset);
-      }
-      &.top-right {
-        top: var(--_inset);
-        right: var(--_inset);
-        scale: -1 1;
-      }
-      &.bottom-left {
-        bottom: var(--_inset);
-        left: var(--_inset);
-        scale: 1 -1;
-      }
-      &.bottom-right {
-        right: var(--_inset);
-        bottom: var(--_inset);
-        scale: -1 -1;
-      }
     }
   }
 </style>

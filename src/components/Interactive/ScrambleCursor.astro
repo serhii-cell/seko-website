@@ -1,0 +1,172 @@
+---
+interface Props {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+}
+
+const { render = true } = Astro.props;
+---
+
+{
+  render && (
+    <div class="scramble-cursor_wrap" data-cursor="" aria-hidden="true">
+      <div class="scramble-cursor_box">
+        <span class="scramble-cursor_text" />
+        <svg
+          class="scramble-cursor_chevron"
+          viewBox="0 0 22 39"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M1.875 36.875L19.375 19.375L1.875 1.875"
+            stroke="currentColor"
+            stroke-width="5"
+            stroke-linecap="square"
+          />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+<script>
+  import { gsap } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  const CHARS = "XYZxy#&@0$€£";
+  const CYCLE = 1800;
+
+  onPage(() => {
+    const cursor = document.querySelector<HTMLElement>(".scramble-cursor_wrap");
+    const label = cursor?.querySelector<HTMLElement>(".scramble-cursor_text");
+    const fine = matchMedia("(hover: hover) and (pointer: fine)").matches;
+    if (!cursor || !label || !fine) return;
+
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const ctx = gsap.context(() => {});
+    const xTo = gsap.quickTo(cursor, "x", { duration: still ? 0 : 0.4, ease: "power3.out" });
+    const yTo = gsap.quickTo(cursor, "y", { duration: still ? 0 : 0.4, ease: "power3.out" });
+    let mouseX = 0;
+    let mouseY = 0;
+    let moved = false;
+    let frame = 0;
+    let timer = 0;
+    let active: HTMLElement | null = null;
+
+    const say = (text: string) =>
+      ctx.add(() => {
+        if (still) {
+          label.textContent = text;
+          return;
+        }
+        gsap.to(label, {
+          duration: 0.6,
+          overwrite: "auto",
+          scrambleText: { text, chars: CHARS, speed: 1.2 },
+        });
+      });
+
+    /* The hovered item's facts, one after another, while it stays hovered. */
+    const update = () => {
+      frame = 0;
+      const item =
+        document
+          .elementFromPoint(mouseX, mouseY)
+          ?.closest<HTMLElement>("[data-cursor-hover]") ?? null;
+      const edge = cursor.getBoundingClientRect().right >= innerWidth;
+      cursor.dataset.cursor = item ? (edge ? "active-edge" : "active") : "";
+      if (item === active) return;
+      active = item;
+      clearInterval(timer);
+      const facts = item?.dataset.cursorText?.split("|") ?? [];
+      let index = 0;
+      say(facts[0] ?? "");
+      if (facts.length > 1) {
+        timer = window.setInterval(() => {
+          index = (index + 1) % facts.length;
+          say(facts[index]);
+        }, CYCLE);
+      }
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+
+    const onMove = (event: MouseEvent) => {
+      mouseX = event.clientX;
+      mouseY = event.clientY;
+      moved = true;
+      xTo(mouseX);
+      yTo(mouseY);
+      schedule();
+    };
+    const onScroll = () => {
+      if (moved) schedule();
+    };
+    addEventListener("mousemove", onMove, { passive: true });
+    addEventListener("scroll", onScroll, { passive: true });
+
+    return () => {
+      removeEventListener("mousemove", onMove);
+      removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+      clearInterval(timer);
+      ctx.revert();
+      cursor.dataset.cursor = "";
+    };
+  });
+</script>
+
+<style is:global>
+  @layer components {
+    .scramble-cursor_wrap {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 150;
+      padding: 1.25rem 1rem 0 0.75rem;
+      pointer-events: none;
+      @media not ((hover: hover) and (pointer: fine)) {
+        display: none;
+      }
+    }
+
+    .scramble-cursor_box {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      height: 2.25rem;
+      padding-inline: 0.875rem;
+      background-color: var(--dark-950);
+      border: var(--border-width) solid
+        color-mix(in srgb, var(--light-100) 18%, transparent);
+      color: var(--light-100);
+      opacity: 0;
+      transition:
+        transform 0.4s cubic-bezier(0.625, 0.05, 0, 1),
+        opacity 0.2s ease 0.1s;
+      [data-cursor="active"] > &,
+      [data-cursor="active-edge"] > & {
+        opacity: 1;
+        transition-delay: 0s;
+      }
+      [data-cursor="active-edge"] > & {
+        transform: translateX(-100%);
+      }
+    }
+
+    .scramble-cursor_text {
+      font-family: var(--mono-family);
+      font-size: 0.75rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .scramble-cursor_chevron {
+      width: 0.375rem;
+      color: var(--brand-500);
+    }
+  }
+</style>

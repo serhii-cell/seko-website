@@ -83,18 +83,26 @@ take no `render` prop; the layout decides where they appear.
 - **`SmoothScroll`** starts Lenis once per visit and drives it from GSAP's
   ticker, so ScrollTrigger reads the same scroll position. Its CSS is Lenis's
   own, class names included.
+- **`ScrambleCursor`** (from Osmo's Scramble Text Cursor) follows the mouse
+  and, over anything marked `data-cursor-hover`, shows a small label that
+  scrambles through the facts in its `data-cursor-text` (separated by `|`),
+  one every 1.8s. Work cards set these from their `cursor` prop. It lives in
+  the layout, not a section, because a pinned section's transform would
+  shift a fixed element inside it.
 - **`ScrollReveal`** runs on pages whose layout has `reveal`. Section
   headlines (display or h2) light up letter by letter as they scroll through
   (`src/utils/wave.ts`, from Osmo's Gradient Wave Text on Scroll): each
   letter waits at 20% of its colour, switches on in reading order between
-  `top 90%` and `center 40%` with a 0.1 scrub, and passes through the brand
+  `top 95%` and `bottom 75%` (done while the whole headline is still low on
+  screen) with a 0.1 scrub, and passes through the brand
   green on its way to its own colour; scrolling back switches them off. A
   headline already on screen at load lights up once over time instead. The
   page's opening headline, the paragraphs under headings, smaller headings
   (h3), eyebrows, labels (`.text-style-label` on a `p`, `dt` or heading) and
   anything marked `data-lines` rise line by line from under their own masks
-  (`src/utils/lines.ts`, from Osmo's Masked Text Reveal: `yPercent` 110 to
-  0, 0.8s, 0.08s apart, `expo.out`), once their top reaches `clamp(top
+  (`src/utils/lines.ts`, from Osmo's Masked Text Reveal, slowed down: each
+  line rises from `yPercent` 110 over 1.4s (`power3.out`) and fades in over 2s
+  (`power1.out`), 0.12s apart), once their top reaches `clamp(top
   80%)`, then the text goes back to how it was. `data-lines="off"` opts out
   of both. Blocks with no text of their own, and anything marked
   `data-fade`, fade in from 0 opacity instead. Parts outside `<main>`
@@ -103,7 +111,11 @@ take no `render` prop; the layout decides where they appear.
   each part carries `data-step`, step 1 starts when the first-load loader
   hands the page over (`page-intro:content`), a moment before its glyphs
   land in the hero's ASCII panel, and each step follows
-  0.1s later (`src/utils/intro.ts`). Items in the same step go in reading
+  0.1s later (`src/utils/intro.ts`). First, every rule on that screen —
+  `.dashed` lines, the frame rails and anything marked `data-draw` — draws
+  itself in over 1.6s (`power3.inOut`), across from the left and down from
+  the top, driven by a `--draw` variable from 0 to 1; the content in `<main>`
+  starts 0.7s later, its blocks rising 1.125rem over 1s as they fade in over 1.6s. Items in the same step go in reading
   order, 0.06s apart; components with their own first-screen animation — the
   hero's ASCII container and guides, the logo strip — start on their step too. The rest comes in as
   it scrolls into view: text once its top reaches `clamp(top 80%)`, section
