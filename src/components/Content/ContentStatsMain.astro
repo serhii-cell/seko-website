@@ -2,6 +2,7 @@
 import type { ImageMetadata } from "astro";
 import type { HTMLAttributes } from "astro/types";
 import Paragraph from "@/components/Typography/Paragraph.astro";
+import Odometer from "@/components/Typography/Odometer.astro";
 
 export type Stat = {
   /** What the figure measures, set small above it. */
@@ -28,14 +29,14 @@ const { render = true, stats = [], class: className, ...rest } = Astro.props;
   render && stats.length > 0 && (
     <div class:list={["stats-main_wrap", className]} {...rest}>
       <span class="stats-main_rule dashed dashed-block" aria-hidden="true" />
-      <ul class="stats-main_list hatched">
+      <ul class="stats-main_list hatched" data-odometer-group>
         {stats.map((stat) => (
           <li class="stats-main_tile dashed">
             <Paragraph variant="label" class="stats-main_label color-faded">
               {stat.label}
             </Paragraph>
             <Paragraph variant="h2" class="stats-main_value">
-              {stat.value}
+              <Odometer value={stat.value} />
             </Paragraph>
             {stat.logo && (
               <img

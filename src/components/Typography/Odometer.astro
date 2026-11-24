@@ -1,0 +1,258 @@
+---
+import type { HTMLAttributes } from "astro/types";
+
+type Props = HTMLAttributes<"span"> & {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /**
+   * The figure it lands on, written as it should read: `+170%`, `4.6×`,
+   * `20+`. Digits roll; everything else stays where it is.
+   */
+  value?: string;
+  /** The number the digits roll from. Defaults to 0. */
+  start?: number;
+  /** Seconds each digit takes to roll. Defaults to 1.6. */
+  duration?: number;
+};
+
+const {
+  render = true,
+  value,
+  start,
+  duration,
+  class: className,
+  ...rest
+} = Astro.props;
+---
+
+{/*
+  Osmo's Number Odometer. Each digit rolls through 0–9 like a mechanical
+  counter and fades up from nothing as it goes. Figures inside one
+  `data-odometer-group` start together, one after another; a figure outside
+  any group is its own.
+*/}
+{
+  render && value && (
+    <span class:list={["odometer_wrap", className]} {...rest}>
+      <span class="sr-only">{value}</span>
+      <span
+        class="odometer_figure"
+        aria-hidden="true"
+        data-odometer-start={start}
+        data-odometer-duration={duration}
+      >
+        {value}
+      </span>
+    </span>
+  )
+}
+
+<script>
+  import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+  import { LEAD, onIntroStep, stepOf } from "@/utils/intro.ts";
+
+  /* Osmo's defaults, slowed a little, with a fade added: every digit and
+     sign starts invisible and comes up as its digit rolls. */
+  const ROLL = {
+    duration: 1.6,
+    ease: "power3.out",
+    digitStagger: 0.04,
+    figureStagger: 0.1,
+    cycles: 2,
+  };
+  const FADE = { duration: 0.9, ease: "power2.out" };
+
+  type Figure = {
+    figure: HTMLElement;
+    text: string;
+    step: number;
+    duration: number;
+    parts: HTMLElement[];
+    rollers: { roller: HTMLElement; target: number }[];
+  };
+
+  /* Line height as a share of the font size: one digit's height, in em. */
+  const lineRatio = (element: HTMLElement) => {
+    const style = getComputedStyle(element);
+    return style.lineHeight === "normal"
+      ? 1.2
+      : parseFloat(style.lineHeight) / parseFloat(style.fontSize);
+  };
+
+  /* Each digit becomes a strip of 0–9 behind a mask one line tall, set on
+     its starting digit; anything else stays as a plain part. */
+  function split(figure: HTMLElement): Figure {
+    const text = figure.textContent?.trim() ?? "";
+    const step = lineRatio(figure);
+    const count = [...text].filter((char) => /\d/.test(char)).length;
+    const from = String(Math.floor(Math.abs(Number(figure.dataset.odometerStart) || 0)))
+      .padStart(count, "0")
+      .slice(-count);
+    const parts: HTMLElement[] = [];
+    const rollers: Figure["rollers"] = [];
+    let digit = 0;
+
+    figure.textContent = "";
+    figure.style.setProperty("--_step", String(step));
+    for (const char of text) {
+      const part = document.createElement("span");
+      parts.push(part);
+      figure.append(part);
+      if (!/\d/.test(char)) {
+        part.className = "odometer_static";
+        part.textContent = char;
+        continue;
+      }
+      const start = Number(from[digit++]);
+      const end = Number(char);
+      const roller = document.createElement("span");
+      part.className = "odometer_mask";
+      roller.className = "odometer_roller";
+      roller.textContent = Array.from(
+        { length: 10 * ROLL.cycles },
+        (_, index) => index % 10,
+      ).join("\n");
+      part.append(roller);
+      gsap.set(roller, { y: `${-start * step}em` });
+      rollers.push({ roller, target: end > start ? end : 10 + end });
+    }
+
+    return {
+      figure,
+      text,
+      step,
+      duration: Number(figure.dataset.odometerDuration) || ROLL.duration,
+      parts,
+      rollers,
+    };
+  }
+
+  /* Once the digits land, each strip gives way to its final digit, so the
+     page keeps no strips and the figure doesn't shift. */
+  function settle({ figure, text }: Figure) {
+    const digits = [...text].filter((char) => /\d/.test(char));
+    figure
+      .querySelectorAll<HTMLElement>(".odometer_mask")
+      .forEach((mask, index) => (mask.textContent = digits[index] ?? ""));
+  }
+
+  /* Figures one after another, and within each the digits right to left,
+     as Osmo rolls them. */
+  function build(figures: Figure[]) {
+    const timeline = gsap.timeline({
+      paused: true,
+      onComplete: () => figures.forEach(settle),
+    });
+    figures.forEach(({ parts, rollers, step, duration }, order) => {
+      const offset = order * ROLL.figureStagger;
+      parts.forEach((part, index) => {
+        timeline.fromTo(
+          part,
+          { autoAlpha: 0 },
+          { autoAlpha: 1, ...FADE },
+          offset + (parts.length - 1 - index) * ROLL.digitStagger,
+        );
+      });
+      rollers.forEach(({ roller, target }, index) => {
+        timeline.to(
+          roller,
+          {
+            y: `${-target * step}em`,
+            duration,
+            ease: ROLL.ease,
+            force3D: true,
+          },
+          offset + (rollers.length - 1 - index) * ROLL.digitStagger,
+        );
+      });
+    });
+    return timeline;
+  }
+
+  onPage(() => {
+    if (document.documentElement.classList.contains("stacki-designer")) return;
+    const figures = gsap.utils.toArray<HTMLElement>(".odometer_figure");
+    if (figures.length === 0) return;
+
+    const groups = new Map<HTMLElement, HTMLElement[]>();
+    figures.forEach((figure) => {
+      const group =
+        figure.closest<HTMLElement>("[data-odometer-group]") ?? figure;
+      groups.set(group, [...(groups.get(group) ?? []), figure]);
+    });
+
+    /* With reduced motion the figures simply show. */
+    const mm = gsap.matchMedia();
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const stops: (() => void)[] = [];
+      groups.forEach((members, group) => {
+        const parts = members.map(split);
+        const timeline = build(parts);
+
+        /* On the first screen it rolls with its intro step, once the rules
+           have drawn; further down, when it scrolls into view. */
+        if (group.closest("[data-step]") && ScrollTrigger.isInViewport(group)) {
+          let call: gsap.core.Tween | null = null;
+          const stop = onIntroStep(stepOf(group), () => {
+            call = gsap.delayedCall(LEAD, () => timeline.play());
+          });
+          stops.push(() => {
+            stop();
+            call?.kill();
+          });
+        } else {
+          const trigger = ScrollTrigger.create({
+            trigger: group,
+            start: "top 85%",
+            once: true,
+            onEnter: () => timeline.play(),
+          });
+          stops.push(() => trigger.kill());
+        }
+
+        stops.push(() => {
+          timeline.kill();
+          parts.forEach(({ figure, text }) => {
+            figure.textContent = text;
+            figure.style.removeProperty("--_step");
+          });
+        });
+      });
+      return () => stops.forEach((stop) => stop());
+    });
+    return () => mm.revert();
+  });
+</script>
+
+<style is:global>
+  @layer components {
+    /* Tabular figures, so every digit takes the same width while it rolls
+       and the figure lands without shifting. */
+    .odometer_figure {
+      display: inline-flex;
+      align-items: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .odometer_mask,
+    .odometer_static {
+      display: inline-block;
+      height: calc(var(--_step) * 1em);
+      line-height: var(--_step);
+      padding: 0.05em;
+      margin: -0.05em;
+    }
+
+    .odometer_mask {
+      overflow: clip;
+    }
+
+    .odometer_roller {
+      display: block;
+      white-space: pre;
+      text-align: center;
+      will-change: transform;
+    }
+  }
+</style>

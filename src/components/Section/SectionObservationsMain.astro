@@ -106,7 +106,9 @@ const at = (x: number, y: number) =>
                       ]}
                       style={`left: ${(tick.x / WIDTH) * 100}%`}
                     >
-                      {tick.text}
+                      <span class="observations-main_tick_text">
+                        {tick.text}
+                      </span>
                     </span>
                   ))}
                 </div>
@@ -151,7 +153,9 @@ const at = (x: number, y: number) =>
                         class="observations-main_issue"
                         style={at(issue.x, issue.y)}
                       >
-                        <span class="observations-main_tag">{issue.text}</span>
+                        <span class="observations-main_tag text-style-label">
+                          {issue.text}
+                        </span>
                       </span>
                     </>
                   ))}
@@ -176,36 +180,44 @@ const at = (x: number, y: number) =>
   /* The visible plot is 861 × 160. The runner goes on past the right edge,
      where its track clips it. */
   const WIDTH = 861;
+  const HEIGHT = 160;
   const END = WIDTH + 40;
-  /* The dot moves in stages, one issue at a time: each leg eases in and
-     out, taking longer the further it goes, and it rests at each issue
-     while that issue's point and tag pop up. */
-  const SPEED = 520;
-  const MIN_LEG = 0.45;
-  const REST = 0.45;
-  const LEG_EASE = "power2.inOut";
-  /* The whole sequence plays at this speed, keeping the proportions of the
-     timings above: 1.5 runs it half as fast again. */
-  const PACE = 1.5;
+  /* One run, no rests: the frame draws in, then the dot draws the curve in a
+     single eased pass and each issue rises as the dot reaches it. */
+  const FRAME = { duration: 1.2, stagger: 0.08 };
+  const RUN = { start: 0.5, duration: 2.6, ease: "power2.inOut" };
+  const TAG = { duration: 0.9, lead: 0.05 };
 
-  /* A glowing dot runs along the curve from left to right, drawing it as it
-     goes. It stops at each issue: the point pops in and its tag springs up
-     out of it, then the dot moves on. It leaves through the right edge, and
-     what remains is the chart as drawn. */
+  /* When, within the run, an eased pass from 0 to END reaches x. */
+  function reach(x: number) {
+    const ease = gsap.parseEase(RUN.ease);
+    const target = x / END;
+    let low = 0;
+    let high = 1;
+    for (let i = 0; i < 24; i++) {
+      const mid = (low + high) / 2;
+      if (ease(mid) < target) low = mid;
+      else high = mid;
+    }
+    return RUN.start + ((low + high) / 2) * RUN.duration;
+  }
+
+  /* The dividers draw down one by one and the times rise behind them, the
+     hatching fades up, then a glowing dot runs the curve left to right,
+     drawing it as it goes. As it reaches each issue the point pops in and
+     its tag rises out of it; the dot leaves through the right edge. */
   function buildTimeline(chart: HTMLElement) {
     const plot = chart.querySelector<HTMLElement>(".observations-main_plot");
     const runner = chart.querySelector<HTMLElement>(
       ".observations-main_runner",
     );
-    const points = gsap.utils.toArray<SVGElement>(
-      ".observations-main_point",
-      chart,
-    );
-    const issues = gsap.utils.toArray<HTMLElement>(
-      ".observations-main_issue",
-      chart,
-    );
     if (!plot || !runner) return null;
+    const q = gsap.utils.selector(chart);
+    const dividers = q(".observations-main_dividers line");
+    const ticks = q(".observations-main_tick_text");
+    const graph = q(".observations-main_graph");
+    const points = gsap.utils.toArray<SVGElement>(".observations-main_point", chart);
+    const tags = q(".observations-main_tag");
     const curve = smoothCurve(
       JSON.parse(plot.dataset.curve ?? "[]") as Point[],
     );
@@ -213,62 +225,74 @@ const at = (x: number, y: number) =>
     const travel = { x: 0 };
     const place = () => {
       runner.style.left = `${(travel.x / WIDTH) * 100}%`;
-      runner.style.top = `${(curve.y(travel.x) / 160) * 100}%`;
+      runner.style.top = `${(curve.y(travel.x) / HEIGHT) * 100}%`;
       plot.style.setProperty("--_drawn", String(Math.min(1, travel.x / WIDTH)));
     };
 
     const timeline = gsap.timeline({ paused: true });
-    timeline.fromTo(
-      runner,
-      { autoAlpha: 0 },
-      { autoAlpha: 1, duration: 0.15 },
-      0,
-    );
-    /* `at` is when the next leg starts, in seconds. */
-    let at = 0;
-    let from = 0;
-    const leg = (to: number, ease = LEG_EASE) => {
-      const duration = Math.max(MIN_LEG, (to - from) / SPEED);
-      timeline.fromTo(
+    timeline
+      .fromTo(
+        dividers,
+        { attr: { y2: 0 } },
+        { attr: { y2: HEIGHT }, ease: "osmo", ...FRAME },
+        0,
+      )
+      .fromTo(
+        ticks,
+        { yPercent: 110 },
+        { yPercent: 0, ease: "osmo", ...FRAME },
+        0.1,
+      )
+      .fromTo(
+        graph,
+        { autoAlpha: 0 },
+        { autoAlpha: 1, duration: 1.6, ease: "power1.out" },
+        0.2,
+      )
+      .fromTo(
+        runner,
+        { autoAlpha: 0 },
+        { autoAlpha: 1, duration: 0.3, ease: "power1.out" },
+        RUN.start,
+      )
+      .fromTo(
         travel,
-        { x: from },
-        { x: to, duration, ease, onUpdate: place, immediateRender: false },
-        at,
+        { x: 0 },
+        {
+          x: END,
+          duration: RUN.duration,
+          ease: RUN.ease,
+          onUpdate: place,
+          immediateRender: false,
+        },
+        RUN.start,
       );
-      from = to;
-      at += duration;
-    };
+
     points.forEach((point, index) => {
-      leg(Number(point.dataset.x) || 0);
-      const issue = issues[index];
-      const tag = issue?.querySelector(".observations-main_tag");
+      const at = reach(Number(point.dataset.x) || 0);
       timeline.fromTo(
         point,
         { scale: 0, autoAlpha: 0 },
-        { scale: 1, autoAlpha: 1, duration: 0.45, ease: "back.out(3)" },
-        at - 0.08,
+        { scale: 1, autoAlpha: 1, duration: 0.6, ease: "back.out(1.7)" },
+        at - TAG.lead,
       );
-      if (issue && tag) {
-        timeline
-          .fromTo(
-            issue,
-            { autoAlpha: 0 },
-            { autoAlpha: 1, duration: 0.2, ease: "power1.out" },
-            at,
-          )
-          .fromTo(
-            tag,
-            { scale: 0.6, y: 10, transformOrigin: "50% 100%" },
-            { scale: 1, y: 0, duration: 0.6, ease: "back.out(2.2)" },
-            at,
-          );
+      const tag = tags[index];
+      if (tag) {
+        timeline.fromTo(
+          tag,
+          { clipPath: "inset(100% 0% 0% 0%)", y: 8, autoAlpha: 0 },
+          {
+            clipPath: "inset(0% 0% 0% 0%)",
+            y: 0,
+            autoAlpha: 1,
+            duration: TAG.duration,
+            ease: "osmo",
+          },
+          at,
+        );
       }
-      at += REST;
     });
-    /* Off through the right edge, picking up speed as it goes. */
-    leg(END, "power2.in");
     place();
-    timeline.timeScale(PACE);
     return timeline;
   }
 
@@ -276,9 +300,11 @@ const at = (x: number, y: number) =>
     const chart = section.querySelector<HTMLElement>(
       ".observations-main_chart",
     );
-    if (!chart) return () => {};
+    if (!chart || document.documentElement.classList.contains("stacki-designer")) {
+      return () => {};
+    }
 
-    /* When the chart comes into view the dot runs once by itself; scrolling
+    /* When the chart comes into view it plays once by itself; scrolling
        back past it doesn't replay or reverse it. */
     const mm = gsap.matchMedia();
     mm.add("(prefers-reduced-motion: no-preference)", () => {
@@ -426,6 +452,7 @@ const at = (x: number, y: number) =>
       --_trim-bottom: 0.5lh;
       position: absolute;
       top: 0;
+      overflow: clip;
       white-space: nowrap;
       color: color-mix(in srgb, currentColor 40%, transparent);
       &.middle {
@@ -436,11 +463,17 @@ const at = (x: number, y: number) =>
       }
     }
 
+    /* Each time rises into view through its own box. */
+    .observations-main_tick_text {
+      display: block;
+    }
+
     /* Only the running dot is clipped, as it leaves past the right edge;
        the first tag may spill a little left on a narrow chart. */
     .observations-main_plot {
       --_drawn: 1;
       position: relative;
+      container-type: inline-size;
       aspect-ratio: 861 / 160;
     }
 
@@ -494,17 +527,22 @@ const at = (x: number, y: number) =>
       position: absolute;
     }
 
+    /* Square hairline tags, as on the work cards, on the light surface. */
     .observations-main_tag {
       position: absolute;
       left: 0;
       bottom: 1.0625rem;
       translate: -50% 0;
-      padding: 0.25rem 0.625rem;
-      background-color: var(--stroke);
-      border-radius: var(--radius-small);
-      font-size: 0.75rem;
-      font-weight: var(--primary-medium);
-      line-height: var(--line-height-huge);
+      padding: 0.5em 0.65em;
+      background-color: var(--background);
+      border: var(--border-width) solid
+        color-mix(in srgb, var(--text) 18%, transparent);
+      color: color-mix(in srgb, var(--text) 75%, transparent);
+      /* Sized to the chart, so neighbouring tags never meet on its
+         narrowest, 40rem width. */
+      font-size: clamp(0.625rem, 1.55cqw, 0.75rem);
+      letter-spacing: 0.02em;
+      line-height: 1;
       white-space: nowrap;
     }
 
