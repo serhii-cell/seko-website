@@ -527,14 +527,14 @@ const at = (x: number, y: number) =>
       position: absolute;
     }
 
-    /* Square hairline tags, as on the work cards, on the light surface. */
+    /* Square hairline tags, as on the work cards, on a soft light grey. */
     .observations-main_tag {
       position: absolute;
       left: 0;
       bottom: 1.0625rem;
       translate: -50% 0;
       padding: 0.5em 0.65em;
-      background-color: var(--background);
+      background-color: color-mix(in srgb, var(--text) 5%, var(--background));
       border: var(--border-width) solid
         color-mix(in srgb, var(--text) 18%, transparent);
       color: color-mix(in srgb, var(--text) 75%, transparent);
