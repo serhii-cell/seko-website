@@ -25,6 +25,11 @@ and CSS; this covers what changes once JavaScript is involved.
   figure through 0–9 and fades it up from nothing. Figures inside one
   `data-odometer-group` roll together, one after another; on the first screen
   they wait for their intro step and `LEAD`, further down for the scroll.
+- **Dissolve:** `src/utils/dissolve.ts` turns a card dropping out of a deck
+  into ASCII: an SVG mask takes it away cell by cell from its bottom edge,
+  and each cell leaves a character that drifts off, turns green and fades,
+  shown only around the deck. It reads the card's `yPercent`, so it follows
+  the scroll both ways. The Services deck uses it while it is held.
 - CSS stays the first choice for hovers and simple state changes, on the
   `--hover-*` and `--open-*` tokens in `src/styles/base.css`. GSAP is for
   anything sequenced, scroll-driven or split into parts.
