@@ -348,12 +348,12 @@ if (import.meta.env.DEV && render) {
 
     /* Work: a case study, the whole card one link. Tags and the visual sit in
        the media column; title and text share a row under it. */
-    /* The card fits the screen's height: what's left after the nav, the tags
-       and the box under the visual is the visual's height, and its ratio
-       sets the card's width from that. */
+    /* The card fits the screen's height: what's left after the nav and the
+       box under the visual is the visual's height, and its ratio sets the
+       card's width from that. */
     .card_wrap.work {
       --_visual-ratio: 1249 / 725;
-      --_chrome: 24rem;
+      --_chrome: 22rem;
       max-width: max(20rem, calc((100svh - var(--_chrome)) * var(--_visual-ratio)));
       container: card / inline-size;
       gap: 0;
@@ -370,27 +370,36 @@ if (import.meta.env.DEV && render) {
     }
 
     .card_media {
+      position: relative;
       display: flex;
       flex-direction: column;
-      gap: var(--space-4);
       width: 100%;
     }
 
+    /* The tags sit on the visual's top-left corner, so they take no height
+       of their own. Clicks pass through to the card's link. */
     .card_tags {
+      position: absolute;
+      top: var(--space-4);
+      left: var(--space-4);
+      right: var(--space-4);
+      z-index: 1;
       display: flex;
       flex-wrap: wrap;
       gap: 0.375rem;
       margin: 0;
       padding: 0;
       list-style: none;
+      pointer-events: none;
     }
 
-    /* Hairline tags, square like the rest of the frame. */
+    /* Square hairline tags on a dark plate, like the scramble cursor. */
     .card_tag {
-      padding: 0.4em 0.6em;
+      padding: 0.5em 0.65em;
+      background-color: var(--dark-950);
       border: var(--border-width) solid
-        color-mix(in srgb, var(--text) 22%, transparent);
-      color: color-mix(in srgb, var(--text) 60%, transparent);
+        color-mix(in srgb, var(--light-100) 18%, transparent);
+      color: color-mix(in srgb, var(--light-100) 75%, transparent);
       line-height: 1;
     }
 
