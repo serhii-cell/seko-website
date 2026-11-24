@@ -13,8 +13,8 @@ import { gsap } from "@/utils/gsap.ts";
 
 /** One character per cell, in CSS px. */
 const CELL = { w: 6, h: 9 };
-/** Share of a card's drop before it starts to break up. */
-const START = 0.25;
+/** Share of a card's drop before it starts to break up: about halfway. */
+const START = 0.5;
 /** Share of the dissolve a released character stays visible. */
 const LIFE = 0.3;
 /** Extra room around a card, for anything drawn past its edges. */
