@@ -514,6 +514,10 @@ const total = String(Math.min(problems.length, visuals.length));
        container rather than the viewport, so its panel can never spill past
        them (100vw counts the scrollbar). Only its two rules run full width. */
     .problems-main_band {
+      /* Stretched across the container rather than sized to its content, so
+         the line reveal (which splits the text into already-wrapped lines)
+         can't narrow it while it plays. */
+      align-self: stretch;
       position: relative;
       margin-inline: calc(var(--_frame-inset, var(--space-7)) * -1);
       padding-block: var(--border-width);
