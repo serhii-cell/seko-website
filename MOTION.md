@@ -30,11 +30,6 @@ and CSS; this covers what changes once JavaScript is involved.
   and each cell leaves a character that drifts off, turns green and fades,
   shown only around the deck. It reads the card's `yPercent`, so it follows
   the scroll both ways. The Services deck uses it while it is held.
-- **Part dissolve:** `src/utils/part-dissolve.ts` dissolves a hovered part
-  of an SVG drawing the same way, cell by cell through a mask, its cells
-  shedding green characters only where the part is drawn; leaving plays it
-  back. The Problems drawings use it on their settings, knob, people, gear,
-  hub and scooter parts, once their intros have played.
 - CSS stays the first choice for hovers and simple state changes, on the
   `--hover-*` and `--open-*` tokens in `src/styles/base.css`. GSAP is for
   anything sequenced, scroll-driven or split into parts.
