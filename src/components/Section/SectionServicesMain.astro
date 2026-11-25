@@ -405,7 +405,8 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           scrollTrigger: {
             trigger: deck,
             start: () => `top ${holdAt(deck)}`,
-            end: () => `+=${innerHeight * 0.7 * (total - 1)}`,
+            /* A screen of scroll per card, so its dissolve has room to play. */
+            end: () => `+=${innerHeight * (total - 1)}`,
             pin: section,
             /* Off by default inside a flex parent like <main>. */
             pinSpacing: true,

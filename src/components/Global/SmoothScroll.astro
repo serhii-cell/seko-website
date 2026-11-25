@@ -11,6 +11,9 @@
     if (!location.hash) scrollTo(0, 0);
 
     const lenis = new Lenis({
+      /* How far the page closes on the wheel each frame: above Lenis's 0.1,
+         so it follows the scroll more closely and settles sooner. */
+      lerp: 0.16,
       autoToggle: true,
       allowNestedScroll: true,
       respectReducedMotion: true,
