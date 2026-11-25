@@ -44,6 +44,19 @@ export const STILL = 2;
 const SCALE = 0.8;
 export const PLACE = `translate(${(CX * (1 - SCALE)).toFixed(1)} ${(H / 2 - CY * SCALE).toFixed(1)}) scale(${SCALE})`;
 
+/** The whole frame in the dial's own units (before `PLACE`), for things
+    that come in from anywhere in it. */
+export const FRAME_BOUNDS = (() => {
+  const tx = CX * (1 - SCALE);
+  const ty = H / 2 - CY * SCALE;
+  return {
+    left: -tx / SCALE,
+    top: -ty / SCALE,
+    right: (W - tx) / SCALE,
+    bottom: (H - ty) / SCALE,
+  };
+})();
+
 const f = (value: number) => value.toFixed(1);
 
 /* The symbols: Material Symbols (outlined, weight 400, Apache 2.0), each
