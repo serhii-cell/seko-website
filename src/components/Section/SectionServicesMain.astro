@@ -158,7 +158,7 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
                     </Paragraph>
                     <ul class="services-main_outcomes" role="list">
                       {service.outcomes.map((outcome) => (
-                        <li class="services-main_outcome">{outcome}</li>
+                        <li class="services-main_outcome text-style-label">{outcome}</li>
                       ))}
                     </ul>
                   </div>
@@ -186,14 +186,26 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
 
   const CARD = ".services-main_card";
 
-  /* Where the deck holds while pinned, in px from the top of the screen:
-     centred in the space under the nav, or its bottom on the screen's
-     bottom when it is taller than that space. */
-  function holdAt(element: HTMLElement) {
+  /* Where the deck holds while pinned, in px from the top of the screen.
+     With `lead` (the figures above the deck), the section holds once the
+     heading has gone under the nav: the figures a little below the nav,
+     the deck under them, unless that would push the deck's bottom off the
+     screen, when the deck's bottom sits a little above the screen's.
+     Without it, the deck is centred in the space under the nav, or its
+     bottom on the screen's bottom when it is taller than that space. */
+  function holdAt(element: HTMLElement, lead?: HTMLElement | null) {
     const root = getComputedStyle(document.documentElement);
-    const nav = (parseFloat(root.getPropertyValue("--nav-height")) || 0) * parseFloat(root.fontSize);
+    const rem = parseFloat(root.fontSize);
+    const nav = (parseFloat(root.getPropertyValue("--nav-height")) || 0) * rem;
     const room = innerHeight - nav;
     const height = element.offsetHeight;
+    if (lead) {
+      const margin = 2 * rem;
+      const above = element.getBoundingClientRect().top - lead.getBoundingClientRect().top;
+      const under = nav + margin + above;
+      const lowest = innerHeight - margin - height;
+      return Math.max(Math.min(under, lowest), Math.min(nav, lowest));
+    }
     return height <= room ? nav + (room - height) / 2 : innerHeight - height;
   }
 
@@ -404,7 +416,8 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           defaults: { ease: "power2.inOut", duration: 1 },
           scrollTrigger: {
             trigger: deck,
-            start: () => `top ${holdAt(deck)}`,
+            start: () =>
+              `top ${holdAt(deck, section.querySelector<HTMLElement>(".services-main_stats"))}`,
             /* A screen of scroll per card, so its dissolve has room to play. */
             end: () => `+=${innerHeight * (total - 1)}`,
             pin: section,
@@ -737,14 +750,16 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
       list-style: none;
     }
 
-    /* Round at one line; a tag that still wraps keeps the same corners. */
+    /* Square hairline tags on a soft light grey, as on the chart and the
+       work cards. */
     .services-main_outcome {
-      padding: 0.25rem 0.625rem;
-      border-radius: calc(0.5lh + 0.25rem);
-      background-color: var(--stroke);
-      color: var(--text);
-      font-size: var(--text-main);
-      line-height: var(--text-main-line-height);
+      padding: 0.5em 0.65em;
+      background-color: color-mix(in srgb, var(--text) 5%, var(--background));
+      border: var(--border-width) solid
+        color-mix(in srgb, var(--text) 18%, transparent);
+      color: color-mix(in srgb, var(--text) 75%, transparent);
+      letter-spacing: 0.02em;
+      line-height: 1.2;
     }
 
     .services-main_cover {
