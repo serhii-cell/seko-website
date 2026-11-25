@@ -960,7 +960,7 @@ const total = String(Math.min(problems.length, visuals.length));
       flex-direction: column;
       align-items: center;
       gap: var(--_panel-gap);
-      padding-block: var(--section-space-small);
+      padding-block: var(--space-6) var(--section-space-small);
       padding-inline: var(--_frame-inset, var(--space-7));
       background-color: var(--background-2);
       overflow: clip;
@@ -977,10 +977,18 @@ const total = String(Math.min(problems.length, visuals.length));
       }
     }
 
-    /* The header's divider sits as far below it as the panel's edge is
-       above it; the problems keep the wider gap. */
+    /* The header sits close under the panel's top edge, with its divider as
+       close below it, running the panel's full width; the problems keep the
+       wider gap. */
     .problems-main_header + .problems-main_divider {
-      margin-top: calc(var(--section-space-small) - var(--_panel-gap));
+      align-self: stretch;
+      width: auto;
+      margin-top: calc(var(--space-6) - var(--_panel-gap));
+      margin-inline: calc(var(--_frame-inset, var(--space-7)) * -1);
+      @media (width >= 64rem) {
+        width: auto;
+        margin-inline: 0;
+      }
     }
 
     /* Every problem stacks below 64rem: its label row, the drawing, then
