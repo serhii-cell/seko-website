@@ -62,7 +62,7 @@ const at = (x: number, y: number) =>
     <Section
       theme="light"
       frame
-      class="observations-main_wrap"
+      class="observations-main_wrap overflow-x-clip"
       containerClass="observations-main_frame"
     >
       <div class="observations-main_content">
@@ -88,7 +88,7 @@ const at = (x: number, y: number) =>
           </div>
         </div>
         {chartLabel && (
-          <div class="observations-main_row">
+          <div class="observations-main_row observations-main_band">
             <Paragraph
               variant="label"
               class="observations-main_label observations-main_chart-label"
@@ -112,10 +112,7 @@ const at = (x: number, y: number) =>
                     </span>
                   ))}
                 </div>
-                <div
-                  class="observations-main_plot"
-                  data-curve={JSON.stringify(curvePoints)}
-                >
+                <div class="observations-main_plot">
                   <Chart class="observations-main_graph" />
                   <svg
                     class="observations-main_curve"
@@ -161,9 +158,6 @@ const at = (x: number, y: number) =>
                       </span>
                     </>
                   ))}
-                  <span class="observations-main_track" aria-hidden="true">
-                    <span class="observations-main_runner" />
-                  </span>
                 </div>
               </div>
             </div>
@@ -177,48 +171,34 @@ const at = (x: number, y: number) =>
 <script>
   import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
-  import { smoothCurve, type Point } from "@/utils/curve.ts";
 
-  /* The visible plot is 861 × 160. The runner goes on past the right edge,
-     where its track clips it. */
+  /* The visible plot is 861 × 160. */
   const WIDTH = 861;
   const HEIGHT = 160;
-  const END = WIDTH + 40;
-  /* One run, no rests: the frame draws in, then the dot draws the curve in a
-     single eased pass and each issue rises as the dot reaches it. */
-  const FRAME = { duration: 1.2, stagger: 0.08 };
-  const RUN = { start: 0.5, duration: 2.6, ease: "power2.inOut" };
-  /* A tag wipes up from its bottom edge first, then its words fade up
-     inside once it is mostly open, so the box and the text never move
-     together. */
-  const TAG = { open: 0.7, text: 0.6, gap: 0.4, lead: 0.05 };
+  /* The line draws left to right at an even pace, and each divider with its
+     time, each point with its tag, comes in as the line reaches it. Their
+     marks are about evenly spaced, so they arrive in a steady rhythm. */
+  const DRAW = 1.5;
+  /* Every part comes in on Osmo's ease, each starting a little before the
+     one before it has finished, so they run on into each other. */
+  const PART = { duration: 0.65, ease: "osmo" };
+  const LEAD = 0.08;
+  /* A tag wipes up from its bottom edge while its point is still growing,
+     then its words fade up inside once it is mostly open. */
+  const TAG = { open: 0.55, text: 0.45, after: 0.04, gap: 0.22 };
 
-  /* When, within the run, an eased pass from 0 to END reaches x. */
-  function reach(x: number) {
-    const ease = gsap.parseEase(RUN.ease);
-    const target = x / END;
-    let low = 0;
-    let high = 1;
-    for (let i = 0; i < 24; i++) {
-      const mid = (low + high) / 2;
-      if (ease(mid) < target) low = mid;
-      else high = mid;
-    }
-    return RUN.start + ((low + high) / 2) * RUN.duration;
-  }
-
-  /* The dividers draw down one by one and the times rise behind them, the
-     hatching slides in as it fades up, then a glowing dot runs the curve left to right,
-     drawing it as it goes. As it reaches each issue the point pops in and
-     its tag rises out of it; the dot leaves through the right edge. */
+  /* The hatching slides in as it fades up, and the line starts drawing at
+     once. As the line reaches each divider, that divider draws down and its
+     time rises; as it reaches each issue, the point grows in and its tag
+     opens above it. The last divider and time arrive with the line's end. */
   function buildTimeline(chart: HTMLElement) {
     const plot = chart.querySelector<HTMLElement>(".observations-main_plot");
-    const runner = chart.querySelector<HTMLElement>(
-      ".observations-main_runner",
-    );
-    if (!plot || !runner) return null;
+    if (!plot) return null;
     const q = gsap.utils.selector(chart);
-    const dividers = q(".observations-main_dividers line");
+    const dividers = gsap.utils.toArray<SVGLineElement>(
+      ".observations-main_dividers line",
+      chart,
+    );
     const ticks = q(".observations-main_tick_text");
     const graph = q(".observations-main_graph");
     /* The hatching's lines, inside the graph's clip: they run well past its
@@ -226,71 +206,48 @@ const at = (x: number, y: number) =>
     const hatch = q(".observations-main_graph > g > g");
     const points = gsap.utils.toArray<SVGElement>(".observations-main_point", chart);
     const tags = q(".observations-main_tag");
-    const curve = smoothCurve(
-      JSON.parse(plot.dataset.curve ?? "[]") as Point[],
-    );
+    /* When the line reaches x. */
+    const reach = (x: number) => Math.min(1, Math.max(0, x / WIDTH)) * DRAW;
 
-    const travel = { x: 0 };
-    const place = () => {
-      runner.style.left = `${(travel.x / WIDTH) * 100}%`;
-      runner.style.top = `${(curve.y(travel.x) / HEIGHT) * 100}%`;
-      plot.style.setProperty("--_drawn", String(Math.min(1, travel.x / WIDTH)));
-    };
-
+    const line = { drawn: 0 };
     const timeline = gsap.timeline({ paused: true });
     timeline
-      .fromTo(
-        dividers,
-        { attr: { y2: 0 } },
-        { attr: { y2: HEIGHT }, ease: "osmo", ...FRAME },
-        0,
-      )
-      .fromTo(
-        ticks,
-        { yPercent: 110 },
-        { yPercent: 0, ease: "osmo", ...FRAME },
-        0.1,
-      )
       /* As in the stats band: the hatching slides 2rem right as it fades. */
       .fromTo(
         graph,
         { autoAlpha: 0 },
         { autoAlpha: 1, duration: 1.68, ease: "power3.out" },
-        0.2,
+        0,
       )
       .fromTo(
         hatch,
         { x: -32 },
         { x: 0, duration: 1.68, ease: "power3.out" },
-        0.2,
+        0,
       )
       .fromTo(
-        runner,
-        { autoAlpha: 0 },
-        { autoAlpha: 1, duration: 0.3, ease: "power1.out" },
-        RUN.start,
-      )
-      .fromTo(
-        travel,
-        { x: 0 },
+        line,
+        { drawn: 0 },
         {
-          x: END,
-          duration: RUN.duration,
-          ease: RUN.ease,
-          onUpdate: place,
-          immediateRender: false,
+          drawn: 1,
+          duration: DRAW,
+          ease: "none",
+          onUpdate: () => plot.style.setProperty("--_drawn", String(line.drawn)),
         },
-        RUN.start,
+        0,
       );
 
+    dividers.forEach((divider, index) => {
+      const at = Math.max(0, reach((divider.x1.baseVal.value || 0) - 0.5) - LEAD);
+      timeline.fromTo(divider, { attr: { y2: 0 } }, { attr: { y2: HEIGHT }, ...PART }, at);
+      if (ticks[index]) {
+        timeline.fromTo(ticks[index], { yPercent: 110 }, { yPercent: 0, ...PART }, at);
+      }
+    });
+
     points.forEach((point, index) => {
-      const at = reach(Number(point.dataset.x) || 0);
-      timeline.fromTo(
-        point,
-        { scale: 0, autoAlpha: 0 },
-        { scale: 1, autoAlpha: 1, duration: 0.6, ease: "back.out(1.7)" },
-        at - TAG.lead,
-      );
+      const at = Math.max(0, reach(Number(point.dataset.x) || 0) - LEAD);
+      timeline.fromTo(point, { scale: 0, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, ...PART }, at);
       const tag = tags[index];
       const words = tag?.querySelector(".observations-main_tag_text");
       if (tag && words) {
@@ -298,27 +255,18 @@ const at = (x: number, y: number) =>
           .fromTo(
             tag,
             { clipPath: "inset(100% 0% 0% 0%)" },
-            {
-              clipPath: "inset(0% 0% 0% 0%)",
-              duration: TAG.open,
-              ease: "osmo",
-            },
-            at,
+            { clipPath: "inset(0% 0% 0% 0%)", duration: TAG.open, ease: "osmo" },
+            at + TAG.after,
           )
           .fromTo(
             words,
             { autoAlpha: 0, yPercent: 40 },
-            {
-              autoAlpha: 1,
-              yPercent: 0,
-              duration: TAG.text,
-              ease: "power2.out",
-            },
-            at + TAG.gap,
+            { autoAlpha: 1, yPercent: 0, duration: TAG.text, ease: "osmo" },
+            at + TAG.after + TAG.gap,
           );
       }
     });
-    place();
+    plot.style.setProperty("--_drawn", "0");
     return timeline;
   }
 
@@ -364,15 +312,40 @@ const at = (x: number, y: number) =>
   @layer components {
     /* The dashed rails run the full height, so the space above and below
        sits inside the framed container rather than on the section. */
+    /* The section ends with the chart band, right where the next section's
+       rule starts. */
     .observations-main_frame {
-      padding-block: var(--section-space-xlarge);
+      padding-top: var(--section-space-xlarge);
+      padding-bottom: 0;
     }
 
     .observations-main_content {
       display: flex;
       flex-direction: column;
-      gap: var(--section-space-small);
+      gap: var(--section-space-medium);
       width: 100%;
+    }
+
+    /* The chart sits in its own band, ruled across the whole screen above;
+       the rule below is the top of the problems band that follows. */
+    .observations-main_band {
+      position: relative;
+      padding-block: var(--section-space-medium);
+      &::before {
+        content: "";
+        position: absolute;
+        inset-inline: calc(50% - 50vw);
+        height: var(--border-width);
+        pointer-events: none;
+        background-image: repeating-linear-gradient(
+          to right,
+          var(--stroke) 0 var(--dash),
+          transparent 0 calc(var(--dash) * 2)
+        );
+      }
+      &::before {
+        top: 0;
+      }
     }
 
     /* A label in a narrow column, the content in a wide one, as drawn on
@@ -507,20 +480,12 @@ const at = (x: number, y: number) =>
       display: block;
     }
 
-    /* Only the running dot is clipped, as it leaves past the right edge;
-       the first tag may spill a little left on a narrow chart. */
+    /* The first tag may spill a little left on a narrow chart. */
     .observations-main_plot {
       --_drawn: 1;
       position: relative;
       container-type: inline-size;
       aspect-ratio: 861 / 160;
-    }
-
-    .observations-main_track {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-      pointer-events: none;
     }
 
     .observations-main_graph,
@@ -572,32 +537,17 @@ const at = (x: number, y: number) =>
       left: 0;
       bottom: 1.0625rem;
       translate: -50% 0;
-      padding: 0.5em 0.65em;
+      padding: 0.45em 0.6em;
       background-color: color-mix(in srgb, var(--text) 5%, var(--background));
       border: var(--border-width) solid
         color-mix(in srgb, var(--text) 18%, transparent);
       color: var(--_chart-text);
       /* Sized to the chart, so neighbouring tags never meet on its
          narrowest, 40rem width. */
-      font-size: clamp(0.625rem, 1.55cqw, 0.75rem);
+      font-size: clamp(0.5625rem, 1.3cqw, 0.6875rem);
       letter-spacing: 0.02em;
       line-height: 1;
       white-space: nowrap;
-    }
-
-    .observations-main_runner {
-      position: absolute;
-      left: 0;
-      top: 80%;
-      width: 0.75rem;
-      height: 0.75rem;
-      translate: -50% -50%;
-      border-radius: 50%;
-      background-color: var(--brand-500);
-      box-shadow:
-        0 0 0.5rem 0.125rem color-mix(in lab, var(--brand-500) 70%, transparent),
-        0 0 1.5rem 0.375rem color-mix(in lab, var(--brand-500) 35%, transparent);
-      visibility: hidden;
     }
   }
 </style>

@@ -135,34 +135,28 @@ const total = String(Math.min(problems.length, visuals.length));
       paddingTop={paddingTop}
       class="problems-main_wrap overflow-x-clip"
     >
-      <div class="problems-main_header">
-        <Paragraph
-          variant="label"
-          class="problems-main_label color-faded"
-          render={!!label}
-        >
-          {label}
-        </Paragraph>
-        <Heading tag="h2" class="problems-main_heading">
-          {heading}
-        </Heading>
-      </div>
       <div class="problems-main_band">
         <div class="problems-main_panel hatched">
+          <div class="problems-main_header">
+            <Paragraph
+              variant="label"
+              class="problems-main_label color-faded"
+              render={!!label}
+            >
+              {label}
+            </Paragraph>
+            <Heading tag="h2" class="problems-main_heading">
+              {heading}
+            </Heading>
+          </div>
           {problems.slice(0, visuals.length).map((problem, index) => (
-            <Fragment>
-              {index > 0 && (
-                <div
-                  class="problems-main_divider dashed dashed-top"
-                  aria-hidden="true"
-                />
-              )}
-              <article class="problems-main_problem">
-                <div class="problems-main_meta">
+            <article class="problems-main_problem">
+              <div class="problems-main_tab dashed dashed-block">
+                <div class="problems-main_tab-inner">
                   <Paragraph variant="label" class="color-faded">
                     Problem
                   </Paragraph>
-                  <p class="problems-main_count text-style-label" data-fade>
+                  <p class="problems-main_count text-style-label">
                     <span>{index + 1}</span>
                     <span class="color-faded" aria-hidden="true">
                       /
@@ -171,9 +165,17 @@ const total = String(Math.min(problems.length, visuals.length));
                     <span class="color-faded">{total}</span>
                   </p>
                 </div>
+              </div>
+              <div class="problems-main_content">
                 <div class="problems-main_visual" data-fade>
-                  <Fragment set:html={visuals[index]} />
+                  <div class="problems-main_stage">
+                    <Fragment set:html={visuals[index]} />
+                  </div>
                 </div>
+                <span
+                  class="problems-main_split dashed dashed-left"
+                  aria-hidden="true"
+                />
                 <div class="problems-main_body">
                   <div class="problems-main_intro">
                     <Heading tag="h3" class="problems-main_title">
@@ -195,15 +197,16 @@ const total = String(Math.min(problems.length, visuals.length));
                         <li class="problems-main_cost">
                           <svg
                             class="problems-main_icon"
-                            viewBox="0 0 24 24"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="1.25"
                             aria-hidden="true"
                             focusable="false"
                             data-fade
                           >
-                            <path
-                              fill="currentColor"
-                              d="M8.4 17 12 13.4l3.6 3.6 1.4-1.4-3.6-3.6L17 8.4 15.6 7 12 10.6 8.4 7 7 8.4l3.6 3.6L7 15.6 8.4 17Zm3.6 5a9.74 9.74 0 0 1-3.9-.79 10.1 10.1 0 0 1-3.17-2.14 10.1 10.1 0 0 1-2.14-3.17A9.74 9.74 0 0 1 2 12c0-1.38.26-2.68.79-3.9a10.1 10.1 0 0 1 2.14-3.17A10.1 10.1 0 0 1 8.1 2.79 9.74 9.74 0 0 1 12 2c1.38 0 2.68.26 3.9.79a10.1 10.1 0 0 1 3.17 2.14 10.1 10.1 0 0 1 2.14 3.17c.53 1.22.79 2.52.79 3.9s-.26 2.68-.79 3.9a10.1 10.1 0 0 1-2.14 3.17 10.1 10.1 0 0 1-3.17 2.14c-1.22.53-2.52.79-3.9.79Zm0-2c2.23 0 4.13-.78 5.68-2.33C19.23 16.13 20 14.23 20 12s-.78-4.13-2.33-5.68C16.13 4.78 14.23 4 12 4s-4.13.78-5.68 2.32C4.78 7.88 4 9.77 4 12s.78 4.13 2.32 5.67C7.88 19.23 9.77 20 12 20Z"
-                            />
+                            <circle cx="8" cy="8" r="6.5" />
+                            <path d="m5.75 5.75 4.5 4.5m0-4.5-4.5 4.5" />
                           </svg>
                           <Paragraph
                             variant="main"
@@ -216,8 +219,8 @@ const total = String(Math.min(problems.length, visuals.length));
                     </ul>
                   </div>
                 </div>
-              </article>
-            </Fragment>
+              </div>
+            </article>
           ))}
         </div>
       </div>
@@ -1271,13 +1274,15 @@ const total = String(Math.min(problems.length, visuals.length));
       }
     }
 
-    /* Label on the left, heading set further in, as on the 1920 frame. */
+    /* Label on the left, heading set further in, as on the 1920 frame. It
+       opens the panel, above a divider like the ones between problems, and
+       is as wide as a problem so the labels line up. */
     .problems-main_header {
       display: grid;
       width: 100%;
       row-gap: var(--space-4);
-      padding-bottom: var(--section-space-small);
       @media (width >= 64rem) {
+        width: var(--_block);
         grid-template-columns: minmax(0, 389fr) minmax(0, 1251fr);
         align-items: start;
       }
@@ -1286,6 +1291,11 @@ const total = String(Math.min(problems.length, visuals.length));
     .problems-main_label,
     .problems-main_heading {
       margin: 0;
+    }
+
+    /* Without a label the heading takes the whole row, from the left. */
+    .problems-main_heading:only-child {
+      grid-column: 1 / -1;
     }
 
     /* Ruled above and below across the whole screen; the off-white panel
@@ -1322,12 +1332,12 @@ const total = String(Math.min(problems.length, visuals.length));
       }
     }
 
+    /* The header opens the panel; each problem follows under its own tab,
+       one after another with nothing between them. */
     .problems-main_panel {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: var(--_panel-gap);
-      padding-block: var(--section-space-small);
       padding-inline: var(--_frame-inset, var(--space-7));
       background-color: var(--background-2);
       overflow: clip;
@@ -1336,49 +1346,43 @@ const total = String(Math.min(problems.length, visuals.length));
       }
     }
 
-    .problems-main_divider {
-      width: 100%;
-      height: var(--border-width);
+    /* The header opens on plain white, edge to edge, with room above and
+       below, its text inset like the hero's. */
+    .problems-main_header {
+      align-self: stretch;
+      margin-inline: calc(var(--_frame-inset, var(--space-7)) * -1);
+      padding: var(--section-space-small) var(--_frame-inset, var(--space-7));
+      background-color: var(--background);
       @media (width >= 64rem) {
-        width: var(--_block);
+        width: auto;
+        margin-inline: 0;
       }
     }
 
-    /* Every problem is laid out the same way. Below 64rem it stacks: its
-       label row, the drawing, then the heading, text and costs. From 64rem
-       the drawing sits on the left in a box as wide as the first one's,
-       the text centred beside it. */
+    /* A problem spans the panel's full width, so its tab can too. */
     .problems-main_problem {
-      --_ratio: 779 / 500;
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-3);
-      width: 100%;
+      align-self: stretch;
+      margin-inline: calc(var(--_frame-inset, var(--space-7)) * -1);
       @media (width >= 64rem) {
-        display: grid;
-        width: var(--_block);
-        grid-template-columns: minmax(0, 779fr) minmax(0, 634fr);
-        grid-template-areas: "meta ." "visual body";
-        column-gap: calc(161 / 1574 * 100%);
-        row-gap: var(--space-3);
-        & > .problems-main_meta {
-          grid-area: meta;
-        }
-        & > .problems-main_visual {
-          grid-area: visual;
-        }
-        & > .problems-main_body {
-          grid-area: body;
-          align-self: center;
-        }
+        margin-inline: 0;
       }
     }
 
-    .problems-main_meta {
+    /* Osmo's sticky section tab: ruled above and below, it holds under the
+       nav while its problem scrolls by, and the next one's takes over. */
+    .problems-main_tab {
+      position: sticky;
+      top: calc(var(--nav-height) - var(--border-width));
+      z-index: 2;
+      margin-top: calc(var(--border-width) * -1);
+      background-color: var(--background);
+    }
+
+    .problems-main_tab-inner {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      gap: var(--space-3);
+      gap: var(--space-4);
+      padding: var(--space-4) var(--_frame-inset, var(--space-7));
       & > .text {
         margin: 0;
       }
@@ -1395,12 +1399,61 @@ const total = String(Math.min(problems.length, visuals.length));
       }
     }
 
+    /* On the hero's grid: split where the hero splits, at half the width
+       and a half rem, with a dashed line there from tab to tab. The drawing
+       fills the left side and the text sits centred in the right, both
+       inset by the frame's inset all round, as the hero's text is. Below
+       64rem they stack. */
+    .problems-main_content {
+      --_pad: var(--_frame-inset, var(--space-7));
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: var(--_pad);
+      padding: var(--_pad);
+      @media (width >= 64rem) {
+        display: grid;
+        grid-template-columns: minmax(0, calc(50% + 0.5rem)) minmax(0, 1fr);
+        align-items: center;
+        gap: 0;
+        padding: 0;
+        & > .problems-main_visual {
+          margin: var(--_pad);
+        }
+        & > .problems-main_body {
+          padding: var(--_pad);
+        }
+      }
+    }
+
+    .problems-main_split {
+      display: none;
+      @media (width >= 64rem) {
+        display: block;
+        position: absolute;
+        inset-block: 0;
+        left: calc(50% + 0.5rem);
+        width: var(--border-width);
+      }
+    }
+
+    /* The same white frame for every drawing, the first one's shape; each
+       drawing fits inside it, and anything placed over it (problem 2's
+       bubbles) is placed across the whole frame. */
     .problems-main_visual {
       position: relative;
-      container-type: inline-size;
+      display: grid;
+      place-items: center;
+      container-type: size;
       overflow: hidden;
       background-color: var(--background);
-      aspect-ratio: var(--_ratio);
+      aspect-ratio: 779 / 500;
+    }
+
+    .problems-main_stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
     }
 
     .problems-main_drawing {
@@ -1453,13 +1506,15 @@ const total = String(Math.min(problems.length, visuals.length));
       visibility: hidden;
     }
 
+    /* The text keeps a reading measure, the same as the observations
+       paragraph, rather than running the whole right side. */
     .problems-main_body {
       display: flex;
       flex-direction: column;
       gap: var(--space-6);
-      margin-top: var(--space-5);
+      max-width: 35.5rem;
       @media (width >= 64rem) {
-        margin-top: 0;
+        box-sizing: content-box;
       }
     }
 
@@ -1494,15 +1549,16 @@ const total = String(Math.min(problems.length, visuals.length));
 
     .problems-main_cost {
       display: flex;
-      align-items: flex-start;
-      gap: 0.75rem;
+      align-items: center;
+      gap: 0.625rem;
     }
 
+    /* A thin outlined cross, a little smaller than the text. */
     .problems-main_icon {
       flex: none;
-      width: 1.5rem;
-      height: 1.5rem;
-      opacity: 0.2;
+      width: 1rem;
+      height: 1rem;
+      opacity: 0.35;
     }
 
     .problems-main_cost-text {
