@@ -14,7 +14,8 @@ import {
   W as GEAR_W,
   H as GEAR_H,
 } from "@/utils/gear-scene.ts";
-import bicycle from "@/assets/home/problems/problem-3-bicycle.svg?raw";
+import { group } from "@/utils/svg-group.ts";
+import { motorcycle } from "@/utils/moto-scene.ts";
 
 type Problem = {
   heading: string;
@@ -82,20 +83,6 @@ function prepare(
     .replace("</svg>", `${extra}</svg>`);
 }
 
-/* One `<g>` of an SVG source, by its id, with everything inside it. */
-function group(source: string, id: string) {
-  const start = source.indexOf(`<g id="${id}">`);
-  if (start < 0) return "";
-  const tags = /<g\b|<\/g>/g;
-  tags.lastIndex = start;
-  let depth = 0;
-  for (let match = tags.exec(source); match; match = tags.exec(source)) {
-    depth += match[0] === "<g" ? 1 : -1;
-    if (depth === 0) return source.slice(start, match.index + 4);
-  }
-  return "";
-}
-
 /* Problem 2: the people from the Figma drawing, the gear drawn in code so
    it can turn, and what the people say, one line at a time, left first.
    The page shows only the first line (both at once would overlap on
@@ -107,10 +94,15 @@ const LINES = [
   "What is the cost?",
 ];
 const gear = `<svg viewBox="0 0 ${GEAR_W} ${GEAR_H}"><g id="PersonLeft">${group(gearTeam, "Person right")}</g><g id="PersonRight">${group(gearTeam, "Person right_2")}</g><g id="Wheel"><g id="Spin">${wheel(0)}</g></g><g id="Hub"><g id="HubBody">${hub()}</g>${gearGlow("gear-light")}</g></svg>`;
+/* Every drawing sits in the same box, as wide as the first one's (779 ×
+   500), fitted and centred, so the gear (568 wide) has room either side:
+   a share across the gear is this share across the box. */
+const BOX = 779 / 500;
+const across = (share: number) => 0.5 + (share - 0.5) * (GEAR_W / GEAR_H / BOX);
 const bubbles = (["left", "right"] as const)
   .map(
     (side, index) =>
-      `<span class="problems-main_bubble text-style-label${index > 0 ? " is-quiet" : ""}" data-side="${side}" style="left: ${(BUBBLES[side].x * 100).toFixed(2)}%; top: ${(BUBBLES[side].y * 100).toFixed(2)}%"><span class="problems-main_bubble_text">${LINES[index]}</span></span>`,
+      `<span class="problems-main_bubble text-style-label${index > 0 ? " is-quiet" : ""}" data-side="${side}" style="left: ${(across(BUBBLES[side].x) * 100).toFixed(2)}%; top: ${(BUBBLES[side].y * 100).toFixed(2)}%"><span class="problems-main_bubble_text">${LINES[index]}</span></span>`,
   )
   .join("");
 
@@ -129,12 +121,8 @@ const visuals = [
     HubBody: "hub-body",
   }) +
     `<div class="problems-main_bubbles" aria-hidden="true" data-reveal="own" data-said='${JSON.stringify(LINES).replace(/'/g, "&#39;")}'>${bubbles}</div>`,
-  prepare(bicycle, "problem-3", { "Rectangle 148": "beam" }),
+  prepare(motorcycle(), "problem-3"),
 ];
-/* Each problem's drawing keeps its own proportions inside a frame of the
-   first one's; the name marks drawing-specific touches in the CSS. */
-const kinds = ["is-dial", "is-gear", "is-bicycle"];
-const ratios = ["779 / 500", "568 / 500", "860 / 500"];
 const total = String(Math.min(problems.length, visuals.length));
 ---
 
@@ -162,10 +150,7 @@ const total = String(Math.min(problems.length, visuals.length));
             </Heading>
           </div>
           {problems.slice(0, visuals.length).map((problem, index) => (
-            <article
-              class:list={["problems-main_problem", kinds[index]]}
-              style={`--_ratio: ${ratios[index]}`}
-            >
+            <article class="problems-main_problem">
               <div class="problems-main_tab dashed dashed-block">
                 <div class="problems-main_tab-inner">
                   <Paragraph variant="label" class="color-faded">
@@ -263,6 +248,7 @@ const total = String(Math.min(problems.length, visuals.length));
     STILL,
   } from "@/utils/dial-scene.ts";
   import { HOLE, wheel, wheelGlyphs, hubGlyphs } from "@/utils/gear-scene.ts";
+  import { bolts, shake } from "@/utils/moto-scene.ts";
   import { onPage } from "@/utils/lifecycle.ts";
 
   const START = "top 75%";
@@ -309,92 +295,287 @@ const total = String(Math.min(problems.length, visuals.length));
 
   type Box = { left: number; top: number; right: number; bottom: number };
 
+  /* The intros' glyphs are drawn on a canvas laid over the drawing, not as
+     SVG text: a thousand or more <text> elements, each with its own tweens,
+     made the page stutter as it loaded and as they flew. A cloud is one
+     part's glyphs, read off the markup the scenes write; it sits in the
+     drawing where an empty group (its anchor) is put, so it moves with
+     whatever it is part of. */
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  /* Steps from the accent to the glyphs' grey as they land. */
+  const INKS = 12;
+
+  type Cloud = {
+    anchor: SVGGElement;
+    ink: string;
+    size: number;
+    count: number;
+    x: Float32Array;
+    y: Float32Array;
+    /* Where on the ramp each glyph is, and where it has flickered to. */
+    shade: Uint8Array;
+    now: Uint8Array;
+    /* The fly-in: where each starts from (relative to its cell), when it
+       sets off and how long it takes. */
+    fromX: Float32Array;
+    fromY: Float32Array;
+    delay: Float32Array;
+    at: number;
+    flight: number;
+    /* The flicker, until then; the fade out, each glyph at its own moment. */
+    flickerUntil: number;
+    fadeAt: number;
+    fadeFor: number;
+    fadeDelay: Float32Array;
+  };
+
+  const flyEase = gsap.parseEase("power2.inOut");
+  const showEase = gsap.parseEase("power1.out");
+  const greyEase = gsap.parseEase("power1.in");
+
+  function mix(from: string, to: string, share: number) {
+    const channel = (hex: string, i: number) =>
+      parseInt(hex.slice(1 + i * 2, 3 + i * 2), 16);
+    return `rgb(${[0, 1, 2]
+      .map((i) =>
+        Math.round(channel(from, i) + (channel(to, i) - channel(from, i)) * share),
+      )
+      .join(",")})`;
+  }
+
+  function skyOver(visual: Element) {
+    const canvas = document.createElement("canvas");
+    canvas.className = "problems-main_glyphs";
+    canvas.setAttribute("aria-hidden", "true");
+    const svg = visual.querySelector("svg");
+    if (svg) svg.after(canvas);
+    else visual.appendChild(canvas);
+    const context = canvas.getContext("2d");
+    const clouds: Cloud[] = [];
+    /* Every glyph in every ink step drawn once, at the size it shows at,
+       then copied for each glyph in each frame. */
+    const sheets = new Map<
+      string,
+      { sheet: HTMLCanvasElement; cell: number }
+    >();
+    const sheetFor = (ink: string, size: number, scale: number) => {
+      const key = `${ink} ${size} ${scale.toFixed(2)}`;
+      let found = sheets.get(key);
+      if (found) return found;
+      const px = size * scale;
+      const cell = Math.ceil(px * 1.5);
+      const sheet = document.createElement("canvas");
+      sheet.width = cell * RAMP.length;
+      sheet.height = cell * INKS;
+      const pen = sheet.getContext("2d");
+      if (pen) {
+        pen.font = `${px}px ui-monospace, monospace`;
+        pen.textAlign = "center";
+        pen.textBaseline = "middle";
+        for (let row = 0; row < INKS; row++) {
+          pen.fillStyle = mix(ACCENT, ink, row / (INKS - 1));
+          for (let column = 1; column < RAMP.length; column++) {
+            pen.fillText(
+              RAMP[column],
+              column * cell + cell / 2,
+              row * cell + cell / 2,
+            );
+          }
+        }
+      }
+      found = { sheet, cell };
+      sheets.set(key, found);
+      return found;
+    };
+
+    function add(markup: string, parent: Element): Cloud {
+      const head = markup.match(/<g[^>]*>/)?.[0] ?? "";
+      const found = [
+        ...markup.matchAll(
+          /<text x="([-\d.]+)" y="([-\d.]+)"[^>]*>([^<])<\/text>/g,
+        ),
+      ];
+      const count = found.length;
+      const anchor = document.createElementNS(SVG_NS, "g");
+      parent.appendChild(anchor);
+      const cloud: Cloud = {
+        anchor,
+        ink: head.match(/fill="(#[0-9a-fA-F]{6})"/)?.[1] ?? "#9E9E9E",
+        size: Number(head.match(/font-size="([\d.]+)"/)?.[1] ?? 10),
+        count,
+        x: new Float32Array(count),
+        y: new Float32Array(count),
+        shade: new Uint8Array(count),
+        now: new Uint8Array(count),
+        fromX: new Float32Array(count),
+        fromY: new Float32Array(count),
+        delay: new Float32Array(count),
+        at: 0,
+        flight: 1,
+        flickerUntil: -1,
+        fadeAt: Infinity,
+        fadeFor: 0.1,
+        fadeDelay: new Float32Array(count),
+      };
+      found.forEach(([, x, y, glyph], i) => {
+        cloud.x[i] = Number(x);
+        cloud.y[i] = Number(y);
+        cloud.shade[i] = cloud.now[i] = Math.max(1, RAMP.indexOf(glyph));
+      });
+      clouds.push(cloud);
+      return cloud;
+    }
+
+    function clear() {
+      context?.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function draw(t: number) {
+      if (!context) return;
+      const box = canvas.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) return;
+      const ratio = Math.min(2, window.devicePixelRatio || 1);
+      const width = Math.round(box.width * ratio);
+      const height = Math.round(box.height * ratio);
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      } else clear();
+      for (const cloud of clouds) {
+        const place = cloud.anchor.getScreenCTM();
+        if (!place) continue;
+        const scale = place.a * ratio;
+        const left = (place.e - box.left) * ratio;
+        const top = (place.f - box.top) * ratio;
+        const { sheet, cell } = sheetFor(cloud.ink, cloud.size, scale);
+        const half = cell / 2;
+        /* Glyphs flicker to their neighbours on the ramp, so the shape
+           they make holds while they do. */
+        if (t <= cloud.flickerUntil) {
+          for (let n = Math.ceil(cloud.count / 20); n > 0; n--) {
+            const i = Math.floor(Math.random() * cloud.count);
+            cloud.now[i] = Math.min(
+              RAMP.length - 1,
+              Math.max(1, cloud.shade[i] + Math.round(Math.random() * 2 - 1)),
+            );
+          }
+        }
+        for (let i = 0; i < cloud.count; i++) {
+          const since = t - cloud.at - cloud.delay[i];
+          if (since <= 0) continue;
+          let alpha = showEase(Math.min(1, since / (cloud.flight * 0.4)));
+          const gone = t - cloud.fadeAt - cloud.fadeDelay[i];
+          if (gone > 0) alpha *= Math.max(0, 1 - gone / cloud.fadeFor);
+          if (alpha <= 0.004) continue;
+          const left_ = 1 - flyEase(Math.min(1, since / cloud.flight));
+          const grey = greyEase(
+            Math.min(
+              1,
+              Math.max(0, (since - cloud.flight * 0.3) / (cloud.flight * 0.7)),
+            ),
+          );
+          context.globalAlpha = alpha;
+          context.drawImage(
+            sheet,
+            cloud.now[i] * cell,
+            Math.round(grey * (INKS - 1)) * cell,
+            cell,
+            cell,
+            left + (cloud.x[i] + cloud.fromX[i] * left_) * scale - half,
+            top + (cloud.y[i] + cloud.fromY[i] * left_) * scale - half,
+            cell,
+            cell,
+          );
+        }
+      }
+      context.globalAlpha = 1;
+    }
+
+    return {
+      add,
+      /* Draws the clouds as `timeline` plays, from its start until `until`,
+         and clears them after. */
+      play(timeline: gsap.core.Timeline, until: number) {
+        const clock = { t: 0 };
+        timeline.to(
+          clock,
+          {
+            t: until,
+            duration: until,
+            ease: "none",
+            onUpdate: () => draw(clock.t),
+            onComplete: clear,
+          },
+          0,
+        );
+      },
+      remove() {
+        clouds.forEach((cloud) => cloud.anchor.remove());
+        clouds.length = 0;
+        sheets.clear();
+        canvas.remove();
+      },
+    };
+  }
+
+  type Sky = ReturnType<typeof skyOver>;
+
   /* Glyphs coming together out of the digital world, the Services cards'
      dissolve in reverse: each appears in the accent somewhere in `box` and
      flies to its cell, setting off at its own moment within `spread`
-     seconds and taking `flight`, greying (or keeping its own colour) as it
-     lands. `shift` is where the glyphs' layer sits meanwhile, down the
-     screen from its own place (negative for up). */
+     seconds and taking `flight`, greying as it lands. `shift` and `shiftX`
+     are where the cloud sits meanwhile, down and across the screen from its
+     own place. Returns when the last has landed. */
   function assemble(
-    timeline: gsap.core.Timeline,
-    glyphs: SVGTextElement[],
+    cloud: Cloud,
     {
       box,
       spread,
       flight,
       shift = 0,
+      shiftX = 0,
       at = 0,
     }: {
       box: Box;
       spread: number;
       flight: number;
       shift?: number;
+      shiftX?: number;
       at?: number;
     },
   ) {
-    const grey =
-      glyphs[0]?.parentElement?.getAttribute("fill") ?? "currentColor";
-    const ends = glyphs.map((glyph) => glyph.getAttribute("fill") ?? grey);
-    const starts = glyphs.map((glyph) => ({
-      x:
-        gsap.utils.random(box.left, box.right) -
-        Number(glyph.getAttribute("x")),
-      y:
-        gsap.utils.random(box.top, box.bottom) -
-        Number(glyph.getAttribute("y")) -
-        shift,
-    }));
-    const delays = glyphs.map(() => Math.random() * spread);
-    timeline
-      .fromTo(
-        glyphs,
-        { x: (i) => starts[i].x, y: (i) => starts[i].y },
-        {
-          x: 0,
-          y: 0,
-          duration: flight,
-          ease: "power2.inOut",
-          stagger: (i) => delays[i],
-        },
-        at,
-      )
-      .fromTo(
-        glyphs,
-        { opacity: 0 },
-        {
-          opacity: 1,
-          duration: flight * 0.4,
-          ease: "power1.out",
-          stagger: (i) => delays[i],
-        },
-        at,
-      )
-      .fromTo(
-        glyphs,
-        { attr: { fill: ACCENT } },
-        {
-          attr: { fill: (i: number) => ends[i] },
-          duration: flight * 0.7,
-          ease: "power1.in",
-          stagger: (i) => delays[i],
-        },
-        at + flight * 0.3,
-      );
-    return spread + flight;
+    for (let i = 0; i < cloud.count; i++) {
+      cloud.fromX[i] =
+        gsap.utils.random(box.left, box.right) - cloud.x[i] - shiftX;
+      cloud.fromY[i] =
+        gsap.utils.random(box.top, box.bottom) - cloud.y[i] - shift;
+      cloud.delay[i] = Math.random() * spread;
+    }
+    cloud.at = at;
+    cloud.flight = flight;
+    return at + spread + flight;
   }
 
-  /* Glyphs flicker to their neighbours on the ramp, so the shape they make
-     holds while they do. */
-  function flickering(glyphs: SVGTextElement[]) {
-    const shades = glyphs.map((glyph) => RAMP.indexOf(glyph.textContent ?? ""));
-    return () => {
-      for (let i = 0; i < Math.ceil(glyphs.length / 20); i++) {
-        const index = Math.floor(Math.random() * glyphs.length);
-        const shade = shades[index] + Math.round(Math.random() * 2 - 1);
-        glyphs[index].textContent =
-          RAMP[Math.min(RAMP.length - 1, Math.max(1, shade))];
-      }
-    };
+  /* The glyphs flicker until `until`, then go, each at its own moment
+     within `spread` seconds from `at`, taking `duration`. Returns when the
+     last has gone. */
+  function dissolve(
+    clouds: Cloud[],
+    {
+      until,
+      at,
+      spread,
+      duration,
+    }: { until: number; at: number; spread: number; duration: number },
+  ) {
+    for (const cloud of clouds) {
+      cloud.flickerUntil = until;
+      cloud.fadeAt = at;
+      cloud.fadeFor = duration;
+      for (let i = 0; i < cloud.count; i++)
+        cloud.fadeDelay[i] = Math.random() * spread;
+    }
+    return at + spread + duration;
   }
 
   /* The knob can't settle: it turns on two settings, back one, on
@@ -477,20 +658,25 @@ const total = String(Math.min(problems.length, visuals.length));
        the knob in glyphs; it flickers, then dissolves away as the drawn
        knob fades in underneath; the settings fade in round it right after,
        from the top, clockwise. The knob starts turning once they're in. */
-    const wrapper = document.createElementNS("http://www.w3.org/2000/svg", "g");
-    wrapper.innerHTML = knobGlyphs(STILL * STEP);
-    const glyphLayer = wrapper.firstElementChild;
-    if (!glyphLayer) return;
-    holder.appendChild(glyphLayer);
-    const glyphs = [...glyphLayer.children] as SVGTextElement[];
+    const sky = skyOver(visual);
+    const cloud = sky.add(knobGlyphs(STILL * STEP), holder);
     const vector = [body, knob, glow, ...settings];
     gsap.set(vector, { opacity: 0 });
 
-    const flicker = flickering(glyphs);
     /* The fly-in runs half as slow again as the rest of the intro. */
     const SPREAD = 0.9;
     const FLIGHT = 1.65;
-    const LANDED = SPREAD + FLIGHT;
+    const LANDED = assemble(cloud, {
+      box: FRAME_BOUNDS,
+      spread: SPREAD,
+      flight: FLIGHT,
+    });
+    const gone = dissolve([cloud], {
+      until: LANDED + 0.3,
+      at: LANDED + 0.1,
+      spread: 0.6,
+      duration: 0.12,
+    });
 
     let ready = false;
     let visible = false;
@@ -500,7 +686,7 @@ const total = String(Math.min(problems.length, visuals.length));
         onStart: layer.hold,
         onComplete: () => {
           layer.release();
-          glyphLayer.remove();
+          sky.remove();
           gsap.set(vector, { clearProps: "opacity" });
           ready = true;
           /* Half the usual first rest, so the knob gets going soon after. */
@@ -508,19 +694,9 @@ const total = String(Math.min(problems.length, visuals.length));
           if (visible) timeline.play();
         },
       })
-      .to({}, { duration: LANDED + 0.3, onUpdate: flicker }, 0)
       .to(
         [body, knob],
         { opacity: 1, duration: 0.6, ease: "power1.out" },
-        LANDED + 0.1,
-      )
-      .to(
-        glyphs,
-        {
-          opacity: 0,
-          duration: 0.12,
-          stagger: { amount: 0.6, from: "random" },
-        },
         LANDED + 0.1,
       )
       .to(
@@ -528,14 +704,10 @@ const total = String(Math.min(problems.length, visuals.length));
         { opacity: 1, duration: 0.45, ease: "power1.out", stagger: 0.07 },
         LANDED + 0.65,
       )
-      .to(glow, { opacity: 0.5, duration: 0.45 }, LANDED + 0.65 + STILL * 0.07)
-      /* Twice as fast as the timings above. */
-      .timeScale(2);
-    assemble(intro, glyphs, {
-      box: FRAME_BOUNDS,
-      spread: SPREAD,
-      flight: FLIGHT,
-    });
+      .to(glow, { opacity: 0.5, duration: 0.45 }, LANDED + 0.65 + STILL * 0.07);
+    sky.play(intro, gone);
+    /* Twice as fast as the timings above. */
+    intro.timeScale(2);
 
     const trigger = ScrollTrigger.create({
       trigger: visual,
@@ -564,7 +736,7 @@ const total = String(Math.min(problems.length, visuals.length));
       intro.kill();
       timeline.kill();
       if (visible) layer.release();
-      glyphLayer.remove();
+      sky.remove();
       gsap.set(vector, { clearProps: "opacity" });
       knob.innerHTML = still;
       light(STILL);
@@ -639,23 +811,11 @@ const total = String(Math.min(problems.length, visuals.length));
     );
     const said = words.map((word) => word.textContent ?? "");
 
-    /* The two parts in glyphs, inside the parts so they fall with them. */
-    const layerOf = (markup: string, part: SVGGElement) => {
-      const wrapper = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "g",
-      );
-      wrapper.innerHTML = markup;
-      const glyphs = wrapper.firstElementChild as SVGGElement;
-      part.appendChild(glyphs);
-      return glyphs;
-    };
-    const wheelLayer = layerOf(wheelGlyphs(), wheelPart);
-    const hubLayer = layerOf(hubGlyphs(), hubPart);
-    const wheelGlyphsAll = [...wheelLayer.children] as SVGTextElement[];
-    const hubGlyphsAll = [...hubLayer.children] as SVGTextElement[];
-    const glyphs = [...wheelGlyphsAll, ...hubGlyphsAll];
-    const flicker = flickering(glyphs);
+    /* The two parts in glyphs, anchored in the parts so they fall with
+       them. */
+    const sky = skyOver(visual);
+    const wheelCloud = sky.add(wheelGlyphs(), wheelPart);
+    const hubCloud = sky.add(hubGlyphs(), hubPart);
 
     /* Everything starts out of sight: the drawn parts hidden in the air,
        the light off, the people out past the top corners, nothing said. */
@@ -712,32 +872,31 @@ const total = String(Math.min(problems.length, visuals.length));
     const wheelEase = gsap.parseEase("sine.inOut");
     const joinEase = gsap.parseEase("power2.in");
     const intro = gsap.timeline({ paused: true, onStart: layer.hold });
-    const landed = assemble(intro, wheelGlyphsAll, {
+    const landed = assemble(wheelCloud, {
       box: { left: 0, top: 0, right: 568, bottom: 500 },
       spread: GEAR.spread,
       flight: GEAR.flight,
       shift: -GEAR.wheelAir,
     });
-    assemble(intro, hubGlyphsAll, {
+    assemble(hubCloud, {
       box: { left: 0, top: 0, right: 568, bottom: 500 },
       spread: GEAR.spread,
       flight: GEAR.flight,
       shift: -GEAR.hubAir,
     });
+    sky.play(
+      intro,
+      dissolve([wheelCloud, hubCloud], {
+        until: landed + 0.15,
+        at: landed + 0.05,
+        spread: 0.3,
+        duration: 0.08,
+      }),
+    );
     intro
-      .to({}, { duration: landed + 0.15, onUpdate: flicker }, 0)
       .to(
         solid,
         { opacity: 1, duration: 0.3, ease: "power1.out" },
-        landed + 0.05,
-      )
-      .to(
-        glyphs,
-        {
-          opacity: 0,
-          duration: 0.08,
-          stagger: { amount: 0.3, from: "random" },
-        },
         landed + 0.05,
       )
       .to(
@@ -791,8 +950,7 @@ const total = String(Math.min(problems.length, visuals.length));
     intro.call(
       () => {
         layer.release();
-        wheelLayer.remove();
-        hubLayer.remove();
+        sky.remove();
         talks = true;
         if (visible) talking.play();
       },
@@ -827,8 +985,7 @@ const total = String(Math.min(problems.length, visuals.length));
       talking.kill();
       gsap.ticker.remove(tick);
       if (visible) layer.release();
-      wheelLayer.remove();
-      hubLayer.remove();
+      sky.remove();
       spin.innerHTML = still;
       hole.setAttribute("fill", lit);
       /* Only what the script set: the bubbles keep their place, which the
@@ -840,34 +997,242 @@ const total = String(Math.min(problems.length, visuals.length));
     };
   }
 
-  /* The headlamp flickers on and throws its beam forward. */
-  function lamp(visual: Element, layer: Layer) {
-    const beam = visual.querySelector('[data-part="beam"]');
-    if (!beam) return;
-    gsap
-      .timeline({
-        delay: 0.3,
-        scrollTrigger: { trigger: visual, start: START, once: true },
-        onStart: layer.hold,
-        onComplete: layer.release,
-      })
-      .fromTo(
-        beam,
-        { opacity: 0, scaleX: 0.15, transformOrigin: "100% 50%" },
-        {
-          keyframes: { opacity: [0, 1, 0.25, 1, 0.5, 1] },
-          duration: 0.5,
-          ease: "none",
-          immediateRender: true,
-        },
-      )
-      .to(beam, { scaleX: 1, duration: 1 }, 0.2);
+  const CELL = { w: 7, h: 10 };
+
+  /* Parts in glyphs, read off the drawing itself: the parts are drawn alone
+     to a canvas and sampled cell by cell, lighter where they are white,
+     darker on their grey sides and edges. */
+  async function traced(markup: string, width: number, height: number) {
+    const image = new Image();
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`;
+    await image.decode();
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) throw new Error("no canvas");
+    context.drawImage(image, 0, 0, width, height);
+    const { data } = context.getImageData(0, 0, width, height);
+    const at = (x: number, y: number) => {
+      const i = (Math.round(y) * width + Math.round(x)) * 4;
+      return [data[i], data[i + 1], data[i + 2], data[i + 3]];
+    };
+    const samples = [
+      [0, 0],
+      [-2, -3],
+      [2, -3],
+      [-2, 3],
+      [2, 3],
+    ];
+    const glyphs: string[] = [];
+    for (let y = CELL.h / 2; y < height; y += CELL.h) {
+      for (let x = CELL.w / 2; x < width; x += CELL.w) {
+        let alpha = 0;
+        let light = 0;
+        for (const [dx, dy] of samples) {
+          const [r, g, b, a] = at(
+            Math.min(width - 1, Math.max(0, x + dx)),
+            Math.min(height - 1, Math.max(0, y + dy)),
+          );
+          alpha += a / 255 / samples.length;
+          light += ((r + g + b) / 3 / samples.length) * (a / 255);
+        }
+        if (alpha < 0.4) continue;
+        const shade = light / alpha;
+        const value = shade >= 250 ? 0.3 : shade >= 236 ? 0.55 : 0.8;
+        const grain = (Math.sin(x * 12.9898 + y * 78.233) * 43758.5453) % 1;
+        const index = Math.max(
+          1,
+          Math.min(
+            RAMP.length - 1,
+            Math.round(value * (RAMP.length - 1) + grain * 1.2),
+          ),
+        );
+        glyphs.push(
+          `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" opacity="0">${RAMP[index]}</text>`,
+        );
+      }
+    }
+    return `<g class="gear-glyphs" fill="#9E9E9E" font-family="ui-monospace, monospace" font-size="10" text-anchor="middle" dominant-baseline="central">${glyphs.join("")}</g>`;
+  }
+
+  /* Problem 3's story. The scooter comes together out of glyphs, all of
+     it at once and where it stands; once they have gone, its engine runs:
+     the headlamp flicks on, the wheels turn and the body shakes a pixel or
+     so eight times a second. For good, while on screen. */
+  const MOTO = {
+    spread: 0.35,
+    flight: 0.8,
+    /* One full turn of the wheels, in seconds. */
+    wheelTurn: 1.2,
+  };
+
+  /* Work that can wait for a quiet moment, so it doesn't hold up the
+     page as it loads. */
+  const whenIdle = (work: () => void) => {
+    if (typeof window.requestIdleCallback === "function")
+      window.requestIdleCallback(work, { timeout: 1500 });
+    else setTimeout(work, 200);
+  };
+
+  function moto(visual: Element, layer: Layer) {
+    const svg = visual.querySelector<SVGSVGElement>("svg");
+    const bodies = [...visual.querySelectorAll<SVGGElement>(".moto-body")];
+    const wheels = [...visual.querySelectorAll<SVGGElement>(".moto-wheel")];
+    const light = visual.querySelector<SVGGElement>(".moto-light");
+    if (!svg || !light || bodies.length === 0 || wheels.length < 2) return;
+    const [width, height] = (svg.getAttribute("viewBox") ?? "0 0 779 500")
+      .trim()
+      .split(" ")
+      .slice(2)
+      .map(Number);
+    const solid = [...bodies, ...wheels];
+    const shaken = [light, ...bodies];
+    /* Only the bolts move as the wheels turn. */
+    const turning = wheels.map((w) => ({
+      which: w.dataset.wheel === "rear" ? ("rear" as const) : ("front" as const),
+      dots: [...w.querySelectorAll<SVGCircleElement>(".moto-bolts circle")],
+    }));
+    const placeBolts = (angle: number) =>
+      turning.forEach(({ which, dots }) =>
+        bolts(which, angle).forEach(([x, y], i) => {
+          dots[i]?.setAttribute("cx", x.toFixed(1));
+          dots[i]?.setAttribute("cy", y.toFixed(1));
+        }),
+      );
+    /* The drawing to trace, taken before anything is hidden and in the
+       drawing's own order, so the body covers the wheels as it does. */
+    const markup = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" fill="none">${[
+      ...svg.querySelectorAll(".moto-body, .moto-wheel"),
+    ]
+      .map((element) => element.outerHTML)
+      .join("")}</svg>`;
+
+    gsap.set([...solid, light], { opacity: 0 });
+
+    /* The engine runs about 30 times a second, only while on screen. */
+    let running = false;
+    let visible = false;
+    let clock = 0;
+    let last = 0;
+    let shook = "";
+    const tick = (_: number, delta: number) => {
+      if (!running || !visible) return;
+      clock += Math.min(delta, 100) / 1000;
+      if (clock - last < 1 / 30 - 0.004) return;
+      last = clock;
+      placeBolts((clock * Math.PI * 2) / MOTO.wheelTurn);
+      /* Moved only when the shake changes, eight times a second. */
+      const dy = `translate(0 ${shake(clock)})`;
+      if (dy !== shook) {
+        shook = dy;
+        shaken.forEach((part) => part.setAttribute("transform", dy));
+      }
+    };
+    gsap.ticker.add(tick);
+
+    let sky: Sky | null = null;
+    let intro: gsap.core.Timeline | null = null;
+    let trigger: ScrollTrigger | null = null;
+    let stopped = false;
+
+    whenIdle(() => {
+      if (stopped) return;
+      traced(markup, width, height)
+        .then((glyphMarkup) => {
+          if (stopped) return;
+          sky = skyOver(visual);
+          const cloud = sky.add(glyphMarkup, svg);
+          const timeline = gsap.timeline({ paused: true, onStart: layer.hold });
+          const landed = assemble(cloud, {
+            box: { left: 0, top: 0, right: width, bottom: height },
+            spread: MOTO.spread,
+            flight: MOTO.flight,
+          });
+          sky.play(
+            timeline,
+            dissolve([cloud], {
+              until: landed + 0.15,
+              at: landed + 0.05,
+              spread: 0.3,
+              duration: 0.08,
+            }),
+          );
+          const starts = landed + 0.4;
+          timeline
+            .to(
+              solid,
+              { opacity: 1, duration: 0.3, ease: "power1.out" },
+              landed + 0.05,
+            )
+            /* The engine starts: the lamp flicks on and it all runs. */
+            .call(
+              () => {
+                running = true;
+              },
+              [],
+              starts,
+            )
+            .to(
+              light,
+              {
+                keyframes: { opacity: [0, 1, 0.3, 1] },
+                duration: 0.35,
+                ease: "none",
+              },
+              starts,
+            )
+            .call(
+              () => {
+                layer.release();
+                sky?.remove();
+              },
+              [],
+              starts + 0.4,
+            );
+          intro = timeline;
+          trigger = ScrollTrigger.create({
+            trigger: visual,
+            start: START,
+            once: true,
+            onEnter: () => timeline.play(),
+          });
+        })
+        /* Should the tracing fail, the scooter simply shows, and runs. */
+        .catch(() => {
+          if (stopped) return;
+          gsap.set([...solid, light], { clearProps: "opacity" });
+          running = true;
+        });
+    });
+
+    const observer = new IntersectionObserver((entries) => {
+      const now = entries[entries.length - 1].isIntersecting;
+      if (now === visible) return;
+      visible = now;
+      if (visible) layer.hold();
+      else layer.release();
+    });
+    observer.observe(visual);
+
+    return () => {
+      stopped = true;
+      observer.disconnect();
+      trigger?.kill();
+      intro?.kill();
+      gsap.ticker.remove(tick);
+      if (visible) layer.release();
+      sky?.remove();
+      gsap.set([...solid, light], { clearProps: "opacity" });
+      shaken.forEach((part) => part.removeAttribute("transform"));
+      placeBolts(0);
+    };
   }
 
   const setUps: ((visual: Element, layer: Layer) => (() => void) | void)[] = [
     dial,
     gearTeam,
-    lamp,
+    moto,
   ];
 
   onPage(() => {
@@ -898,7 +1263,9 @@ const total = String(Math.min(problems.length, visuals.length));
   @layer components {
     .problems-main_wrap {
       --_block: calc(1574 / 1736 * 100%);
-      --_panel-gap: calc(var(--space-11) * 1.25);
+      /* Between the problems and their dividers: 80px on wide screens,
+         shrinking with the space scale on narrow ones. */
+      --_panel-gap: calc(var(--space-11) * 5 / 6);
       /* Only headings are trimmed to their caps in the design; body text
          and labels keep their full line height. */
       & .text {
@@ -1070,9 +1437,9 @@ const total = String(Math.min(problems.length, visuals.length));
       }
     }
 
-    /* The same white frame for every drawing; each sits centred in it at
-       its own proportions, with anything placed over it (problem 2's
-       bubbles) in the same box. */
+    /* The same white frame for every drawing, the first one's shape; each
+       drawing fits inside it, and anything placed over it (problem 2's
+       bubbles) is placed across the whole frame. */
     .problems-main_visual {
       position: relative;
       display: grid;
@@ -1085,14 +1452,23 @@ const total = String(Math.min(problems.length, visuals.length));
 
     .problems-main_stage {
       position: relative;
-      width: min(100cqw, calc(100cqh * var(--_ratio)));
-      aspect-ratio: var(--_ratio);
+      width: 100%;
+      height: 100%;
     }
 
     .problems-main_drawing {
       display: block;
       width: 100%;
       height: 100%;
+    }
+
+    /* The intros' glyphs, drawn over the drawing while they play. */
+    .problems-main_glyphs {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
     }
 
     /* What the people in problem 2 say, set like the chart's tags: square
@@ -1190,9 +1566,9 @@ const total = String(Math.min(problems.length, visuals.length));
       color: color-mix(in lab, currentcolor 50%, transparent);
     }
 
-    /* Problem 2's abutting faces are stroked in their own colour to close
-       the anti-aliasing seams between them. */
-    .problems-main_problem.is-gear .problems-main_drawing path:not([stroke]) {
+    /* Abutting faces in the Figma drawings are stroked in their own colour
+       to close the anti-aliasing seams between them. */
+    .problems-main_drawing path:not([stroke]) {
       stroke-width: 0.6;
       &[fill="#7BD52D"] {
         stroke: #7bd52d;
