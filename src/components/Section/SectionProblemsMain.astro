@@ -1130,10 +1130,16 @@ const total = String(Math.min(problems.length, visuals.length));
       visibility: hidden;
     }
 
+    /* The text keeps a reading measure, the same as the observations
+       paragraph, rather than running the whole right side. */
     .problems-main_body {
       display: flex;
       flex-direction: column;
       gap: var(--space-6);
+      max-width: 35.5rem;
+      @media (width >= 64rem) {
+        box-sizing: content-box;
+      }
     }
 
     .problems-main_intro {
