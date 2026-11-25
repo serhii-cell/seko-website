@@ -971,7 +971,6 @@ const total = String(Math.min(problems.length, visuals.length));
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding-top: var(--space-6);
       padding-inline: var(--_frame-inset, var(--space-7));
       background-color: var(--background-2);
       overflow: clip;
@@ -980,8 +979,22 @@ const total = String(Math.min(problems.length, visuals.length));
       }
     }
 
+    /* The header opens on plain white, edge to edge, with room above and
+       below; it runs straight into the first tab with no line between. */
     .problems-main_header {
-      padding-bottom: var(--space-6);
+      align-self: stretch;
+      margin-inline: calc(var(--_frame-inset, var(--space-7)) * -1);
+      padding: var(--section-space-small) var(--_frame-inset, var(--space-7));
+      background-color: var(--background);
+      @media (width >= 64rem) {
+        width: auto;
+        margin-inline: 0;
+        padding-inline: calc((100% - var(--_block)) / 2);
+      }
+    }
+
+    .problems-main_header + .problems-main_problem .problems-main_tab {
+      --_dash-top: 0rem;
     }
 
     /* A problem spans the panel's full width, so its tab can too. */
