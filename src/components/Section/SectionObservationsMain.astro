@@ -178,14 +178,15 @@ const at = (x: number, y: number) =>
   /* The line draws left to right at an even pace, and each divider with its
      time, each point with its tag, comes in as the line reaches it. Their
      marks are about evenly spaced, so they arrive in a steady rhythm. */
-  const DRAW = 1.5;
-  /* Every part comes in on Osmo's ease, each starting a little before the
-     one before it has finished, so they run on into each other. */
-  const PART = { duration: 0.65, ease: "osmo" };
-  const LEAD = 0.08;
+  const DRAW = 1.1;
+  /* Every part comes in on Osmo's ease. Marks along the line are about a
+     quarter of its length apart, so each part starts when the one before
+     it is about 70% in. */
+  const PART = { duration: 0.4, ease: "osmo" };
+  const LEAD = 0.05;
   /* A tag wipes up from its bottom edge while its point is still growing,
      then its words fade up inside once it is mostly open. */
-  const TAG = { open: 0.55, text: 0.45, after: 0.04, gap: 0.22 };
+  const TAG = { open: 0.4, text: 0.35, after: 0.03, gap: 0.15 };
 
   /* The hatching slides in as it fades up, and the line starts drawing at
      once. As the line reaches each divider, that divider draws down and its
