@@ -131,7 +131,10 @@ const visuals = [
     `<div class="problems-main_bubbles" aria-hidden="true" data-reveal="own" data-said='${JSON.stringify(LINES).replace(/'/g, "&#39;")}'>${bubbles}</div>`,
   prepare(bicycle, "problem-3", { "Rectangle 148": "beam" }),
 ];
-const layouts = ["side", "middle", "top"];
+/* Each problem's drawing keeps its own proportions inside a frame of the
+   first one's; the name marks drawing-specific touches in the CSS. */
+const kinds = ["is-dial", "is-gear", "is-bicycle"];
+const ratios = ["779 / 500", "568 / 500", "860 / 500"];
 const total = String(Math.min(problems.length, visuals.length));
 ---
 
@@ -158,24 +161,17 @@ const total = String(Math.min(problems.length, visuals.length));
               {heading}
             </Heading>
           </div>
-          <div
-            class="problems-main_divider dashed dashed-top"
-            aria-hidden="true"
-          />
           {problems.slice(0, visuals.length).map((problem, index) => (
-            <Fragment>
-              {index > 0 && (
-                <div
-                  class="problems-main_divider dashed dashed-top"
-                  aria-hidden="true"
-                />
-              )}
-              <article class:list={["problems-main_problem", layouts[index]]}>
-                <div class="problems-main_meta">
+            <article
+              class:list={["problems-main_problem", kinds[index]]}
+              style={`--_ratio: ${ratios[index]}`}
+            >
+              <div class="problems-main_tab dashed dashed-block">
+                <div class="problems-main_tab-inner">
                   <Paragraph variant="label" class="color-faded">
                     Problem
                   </Paragraph>
-                  <p class="problems-main_count text-style-label" data-fade>
+                  <p class="problems-main_count text-style-label">
                     <span>{index + 1}</span>
                     <span class="color-faded" aria-hidden="true">
                       /
@@ -184,8 +180,12 @@ const total = String(Math.min(problems.length, visuals.length));
                     <span class="color-faded">{total}</span>
                   </p>
                 </div>
+              </div>
+              <div class="problems-main_content">
                 <div class="problems-main_visual" data-fade>
-                  <Fragment set:html={visuals[index]} />
+                  <div class="problems-main_stage">
+                    <Fragment set:html={visuals[index]} />
+                  </div>
                 </div>
                 <div class="problems-main_body">
                   <div class="problems-main_intro">
@@ -229,8 +229,8 @@ const total = String(Math.min(problems.length, visuals.length));
                     </ul>
                   </div>
                 </div>
-              </article>
-            </Fragment>
+              </div>
+            </article>
           ))}
         </div>
       </div>
@@ -960,12 +960,13 @@ const total = String(Math.min(problems.length, visuals.length));
       }
     }
 
+    /* The header opens the panel; each problem follows under its own tab,
+       one after another with nothing between them. */
     .problems-main_panel {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: var(--_panel-gap);
-      padding-block: var(--space-6) var(--section-space-small);
+      padding-top: var(--space-6);
       padding-inline: var(--_frame-inset, var(--space-7));
       background-color: var(--background-2);
       overflow: clip;
@@ -974,46 +975,40 @@ const total = String(Math.min(problems.length, visuals.length));
       }
     }
 
-    .problems-main_divider {
-      width: 100%;
-      height: var(--border-width);
-      @media (width >= 64rem) {
-        width: var(--_block);
-      }
+    .problems-main_header {
+      padding-bottom: var(--space-6);
     }
 
-    /* The header sits close under the panel's top edge, with its divider as
-       close below it, running the panel's full width; the problems keep the
-       wider gap. */
-    .problems-main_header + .problems-main_divider {
+    /* A problem spans the panel's full width, so its tab can too. */
+    .problems-main_problem {
       align-self: stretch;
-      width: auto;
-      margin-top: calc(var(--space-6) - var(--_panel-gap));
       margin-inline: calc(var(--_frame-inset, var(--space-7)) * -1);
       @media (width >= 64rem) {
-        width: auto;
         margin-inline: 0;
       }
     }
 
-    /* Every problem stacks below 64rem: its label row, the drawing, then
-       the heading, text and costs. */
-    .problems-main_problem {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-3);
-      width: 100%;
-      @media (width >= 64rem) {
-        display: grid;
-        width: var(--_block);
-      }
+    /* Osmo's sticky section tab: ruled above and below, it holds under the
+       nav while its problem scrolls by, and the next one's takes over. */
+    .problems-main_tab {
+      position: sticky;
+      top: calc(var(--nav-height) - var(--border-width));
+      z-index: 2;
+      margin-top: calc(var(--border-width) * -1);
+      background-color: var(--background);
     }
 
-    .problems-main_meta {
+    .problems-main_tab-inner {
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: var(--space-3);
+      padding: var(--space-4) var(--_frame-inset, var(--space-7));
+      @media (width >= 64rem) {
+        width: var(--_block);
+        margin-inline: auto;
+        padding-inline: 0;
+      }
       & > .text {
         margin: 0;
       }
@@ -1030,11 +1025,40 @@ const total = String(Math.min(problems.length, visuals.length));
       }
     }
 
+    /* Every problem as the first was drawn: the drawing on the left, the
+       text centred beside it. Below 64rem they stack. */
+    .problems-main_content {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-6);
+      padding: var(--section-space-small) var(--_frame-inset, var(--space-7));
+      @media (width >= 64rem) {
+        display: grid;
+        grid-template-columns: minmax(0, 779fr) minmax(0, 634fr);
+        column-gap: calc(161 / 1574 * 100%);
+        align-items: center;
+        width: var(--_block);
+        margin-inline: auto;
+        padding-inline: 0;
+      }
+    }
+
+    /* The same white frame for every drawing; each sits centred in it at
+       its own proportions, with anything placed over it (problem 2's
+       bubbles) in the same box. */
     .problems-main_visual {
       position: relative;
-      container-type: inline-size;
+      display: grid;
+      place-items: center;
+      container-type: size;
       overflow: hidden;
       background-color: var(--background);
+      aspect-ratio: 779 / 500;
+    }
+
+    .problems-main_stage {
+      position: relative;
+      width: min(100cqw, calc(100cqh * var(--_ratio)));
       aspect-ratio: var(--_ratio);
     }
 
@@ -1083,10 +1107,6 @@ const total = String(Math.min(problems.length, visuals.length));
       display: flex;
       flex-direction: column;
       gap: var(--space-6);
-      margin-top: var(--space-5);
-      @media (width >= 64rem) {
-        margin-top: 0;
-      }
     }
 
     .problems-main_intro {
@@ -1136,119 +1156,15 @@ const total = String(Math.min(problems.length, visuals.length));
       color: color-mix(in lab, currentcolor 50%, transparent);
     }
 
-    /* 1: the drawing on the left, the text centred beside it. */
-    .problems-main_problem.side {
-      --_ratio: 779 / 500;
-      @media (width >= 64rem) {
-        grid-template-columns: minmax(0, 779fr) minmax(0, 634fr);
-        grid-template-areas: "meta ." "visual body";
-        column-gap: calc(161 / 1574 * 100%);
-        row-gap: var(--space-3);
-        & > .problems-main_meta {
-          grid-area: meta;
-        }
-        & > .problems-main_visual {
-          grid-area: visual;
-        }
-        & > .problems-main_body {
-          grid-area: body;
-          align-self: center;
-        }
+    /* Problem 2's abutting faces are stroked in their own colour to close
+       the anti-aliasing seams between them. */
+    .problems-main_problem.is-gear .problems-main_drawing path:not([stroke]) {
+      stroke-width: 0.6;
+      &[fill="#7BD52D"] {
+        stroke: #7bd52d;
       }
-    }
-
-    /* 2: the text on the left, the drawing in the middle, costs on the
-       right. Three text-width columns need 80rem; below that the text sits
-       beside the drawing as in 1, mirrored. */
-    .problems-main_problem.middle {
-      --_ratio: 568 / 500;
-      @media (width >= 64rem) {
-        grid-template-columns: minmax(0, 634fr) minmax(0, 779fr);
-        grid-template-areas: ". meta" "body visual";
-        column-gap: calc(161 / 1574 * 100%);
-        row-gap: var(--space-3);
-        & .problems-main_meta {
-          grid-area: meta;
-        }
-        & .problems-main_visual {
-          grid-area: visual;
-        }
-        & .problems-main_body {
-          grid-area: body;
-          align-self: center;
-        }
-      }
-      @media (width >= 80rem) {
-        grid-template-columns: minmax(0, 384fr) minmax(0, 568fr) minmax(
-            0,
-            384fr
-          );
-        grid-template-areas: ". meta ." "intro visual costs";
-        column-gap: calc(120 / 1576 * 100%);
-        & .problems-main_body {
-          display: contents;
-        }
-        & .problems-main_intro {
-          grid-area: intro;
-          align-self: center;
-        }
-        & .problems-main_costs {
-          grid-area: costs;
-          align-self: center;
-        }
-      }
-      /* Abutting faces are stroked in their own colour to close the
-         anti-aliasing seams between them. */
-      & .problems-main_drawing path:not([stroke]) {
-        stroke-width: 0.6;
-        &[fill="#7BD52D"] {
-          stroke: #7bd52d;
-        }
-        &[fill="#F0F0F0"] {
-          stroke: #f0f0f0;
-        }
-      }
-    }
-
-    /* 3: centred, the heading above the drawing, the text and costs side
-       by side below it. Narrowed to the drawing's width from 80rem; below
-       that it keeps the full block so the costs fit on one line. */
-    .problems-main_problem.top {
-      --_ratio: 860 / 500;
-      @media (width >= 64rem) {
-        grid-template-columns: minmax(0, 464fr) minmax(0, 276fr);
-        grid-template-areas: "title title" "meta meta" "visual visual" "text costs";
-        column-gap: calc(120 / 860 * 100%);
-        row-gap: 0;
-        & .problems-main_body,
-        & .problems-main_intro {
-          display: contents;
-        }
-        & .problems-main_title {
-          grid-area: title;
-          justify-self: center;
-          width: calc(568 / 860 * 100%);
-          text-align: center;
-        }
-        & .problems-main_meta {
-          grid-area: meta;
-          margin-top: var(--space-7);
-        }
-        & .problems-main_visual {
-          grid-area: visual;
-          margin-top: var(--space-3);
-        }
-        & .problems-main_text {
-          grid-area: text;
-          margin-top: var(--space-7);
-        }
-        & .problems-main_costs {
-          grid-area: costs;
-          margin-top: var(--space-7);
-        }
-      }
-      @media (width >= 80rem) {
-        width: calc(860 / 1736 * 100%);
+      &[fill="#F0F0F0"] {
+        stroke: #f0f0f0;
       }
     }
 
