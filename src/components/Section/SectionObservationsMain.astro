@@ -62,7 +62,7 @@ const at = (x: number, y: number) =>
     <Section
       theme="light"
       frame
-      class="observations-main_wrap"
+      class="observations-main_wrap overflow-x-clip"
       containerClass="observations-main_frame"
     >
       <div class="observations-main_content">
@@ -88,7 +88,7 @@ const at = (x: number, y: number) =>
           </div>
         </div>
         {chartLabel && (
-          <div class="observations-main_row">
+          <div class="observations-main_row observations-main_band">
             <Paragraph
               variant="label"
               class="observations-main_label observations-main_chart-label"
@@ -178,13 +178,14 @@ const at = (x: number, y: number) =>
   /* The line draws left to right at an even pace, and each divider with its
      time, each point with its tag, comes in as the line reaches it. Their
      marks are about evenly spaced, so they arrive in a steady rhythm. */
-  const DRAW = 1.9;
-  /* Every part comes in on Osmo's ease. */
-  const PART = { duration: 0.8, ease: "osmo" };
-  /* A tag wipes up from its bottom edge first, then its words fade up
-     inside once it is mostly open, so the box and the text never move
-     together. */
-  const TAG = { open: 0.7, text: 0.6, gap: 0.35 };
+  const DRAW = 1.5;
+  /* Every part comes in on Osmo's ease, each starting a little before the
+     one before it has finished, so they run on into each other. */
+  const PART = { duration: 0.65, ease: "osmo" };
+  const LEAD = 0.08;
+  /* A tag wipes up from its bottom edge while its point is still growing,
+     then its words fade up inside once it is mostly open. */
+  const TAG = { open: 0.55, text: 0.45, after: 0.04, gap: 0.22 };
 
   /* The hatching slides in as it fades up, and the line starts drawing at
      once. As the line reaches each divider, that divider draws down and its
@@ -237,7 +238,7 @@ const at = (x: number, y: number) =>
       );
 
     dividers.forEach((divider, index) => {
-      const at = reach((divider.x1.baseVal.value || 0) - 0.5);
+      const at = Math.max(0, reach((divider.x1.baseVal.value || 0) - 0.5) - LEAD);
       timeline.fromTo(divider, { attr: { y2: 0 } }, { attr: { y2: HEIGHT }, ...PART }, at);
       if (ticks[index]) {
         timeline.fromTo(ticks[index], { yPercent: 110 }, { yPercent: 0, ...PART }, at);
@@ -245,7 +246,7 @@ const at = (x: number, y: number) =>
     });
 
     points.forEach((point, index) => {
-      const at = reach(Number(point.dataset.x) || 0);
+      const at = Math.max(0, reach(Number(point.dataset.x) || 0) - LEAD);
       timeline.fromTo(point, { scale: 0, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, ...PART }, at);
       const tag = tags[index];
       const words = tag?.querySelector(".observations-main_tag_text");
@@ -255,13 +256,13 @@ const at = (x: number, y: number) =>
             tag,
             { clipPath: "inset(100% 0% 0% 0%)" },
             { clipPath: "inset(0% 0% 0% 0%)", duration: TAG.open, ease: "osmo" },
-            at,
+            at + TAG.after,
           )
           .fromTo(
             words,
             { autoAlpha: 0, yPercent: 40 },
             { autoAlpha: 1, yPercent: 0, duration: TAG.text, ease: "osmo" },
-            at + TAG.gap,
+            at + TAG.after + TAG.gap,
           );
       }
     });
@@ -311,15 +312,44 @@ const at = (x: number, y: number) =>
   @layer components {
     /* The dashed rails run the full height, so the space above and below
        sits inside the framed container rather than on the section. */
+    /* The section ends on the chart band's lower rule, which is where the
+       next section starts. */
     .observations-main_frame {
-      padding-block: var(--section-space-xlarge);
+      padding-top: var(--section-space-xlarge);
+      padding-bottom: 0;
     }
 
     .observations-main_content {
       display: flex;
       flex-direction: column;
-      gap: var(--section-space-small);
+      gap: var(--section-space-medium);
       width: 100%;
+    }
+
+    /* The chart sits in its own band, ruled above and below across the
+       whole screen, as the problems band below it is. */
+    .observations-main_band {
+      position: relative;
+      padding-block: var(--section-space-small);
+      &::before,
+      &::after {
+        content: "";
+        position: absolute;
+        inset-inline: calc(50% - 50vw);
+        height: var(--border-width);
+        pointer-events: none;
+        background-image: repeating-linear-gradient(
+          to right,
+          var(--stroke) 0 var(--dash),
+          transparent 0 calc(var(--dash) * 2)
+        );
+      }
+      &::before {
+        top: 0;
+      }
+      &::after {
+        bottom: 0;
+      }
     }
 
     /* A label in a narrow column, the content in a wide one, as drawn on
