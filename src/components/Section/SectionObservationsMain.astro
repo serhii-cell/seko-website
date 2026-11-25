@@ -312,8 +312,8 @@ const at = (x: number, y: number) =>
   @layer components {
     /* The dashed rails run the full height, so the space above and below
        sits inside the framed container rather than on the section. */
-    /* The section ends on the chart band's lower rule, which is where the
-       next section starts. */
+    /* The section ends with the chart band, right where the next section's
+       rule starts. */
     .observations-main_frame {
       padding-top: var(--section-space-xlarge);
       padding-bottom: 0;
@@ -326,13 +326,12 @@ const at = (x: number, y: number) =>
       width: 100%;
     }
 
-    /* The chart sits in its own band, ruled above and below across the
-       whole screen, as the problems band below it is. */
+    /* The chart sits in its own band, ruled across the whole screen above;
+       the rule below is the top of the problems band that follows. */
     .observations-main_band {
       position: relative;
-      padding-block: var(--section-space-small);
-      &::before,
-      &::after {
+      padding-block: var(--section-space-medium);
+      &::before {
         content: "";
         position: absolute;
         inset-inline: calc(50% - 50vw);
@@ -346,9 +345,6 @@ const at = (x: number, y: number) =>
       }
       &::before {
         top: 0;
-      }
-      &::after {
-        bottom: 0;
       }
     }
 

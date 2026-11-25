@@ -144,20 +144,24 @@ const total = String(Math.min(problems.length, visuals.length));
       paddingTop={paddingTop}
       class="problems-main_wrap overflow-x-clip"
     >
-      <div class="problems-main_header">
-        <Paragraph
-          variant="label"
-          class="problems-main_label color-faded"
-          render={!!label}
-        >
-          {label}
-        </Paragraph>
-        <Heading tag="h2" class="problems-main_heading">
-          {heading}
-        </Heading>
-      </div>
       <div class="problems-main_band">
         <div class="problems-main_panel hatched">
+          <div class="problems-main_header">
+            <Paragraph
+              variant="label"
+              class="problems-main_label color-faded"
+              render={!!label}
+            >
+              {label}
+            </Paragraph>
+            <Heading tag="h2" class="problems-main_heading">
+              {heading}
+            </Heading>
+          </div>
+          <div
+            class="problems-main_divider dashed dashed-top"
+            aria-hidden="true"
+          />
           {problems.slice(0, visuals.length).map((problem, index) => (
             <Fragment>
               {index > 0 && (
@@ -898,13 +902,15 @@ const total = String(Math.min(problems.length, visuals.length));
       }
     }
 
-    /* Label on the left, heading set further in, as on the 1920 frame. */
+    /* Label on the left, heading set further in, as on the 1920 frame. It
+       opens the panel, above a divider like the ones between problems, and
+       is as wide as a problem so the labels line up. */
     .problems-main_header {
       display: grid;
       width: 100%;
       row-gap: var(--space-4);
-      padding-bottom: var(--section-space-small);
       @media (width >= 64rem) {
+        width: var(--_block);
         grid-template-columns: minmax(0, 389fr) minmax(0, 1251fr);
         align-items: start;
       }
@@ -969,6 +975,12 @@ const total = String(Math.min(problems.length, visuals.length));
       @media (width >= 64rem) {
         width: var(--_block);
       }
+    }
+
+    /* The header's divider sits as far below it as the panel's edge is
+       above it; the problems keep the wider gap. */
+    .problems-main_header + .problems-main_divider {
+      margin-top: calc(var(--section-space-small) - var(--_panel-gap));
     }
 
     /* Every problem stacks below 64rem: its label row, the drawing, then
