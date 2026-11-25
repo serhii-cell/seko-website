@@ -486,11 +486,13 @@ const uid = Math.random().toString(36).slice(2, 8);
       }
     }
 
-    /* Stories, stacked in one cell and cross-faded */
+    /* Stories, stacked in one cell and cross-faded. Each is as tall as the
+       longest, its source pinned to the bottom, so the logo row stays put
+       whatever the length of the quote above it. */
     .reviews-main_panels {
       grid-area: panels;
       display: grid;
-      align-items: start;
+      align-items: stretch;
     }
     .reviews-main_panel {
       grid-area: 1 / 1;
@@ -535,6 +537,7 @@ const uid = Math.random().toString(36).slice(2, 8);
       display: flex;
       align-items: center;
       gap: var(--space-5);
+      margin-top: auto;
       @media (width < 48rem) {
         flex-direction: column;
         align-items: start;
