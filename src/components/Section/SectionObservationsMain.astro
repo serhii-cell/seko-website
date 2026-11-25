@@ -48,7 +48,7 @@ const curvePoints: CurvePoint[] = [
 ];
 const curve = smoothCurve(curvePoints);
 const issues = [
-  { text: "Incoherent design system", x: 108 },
+  { text: "No design system", x: 108 },
   { text: "UI errors", x: 323 },
   { text: "Different UX patterns", x: 538 },
   { text: "Growing design debt", x: 753 },
@@ -91,7 +91,7 @@ const at = (x: number, y: number) =>
           <div class="observations-main_row">
             <Paragraph
               variant="label"
-              class="observations-main_label color-faded"
+              class="observations-main_label observations-main_chart-label"
             >
               {chartLabel}
             </Paragraph>
@@ -208,7 +208,7 @@ const at = (x: number, y: number) =>
   }
 
   /* The dividers draw down one by one and the times rise behind them, the
-     hatching fades up, then a glowing dot runs the curve left to right,
+     hatching slides in as it fades up, then a glowing dot runs the curve left to right,
      drawing it as it goes. As it reaches each issue the point pops in and
      its tag rises out of it; the dot leaves through the right edge. */
   function buildTimeline(chart: HTMLElement) {
@@ -221,6 +221,9 @@ const at = (x: number, y: number) =>
     const dividers = q(".observations-main_dividers line");
     const ticks = q(".observations-main_tick_text");
     const graph = q(".observations-main_graph");
+    /* The hatching's lines, inside the graph's clip: they run well past its
+       left edge, so sliding them right never shows a gap. */
+    const hatch = q(".observations-main_graph > g > g");
     const points = gsap.utils.toArray<SVGElement>(".observations-main_point", chart);
     const tags = q(".observations-main_tag");
     const curve = smoothCurve(
@@ -248,10 +251,17 @@ const at = (x: number, y: number) =>
         { yPercent: 0, ease: "osmo", ...FRAME },
         0.1,
       )
+      /* As in the stats band: the hatching slides 2rem right as it fades. */
       .fromTo(
         graph,
         { autoAlpha: 0 },
-        { autoAlpha: 1, duration: 1.6, ease: "power1.out" },
+        { autoAlpha: 1, duration: 1.68, ease: "power3.out" },
+        0.2,
+      )
+      .fromTo(
+        hatch,
+        { x: -32 },
+        { x: 0, duration: 1.68, ease: "power3.out" },
         0.2,
       )
       .fromTo(
@@ -393,6 +403,15 @@ const at = (x: number, y: number) =>
       margin: 0;
     }
 
+    /* The chart's own text, its label, times and tags, shares one colour. */
+    .observations-main_wrap {
+      --_chart-text: color-mix(in srgb, var(--text) 75%, transparent);
+    }
+
+    .observations-main_chart-label {
+      color: var(--_chart-text);
+    }
+
     /* The labels keep their full 18px line, as drawn, so their text sits
        below the heading's cap line and level with the time axis. */
     .observations-main_label {
@@ -470,7 +489,7 @@ const at = (x: number, y: number) =>
       top: 0;
       overflow: clip;
       white-space: nowrap;
-      color: color-mix(in srgb, currentColor 40%, transparent);
+      color: var(--_chart-text);
       &.middle {
         translate: -50% 0;
       }
@@ -557,7 +576,7 @@ const at = (x: number, y: number) =>
       background-color: color-mix(in srgb, var(--text) 5%, var(--background));
       border: var(--border-width) solid
         color-mix(in srgb, var(--text) 18%, transparent);
-      color: color-mix(in srgb, var(--text) 75%, transparent);
+      color: var(--_chart-text);
       /* Sized to the chart, so neighbouring tags never meet on its
          narrowest, 40rem width. */
       font-size: clamp(0.625rem, 1.55cqw, 0.75rem);

@@ -56,6 +56,70 @@ const { render = true, stats = [], class: className, ...rest } = Astro.props;
   )
 }
 
+<script>
+  import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+  import { LEAD, onIntroStep, stepOf } from "@/utils/intro.ts";
+
+  /* The band's hatching slides in from the left as it fades in, with the
+     figures: on the first screen once the rules have drawn, further down
+     when it scrolls into view. With reduced motion it simply shows. */
+  onPage(() => {
+    if (document.documentElement.classList.contains("stacki-designer")) return;
+    const lists = gsap.utils.toArray<HTMLElement>(".stats-main_list");
+    if (lists.length === 0) return;
+    const mm = gsap.matchMedia();
+    mm.add("(prefers-reduced-motion: no-preference)", () => {
+      const stops: (() => void)[] = [];
+      lists.forEach((list) => {
+        gsap.set(list, { "--_hatch-x": "-2rem", "--_hatch-alpha": 0 });
+        /* The lines keep sliding half a second after they have faded in,
+           on a gentler ease, so the movement reads. */
+        const tween = gsap
+          .timeline({
+            paused: true,
+            onComplete: () =>
+              gsap.set(list, { clearProps: "--_hatch-x,--_hatch-alpha" }),
+          })
+          .to(
+            list,
+            { "--_hatch-alpha": 1, duration: 1.68, ease: "power3.out" },
+            0,
+          )
+          .to(
+            list,
+            { "--_hatch-x": "0rem", duration: 2.18, ease: "power2.out" },
+            0,
+          );
+        if (list.closest("[data-step]") && ScrollTrigger.isInViewport(list)) {
+          let call: gsap.core.Tween | null = null;
+          const stop = onIntroStep(stepOf(list), () => {
+            call = gsap.delayedCall(LEAD, () => tween.play());
+          });
+          stops.push(() => {
+            stop();
+            call?.kill();
+          });
+        } else {
+          const trigger = ScrollTrigger.create({
+            trigger: list,
+            start: "top 85%",
+            once: true,
+            onEnter: () => tween.play(),
+          });
+          stops.push(() => trigger.kill());
+        }
+        stops.push(() => {
+          tween.kill();
+          gsap.set(list, { clearProps: "--_hatch-x,--_hatch-alpha" });
+        });
+      });
+      return () => stops.forEach((stop) => stop());
+    });
+    return () => mm.revert();
+  });
+</script>
+
 <style is:global>
   @layer components {
     /* A band of figures across the working area, ruled across the whole page
@@ -85,6 +149,13 @@ const { render = true, stats = [], class: className, ...rest } = Astro.props;
       @media (width >= 64rem) {
         grid-template-columns: repeat(4, minmax(0, 1fr));
         column-gap: 1rem;
+      }
+      /* The hatching reaches 2rem past both sides (the list clips it), so it
+         still covers the band while it slides in from the left. */
+      &::before {
+        inset-inline: -2rem;
+        translate: var(--_hatch-x, 0) 0;
+        opacity: var(--_hatch-alpha, 1);
       }
     }
 
