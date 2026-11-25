@@ -566,9 +566,9 @@ const total = String(Math.min(problems.length, visuals.length));
      high up, the hub above the wheel, already falling as they do; the hub
      falls faster, meets the wheel on the way and they land together. The
      hole through them turns green, the light flicks on and the wheel starts
-     turning, for good. The two people walk in along the drawing's axes,
-     from the top corners, from the start; once both are there they take
-     turns asking, left first, for good. */
+     turning, for good. The two people pop up where they stand, with a slight
+     bounce, as it lands; once they are up they take turns asking,
+     left first, for good. */
   const GEAR = {
     /* How high each part starts above where it lands. */
     wheelAir: 90,
@@ -583,12 +583,12 @@ const total = String(Math.min(problems.length, visuals.length));
        the gap slowly at first and quickly at the end, so the two read as
        separate parts until late in the fall. */
     join: 0.9,
-    /* When the people set off, how long their walk takes, how far they
-       come from and how many steps they take. */
-    walkAt: 0.3,
-    walk: 1.5,
-    from: 320,
-    steps: 6,
+    /* When the people pop up where they stand (as the gear lands, once
+       it is clear of them), the right one a moment after the left, and how
+       long the pop takes. */
+    popAt: 1.25,
+    popGap: 0.12,
+    pop: 0.6,
     /* One full turn of the wheel, in seconds. */
     turn: 30,
     /* Each line shows this long, a new one every `say` seconds. */
@@ -657,14 +657,11 @@ const total = String(Math.min(problems.length, visuals.length));
     const lit = hole.getAttribute("fill") ?? "";
     hole.setAttribute("fill", HOLE);
     gsap.set(light, { opacity: 0 });
-    /* Down a person's way in, along the drawing's axes: from the top left
-       for the left one, the top right for the right one. */
-    const away = (side: -1 | 1, share: number) => ({
-      x: side * GEAR.from * Math.cos(Math.PI / 6) * share,
-      y: -GEAR.from * Math.sin(Math.PI / 6) * share,
+    gsap.set([left, right], {
+      scale: 0,
+      opacity: 0,
+      transformOrigin: "50% 100%",
     });
-    gsap.set(left, away(-1, 1));
-    gsap.set(right, away(1, 1));
     gsap.set(bubbles, { autoAlpha: 0 });
 
     /* The wheel turns about 30 times a second, only while on screen. */
@@ -770,28 +767,17 @@ const total = String(Math.min(problems.length, visuals.length));
         },
         GEAR.fall,
       );
-    /* The people walk in with a small bob at every step. */
-    (
-      [
-        [left, -1],
-        [right, 1],
-      ] as const
-    ).forEach(([person, side]) => {
-      const walk = { q: 0 };
-      intro.to(
-        walk,
-        {
-          q: 1,
-          duration: GEAR.walk,
-          ease: "power2.out",
-          onUpdate: () => {
-            const { x, y } = away(side, 1 - walk.q);
-            const bob = Math.abs(Math.sin(walk.q * Math.PI * GEAR.steps)) * 4;
-            gsap.set(person, { x, y: y - bob * (1 - walk.q) });
-          },
-        },
-        GEAR.walkAt,
-      );
+    /* The people pop up where they stand, from their feet, with a slight
+       bounce. */
+    [left, right].forEach((person, index) => {
+      const at = GEAR.popAt + index * GEAR.popGap;
+      intro
+        .to(person, { opacity: 1, duration: 0.15, ease: "power1.out" }, at)
+        .to(
+          person,
+          { scale: 1, duration: GEAR.pop, ease: "back.out(2.2)" },
+          at,
+        );
     });
     intro.call(
       () => {
@@ -802,7 +788,7 @@ const total = String(Math.min(problems.length, visuals.length));
         if (visible) talking.play();
       },
       [],
-      Math.max(GEAR.fall + 0.35, GEAR.walkAt + GEAR.walk) + 0.3,
+      Math.max(GEAR.fall + 0.35, GEAR.popAt + GEAR.popGap + GEAR.pop) + 0.3,
     );
 
     const trigger = ScrollTrigger.create({
@@ -838,7 +824,7 @@ const total = String(Math.min(problems.length, visuals.length));
       hole.setAttribute("fill", lit);
       /* Only what the script set: the bubbles keep their place, which the
          page writes on them. */
-      gsap.set([...solid, light], { clearProps: "opacity" });
+      gsap.set([...solid, light, left, right], { clearProps: "opacity" });
       gsap.set([wheelPart, hubPart, left, right], { clearProps: "transform" });
       gsap.set(bubbles, { clearProps: "opacity,visibility" });
       words.forEach((word, index) => (word.textContent = said[index]));
