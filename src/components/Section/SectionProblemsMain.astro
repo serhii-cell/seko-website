@@ -980,7 +980,7 @@ const total = String(Math.min(problems.length, visuals.length));
     }
 
     /* The header opens on plain white, edge to edge, with room above and
-       below; it runs straight into the first tab with no line between. */
+       below, its text inset like the hero's. */
     .problems-main_header {
       align-self: stretch;
       margin-inline: calc(var(--_frame-inset, var(--space-7)) * -1);
@@ -989,12 +989,7 @@ const total = String(Math.min(problems.length, visuals.length));
       @media (width >= 64rem) {
         width: auto;
         margin-inline: 0;
-        padding-inline: calc((100% - var(--_block)) / 2);
       }
-    }
-
-    .problems-main_header + .problems-main_problem .problems-main_tab {
-      --_dash-top: 0rem;
     }
 
     /* A problem spans the panel's full width, so its tab can too. */
@@ -1021,11 +1016,6 @@ const total = String(Math.min(problems.length, visuals.length));
       align-items: center;
       gap: var(--space-4);
       padding: var(--space-4) var(--_frame-inset, var(--space-7));
-      @media (width >= 64rem) {
-        width: var(--_block);
-        margin-inline: auto;
-        padding-inline: 0;
-      }
       & > .text {
         margin: 0;
       }
@@ -1042,23 +1032,30 @@ const total = String(Math.min(problems.length, visuals.length));
       }
     }
 
-    /* Every problem as the first was drawn: the drawing on the left, the
-       text centred beside it, a dashed line between them running from tab to
-       tab. The space either side of the line is less than the space around
-       the outside. Below 64rem they stack. */
+    /* On the hero's grid: split where the hero splits, at half the width
+       and a half rem, with a dashed line there from tab to tab. The drawing
+       fills the left side and the text sits centred in the right, both
+       inset by the frame's inset all round, as the hero's text is. Below
+       64rem they stack. */
     .problems-main_content {
+      --_pad: var(--_frame-inset, var(--space-7));
+      position: relative;
       display: flex;
       flex-direction: column;
-      gap: var(--space-6);
-      padding: var(--section-space-small) var(--_frame-inset, var(--space-7));
+      gap: var(--_pad);
+      padding: var(--_pad);
       @media (width >= 64rem) {
         display: grid;
-        grid-template-columns: minmax(0, 860fr) auto minmax(0, 600fr);
-        column-gap: var(--space-7);
+        grid-template-columns: minmax(0, calc(50% + 0.5rem)) minmax(0, 1fr);
         align-items: center;
-        width: var(--_block);
-        margin-inline: auto;
-        padding-inline: 0;
+        gap: 0;
+        padding: 0;
+        & > .problems-main_visual {
+          margin: var(--_pad);
+        }
+        & > .problems-main_body {
+          padding: var(--_pad);
+        }
       }
     }
 
@@ -1066,9 +1063,10 @@ const total = String(Math.min(problems.length, visuals.length));
       display: none;
       @media (width >= 64rem) {
         display: block;
-        align-self: stretch;
+        position: absolute;
+        inset-block: 0;
+        left: calc(50% + 0.5rem);
         width: var(--border-width);
-        margin-block: calc(var(--section-space-small) * -1);
       }
     }
 
