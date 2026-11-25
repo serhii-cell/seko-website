@@ -109,7 +109,7 @@ const uid = Math.random().toString(36).slice(2, 8);
 
         <p class="sr-only" aria-live="polite" data-reviews-status />
 
-        <div class="reviews-main_panels">
+        <div class="reviews-main_panels" data-lines="off">
           {reviews.map((review, i) => {
             const Logo = review.logo;
             return (
@@ -166,11 +166,23 @@ const uid = Math.random().toString(36).slice(2, 8);
 </noscript>
 
 <script>
+  import { gsap, SplitText } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
+
+  /* Osmo's Line Reveal Testimonials: the story going out slides up out of
+     its line masks as its logo wipes away; the one coming in rises line by
+     line into place as its logo wipes in. */
+  const HIDDEN = "inset(0% 100% 0% 0%)";
+  const GONE = "inset(0% 0% 0% 100%)";
+  const SHOWN = "inset(0% 0% 0% 0%)";
 
   onPage(() => {
     const controller = new AbortController();
     const { signal } = controller;
+    const cleanups: (() => void)[] = [];
+    const moving =
+      !matchMedia("(prefers-reduced-motion: reduce)").matches &&
+      !document.documentElement.classList.contains("stacki-designer");
 
     for (const root of document.querySelectorAll<HTMLElement>(
       "[data-reviews]",
@@ -189,8 +201,79 @@ const uid = Math.random().toString(36).slice(2, 8);
         tabs.findIndex((tab) => tab.getAttribute("aria-selected") === "true"),
       );
 
+      /* With motion, every story stays laid out and its lines are masked
+         off instead; only the one shown can be reached. */
+      let timeline: gsap.core.Timeline | null = null;
+      const slides = moving
+        ? panels.map((panel, i) => {
+            const targets = [
+              panel.querySelector<HTMLElement>(".reviews-main_quote .text"),
+              panel.querySelector<HTMLElement>(".reviews-main_tagline"),
+            ].filter((el): el is HTMLElement => !!el);
+            const splits = targets.map((el) =>
+              SplitText.create(el, {
+                type: "lines",
+                mask: "lines",
+                linesClass: "reviews-main_line",
+                autoSplit: true,
+                onSplit(self) {
+                  gsap.set(self.lines, { yPercent: i === current ? 0 : 110 });
+                },
+              }),
+            );
+            const logo = panel.querySelector<SVGElement>(".reviews-main_logo");
+            if (logo) gsap.set(logo, { clipPath: i === current ? SHOWN : HIDDEN });
+            panel.inert = i !== current;
+            return {
+              panel,
+              logo,
+              splits,
+              lines: () => splits.flatMap((split) => split.lines),
+            };
+          })
+        : null;
+      if (slides) {
+        root.querySelector(".reviews-main_panels")?.classList.add("is-split");
+        cleanups.push(() => {
+          timeline?.kill();
+          slides.forEach(({ panel, logo, splits }) => {
+            panel.inert = false;
+            splits.forEach((split) => split.revert());
+            if (logo) gsap.set(logo, { clearProps: "clipPath" });
+          });
+        });
+      }
+
+      const reveal = (from: number, to: number) => {
+        if (!slides || from === to) return;
+        timeline?.progress(1);
+        const out = slides[from];
+        const into = slides[to];
+        out.panel.inert = true;
+        into.panel.inert = false;
+        gsap.set(into.lines(), { yPercent: 110 });
+        if (into.logo) gsap.set(into.logo, { clipPath: HIDDEN });
+        timeline = gsap
+          .timeline()
+          .to(
+            out.lines(),
+            { yPercent: -110, duration: 0.6, ease: "power4.inOut", stagger: { amount: 0.25 } },
+            0,
+          );
+        if (out.logo)
+          timeline.to(out.logo, { clipPath: GONE, duration: 0.6, ease: "power4.inOut" }, 0);
+        timeline.to(
+          into.lines(),
+          { yPercent: 0, duration: 0.7, ease: "power4.inOut", stagger: { amount: 0.4 } },
+          ">-=0.3",
+        );
+        if (into.logo)
+          timeline.to(into.logo, { clipPath: SHOWN, duration: 0.75, ease: "power4.inOut" }, "<");
+      };
+
       const show = (next: number, focus = false, announce = false) => {
         const index = (next + tabs.length) % tabs.length;
+        reveal(current, index);
         tabs.forEach((tab, i) => {
           const active = i === index;
           tab.classList.toggle("is-active", active);
@@ -240,7 +323,10 @@ const uid = Math.random().toString(36).slice(2, 8);
       }
     }
 
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      cleanups.forEach((cleanup) => cleanup());
+    };
   });
 </script>
 
@@ -429,6 +515,17 @@ const uid = Math.random().toString(36).slice(2, 8);
         outline-offset: var(--space-3);
       }
     }
+    /* With motion every story stays laid out in the one cell and the
+       script masks its lines off instead of fading it. */
+    .reviews-main_panels.is-split .reviews-main_panel {
+      opacity: 1;
+      visibility: visible;
+      transition: none;
+      &[inert] .reviews-main_divider {
+        visibility: hidden;
+      }
+    }
+
     /* Trim the quote's last line to its baseline, as Figma's cap-height
        trim does, so the logo row lands 80px below it */
     .reviews-main_quote .text {
