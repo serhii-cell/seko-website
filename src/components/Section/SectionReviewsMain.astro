@@ -132,9 +132,6 @@ const uid = Math.random().toString(36).slice(2, 8);
                       data-fade
                     />
                   )}
-                  {Logo && review.tagline && (
-                    <span class="reviews-main_divider" aria-hidden="true" />
-                  )}
                   <Paragraph variant="label" class="reviews-main_tagline">
                     {review.tagline}
                   </Paragraph>
@@ -523,9 +520,6 @@ const uid = Math.random().toString(36).slice(2, 8);
       opacity: 1;
       visibility: visible;
       transition: none;
-      &[inert] .reviews-main_divider {
-        visibility: hidden;
-      }
     }
 
     /* Trim the quote's last line to its baseline, as Figma's cap-height
@@ -553,14 +547,6 @@ const uid = Math.random().toString(36).slice(2, 8);
         height: 1.5rem;
       }
     }
-    .reviews-main_divider {
-      flex: none;
-      align-self: stretch;
-      width: var(--border-width);
-      background-color: var(--stroke);
-      @media (width < 48rem) {
-        display: none;
-      }
     }
   }
 </style>
