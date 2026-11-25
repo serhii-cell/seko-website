@@ -237,7 +237,7 @@ const total = String(Math.min(problems.length, visuals.length));
 
 <script>
   import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
-  import { asciiHover } from "@/utils/ascii-hover.ts";
+  import { partDissolve } from "@/utils/part-dissolve.ts";
   import {
     ACCENT,
     FRAME_BOUNDS,
@@ -1230,6 +1230,20 @@ const total = String(Math.min(problems.length, visuals.length));
     };
   }
 
+  /* The parts of each drawing that dissolve when hovered: the dial's
+     settings and knob, the people, gear and hub, the scooter's wheels,
+     body and light. */
+  const PARTS = [
+    ".dial-setting",
+    '[data-part="grip"]',
+    '[data-part^="person"]',
+    '[data-part="wheel"]',
+    '[data-part="hub"]',
+    ".moto-wheel",
+    ".moto-body",
+    ".moto-light",
+  ].join(", ");
+
   const setUps: ((visual: Element, layer: Layer) => (() => void) | void)[] = [
     dial,
     gearTeam,
@@ -1252,12 +1266,13 @@ const total = String(Math.min(problems.length, visuals.length));
             stops.push(layer.stop);
             const stop = setUps[index]?.(visual, layer);
             if (stop) stops.push(stop);
-            /* Hovered, the drawing turns to ASCII, as its intro begins;
-               not while the intro's own glyphs are up. */
+            /* A part of the drawing dissolves into ASCII while it is
+               hovered; not while the intro's own glyphs are up. */
             if (matchMedia("(hover: hover) and (pointer: fine)").matches)
               stops.push(
-                asciiHover(
+                partDissolve(
                   visual,
+                  PARTS,
                   () => !!visual.querySelector(".problems-main_glyphs"),
                 ),
               );
