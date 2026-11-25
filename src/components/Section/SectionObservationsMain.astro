@@ -179,38 +179,29 @@ const at = (x: number, y: number) =>
   import { onPage } from "@/utils/lifecycle.ts";
   import { smoothCurve, type Point } from "@/utils/curve.ts";
 
-  /* The visible plot is 861 × 160. The runner goes on past the right edge,
-     where its track clips it. */
+  /* The visible plot is 861 × 160. */
   const WIDTH = 861;
   const HEIGHT = 160;
-  const END = WIDTH + 40;
-  /* One run, no rests: the frame draws in, then the dot draws the curve in a
-     single eased pass and each issue rises as the dot reaches it. */
-  const FRAME = { duration: 1.2, stagger: 0.08 };
-  const RUN = { start: 0.5, duration: 2.6, ease: "power2.inOut" };
+  /* The dot runs from the launch to the last issue in one eased pass and
+     stops there. Everything else appears as the dot reaches it: each
+     divider with its time, each point with its tag. */
+  const RUN = { start: 0.35, duration: 3.2, ease: "power2.inOut" };
+  /* A divider draws down and its time rises as the dot passes it. */
+  const MARK = { duration: 0.9, lead: 0.1 };
   /* A tag wipes up from its bottom edge first, then its words fade up
      inside once it is mostly open, so the box and the text never move
      together. */
   const TAG = { open: 0.7, text: 0.6, gap: 0.4, lead: 0.05 };
+  /* At the last issue the dot shrinks away while the line runs on to the
+     edge. */
+  const END = { fade: 0.45, after: 0.2, tail: 0.9 };
 
-  /* When, within the run, an eased pass from 0 to END reaches x. */
-  function reach(x: number) {
-    const ease = gsap.parseEase(RUN.ease);
-    const target = x / END;
-    let low = 0;
-    let high = 1;
-    for (let i = 0; i < 24; i++) {
-      const mid = (low + high) / 2;
-      if (ease(mid) < target) low = mid;
-      else high = mid;
-    }
-    return RUN.start + ((low + high) / 2) * RUN.duration;
-  }
-
-  /* The dividers draw down one by one and the times rise behind them, the
-     hatching slides in as it fades up, then a glowing dot runs the curve left to right,
-     drawing it as it goes. As it reaches each issue the point pops in and
-     its tag rises out of it; the dot leaves through the right edge. */
+  /* The hatching slides in as it fades up while the first divider and the
+     launch draw in and the dot appears. The dot then runs the curve, drawing
+     it as it goes; as it passes each divider that divider and its time come
+     in, and as it reaches each issue the point pops in and its tag rises
+     out of it. At the last issue the dot shrinks away and the line finishes
+     to the edge with the last time. */
   function buildTimeline(chart: HTMLElement) {
     const plot = chart.querySelector<HTMLElement>(".observations-main_plot");
     const runner = chart.querySelector<HTMLElement>(
@@ -218,7 +209,10 @@ const at = (x: number, y: number) =>
     );
     if (!plot || !runner) return null;
     const q = gsap.utils.selector(chart);
-    const dividers = q(".observations-main_dividers line");
+    const dividers = gsap.utils.toArray<SVGLineElement>(
+      ".observations-main_dividers line",
+      chart,
+    );
     const ticks = q(".observations-main_tick_text");
     const graph = q(".observations-main_graph");
     /* The hatching's lines, inside the graph's clip: they run well past its
@@ -229,62 +223,110 @@ const at = (x: number, y: number) =>
     const curve = smoothCurve(
       JSON.parse(plot.dataset.curve ?? "[]") as Point[],
     );
+    const stops = points.map((point) => Number(point.dataset.x) || 0);
+    const last = stops.at(-1) ?? WIDTH;
+    const arrive = RUN.start + RUN.duration;
+
+    /* When the eased run reaches x. */
+    const runEase = gsap.parseEase(RUN.ease);
+    const reach = (x: number) => {
+      if (x <= 0) return RUN.start;
+      if (x >= last) return arrive;
+      let low = 0;
+      let high = 1;
+      for (let i = 0; i < 24; i++) {
+        const mid = (low + high) / 2;
+        if (runEase(mid) < x / last) low = mid;
+        else high = mid;
+      }
+      return RUN.start + ((low + high) / 2) * RUN.duration;
+    };
 
     const travel = { x: 0 };
+    const line = { x: 0 };
+    const draw = () =>
+      plot.style.setProperty("--_drawn", String(Math.min(1, line.x / WIDTH)));
     const place = () => {
       runner.style.left = `${(travel.x / WIDTH) * 100}%`;
       runner.style.top = `${(curve.y(travel.x) / HEIGHT) * 100}%`;
-      plot.style.setProperty("--_drawn", String(Math.min(1, travel.x / WIDTH)));
+      line.x = travel.x;
+      draw();
     };
 
     const timeline = gsap.timeline({ paused: true });
     timeline
-      .fromTo(
-        dividers,
-        { attr: { y2: 0 } },
-        { attr: { y2: HEIGHT }, ease: "osmo", ...FRAME },
-        0,
-      )
-      .fromTo(
-        ticks,
-        { yPercent: 110 },
-        { yPercent: 0, ease: "osmo", ...FRAME },
-        0.1,
-      )
       /* As in the stats band: the hatching slides 2rem right as it fades. */
       .fromTo(
         graph,
         { autoAlpha: 0 },
         { autoAlpha: 1, duration: 1.68, ease: "power3.out" },
-        0.2,
+        0,
       )
       .fromTo(
         hatch,
         { x: -32 },
         { x: 0, duration: 1.68, ease: "power3.out" },
-        0.2,
+        0,
       )
       .fromTo(
         runner,
-        { autoAlpha: 0 },
-        { autoAlpha: 1, duration: 0.3, ease: "power1.out" },
-        RUN.start,
+        { autoAlpha: 0, scale: 0 },
+        { autoAlpha: 1, scale: 1, duration: 0.5, ease: "back.out(1.7)" },
+        RUN.start - 0.25,
       )
       .fromTo(
         travel,
         { x: 0 },
         {
-          x: END,
+          x: last,
           duration: RUN.duration,
           ease: RUN.ease,
           onUpdate: place,
           immediateRender: false,
         },
         RUN.start,
+      )
+      .to(
+        runner,
+        { autoAlpha: 0, scale: 0, duration: END.fade, ease: "power3.in" },
+        arrive + END.after,
+      )
+      .fromTo(
+        line,
+        { x: last },
+        {
+          x: WIDTH,
+          duration: END.tail,
+          ease: "power2.out",
+          onUpdate: draw,
+          immediateRender: false,
+        },
+        arrive,
       );
 
+    /* Each divider and its time, as the dot passes them. */
+    dividers.forEach((divider, index) => {
+      const x = (divider.x1.baseVal.value || 0) - 0.5;
+      const at = Math.max(0, reach(x) - MARK.lead) - (x <= 0 ? 0.25 : 0);
+      timeline.fromTo(
+        divider,
+        { attr: { y2: 0 } },
+        { attr: { y2: HEIGHT }, duration: MARK.duration, ease: "osmo" },
+        at,
+      );
+      if (ticks[index]) {
+        timeline.fromTo(
+          ticks[index],
+          { yPercent: 110 },
+          { yPercent: 0, duration: MARK.duration, ease: "osmo" },
+          at + 0.05,
+        );
+      }
+    });
+
+    /* Each point and its tag, as the dot reaches them. */
     points.forEach((point, index) => {
-      const at = reach(Number(point.dataset.x) || 0);
+      const at = reach(stops[index]);
       timeline.fromTo(
         point,
         { scale: 0, autoAlpha: 0 },
@@ -572,14 +614,14 @@ const at = (x: number, y: number) =>
       left: 0;
       bottom: 1.0625rem;
       translate: -50% 0;
-      padding: 0.5em 0.65em;
+      padding: 0.45em 0.6em;
       background-color: color-mix(in srgb, var(--text) 5%, var(--background));
       border: var(--border-width) solid
         color-mix(in srgb, var(--text) 18%, transparent);
       color: var(--_chart-text);
       /* Sized to the chart, so neighbouring tags never meet on its
          narrowest, 40rem width. */
-      font-size: clamp(0.625rem, 1.55cqw, 0.75rem);
+      font-size: clamp(0.5625rem, 1.3cqw, 0.6875rem);
       letter-spacing: 0.02em;
       line-height: 1;
       white-space: nowrap;
