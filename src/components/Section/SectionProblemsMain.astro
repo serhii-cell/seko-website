@@ -921,6 +921,11 @@ const total = String(Math.min(problems.length, visuals.length));
       margin: 0;
     }
 
+    /* Without a label the heading takes the whole row, from the left. */
+    .problems-main_heading:only-child {
+      grid-column: 1 / -1;
+    }
+
     /* Ruled above and below across the whole screen; the off-white panel
        inside it fills the working area between the rails. */
     /* The band is exactly as wide as the rails, measured from the framed
