@@ -192,6 +192,9 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
      to go, and how far back past that it returns. */
   const LEAD = 0.15;
   const BACK = 0.1;
+  /* How far each step back leans toward the cursor (at half a screen from
+     the front card's centre, or more), in px, and how quickly it follows. */
+  const LEAN = { x: 8, y: 5, time: 0.6 };
 
   /* Where the deck holds while pinned, in px from the top of the screen.
      With `lead` (the figures above the deck), the section holds once the
@@ -231,6 +234,8 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
       if (cards.length < 2) return;
       const posOf = (card: HTMLElement) => Number(card.dataset.pos);
       let moving = false;
+      /* Straightens the cards behind (set below), when the deck reorders. */
+      let leanBack = () => {};
       /* Set while the page's scroll drives the deck. */
       let scrolled: { trigger: ScrollTrigger; order: HTMLElement[]; length: number } | null = null;
       /* A card asked for from the keyboard, to focus once it is in front. */
@@ -299,6 +304,7 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
         }
 
         moving = true;
+        leanBack();
         deck.classList.add("is-moving");
         ctx.add(() => {
           const timeline = gsap.timeline({ onComplete: settle });
@@ -364,6 +370,40 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
         { signal },
       );
 
+      /* The cards behind the front one lean toward the cursor, the further
+         back the more, so their strips slide sideways and rise or sink. */
+      const lean = (nx: number, ny: number, instant = false) => {
+        cards.forEach((card) => {
+          const depth = Math.max(0, posOf(card));
+          gsap.to(card, {
+            "--_lean-x": nx * LEAN.x * depth,
+            "--_lean-y": ny * LEAN.y * depth,
+            duration: instant ? 0 : LEAN.time,
+            ease: "power3.out",
+            overwrite: "auto",
+          });
+        });
+      };
+      leanBack = () => lean(0, 0, true);
+
+      /* Wherever the cursor is on the page: measured from the front card's
+         centre, half a screen away is the full lean. Only while the deck is
+         on screen. */
+      window.addEventListener(
+        "pointermove",
+        (event) => {
+          if (event.pointerType !== "mouse" || moving || reduced.matches) return;
+          const front = cards.find((card) => posOf(card) === 0);
+          const box = front?.getBoundingClientRect();
+          if (!box || box.bottom < 0 || box.top > innerHeight) return;
+          const nx = (event.clientX - (box.left + box.width / 2)) / (innerWidth / 2);
+          const ny = (event.clientY - (box.top + box.height / 2)) / (innerHeight / 2);
+          lean(gsap.utils.clamp(-1, 1, nx), gsap.utils.clamp(-1, 1, ny));
+        },
+        { signal },
+      );
+      document.documentElement.addEventListener("pointerleave", () => lean(0, 0), { signal });
+
       /* The glow on the front card's border follows the cursor. */
       deck.addEventListener(
         "pointermove",
@@ -394,6 +434,7 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
         const show = (index: number) => {
           if (index === front) return;
           front = index;
+          leanBack();
           const active = document.activeElement;
           order.forEach((card, i) => (card.dataset.pos = String(i - index)));
           sync(false);
@@ -658,7 +699,6 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
     }
 
     .services-main_card {
-      --_grow: 0.375rem;
       --_radius: 0.125rem;
       --_ease: cubic-bezier(0.165, 0.84, 0.44, 1);
       --_time: 0.8s;
@@ -669,6 +709,11 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
       background-color: transparent;
       cursor: pointer;
       clip-path: inset(-0.5rem round var(--_radius));
+      /* The cards behind lean toward the cursor (set from the script). As an
+         offset, since the deck's own motion owns the transform (and GSAP
+         keeps `translate` off what it transforms). */
+      left: calc(var(--_lean-x, 0) * 1px);
+      top: calc(var(--_lean-y, 0) * 1px);
 
       &[data-pos="1"] {
         z-index: 2;
@@ -700,14 +745,11 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
 
     .services-main_bg {
       position: absolute;
-      inset: calc(var(--_grow) * -1);
+      inset: 0;
       background-color: var(--background);
       border-radius: var(--_radius);
-      clip-path: inset(var(--_grow) round var(--_radius));
       pointer-events: none;
-      transition:
-        clip-path var(--_time) var(--_ease),
-        background-color var(--hover-duration) var(--hover-ease);
+      transition: background-color var(--hover-duration) var(--hover-ease);
 
       /* The 1px border, lit by an accent glow around the cursor. */
       &::after {
@@ -765,7 +807,6 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
     .services-main_card-title {
       width: 17.4375rem;
       max-width: 100%;
-      transition: translate var(--_time) var(--_ease);
     }
 
     .services-main_expand {
@@ -781,7 +822,6 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
       color: var(--brand-500);
       cursor: pointer;
       transition:
-        translate var(--_time) var(--_ease),
         background-color var(--_time) var(--_ease),
         color var(--_time) var(--_ease);
 
@@ -925,31 +965,15 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           }
         }
 
-        /* After stripe.com: the card grows past its edges without moving
-           the layout, the title and button travelling out with them. */
+        /* The expand arrows part a little. */
         @media (prefers-reduced-motion: no-preference) {
           &:hover {
-            & .services-main_bg {
-              clip-path: inset(0 round var(--_radius));
-            }
-            & .services-main_card-title {
-              translate: 0 calc(var(--_grow) * -1);
-            }
-            & .services-main_expand {
-              translate: var(--_grow) calc(var(--_grow) * -1);
-            }
             & .services-main_arrow-start {
               translate: -0.0625rem 0.0625rem;
             }
             & .services-main_arrow-end {
               translate: 0.0625rem -0.0625rem;
             }
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          & .services-main_bg::after {
-            inset: var(--_grow);
           }
         }
       }
