@@ -202,9 +202,12 @@ const cards = await slotContent(Astro.slots);
       width: max-content;
       padding-inline: var(--border-width);
 
+      /* While held, no taller than the screen leaves room for (`--_fit`,
+         set from the script): shorter screens get proportionally smaller
+         cards, so the heading and the row always fit together. */
       .works-main_scroll & > * {
         flex: none;
-        width: calc(100cqw * var(--_share));
+        width: min(calc(100cqw * var(--_share)), calc(var(--_fit, 100000px) * 1249 / 725));
         scroll-snap-align: start;
       }
     }
@@ -217,6 +220,9 @@ const cards = await slotContent(Astro.slots);
 
   /* The least space kept above the heading and below the row while held. */
   const MIN_GAP = 24;
+  /* While held, the cards shrink to leave at least `room` px above the
+     heading and below the row, but get no shorter than `smallest`. */
+  const FIT = { room: 32, smallest: 240 };
 
   /* While pinned the section fills the space under the nav: the heading and
      the row centred in it, and the section's bottom edge (its dashed line) on
@@ -414,7 +420,17 @@ const cards = await slotContent(Astro.slots);
            refresh measures the section, so the pin and everything below it
            count the right height. */
         const frame = header.parentElement;
-        const fit = () => frame?.style.setProperty("--_hold-gap", `${holdAt(header, viewport).gap}px`);
+        const fit = () => {
+          /* First the cards: as tall as the screen allows once the nav, the
+             heading, the gap under it and some room above and below are
+             counted. */
+          const root = getComputedStyle(document.documentElement);
+          const nav = (parseFloat(root.getPropertyValue("--nav-height")) || 0) * parseFloat(root.fontSize);
+          const above = list.getBoundingClientRect().top - header.getBoundingClientRect().top;
+          const tallest = Math.max(FIT.smallest, innerHeight - nav - above - FIT.room * 2);
+          row.style.setProperty("--_fit", `${tallest}px`);
+          frame?.style.setProperty("--_hold-gap", `${holdAt(header, viewport).gap}px`);
+        };
         fit();
         ScrollTrigger.addEventListener("refreshInit", fit);
         const shift = () => Math.max(0, row.scrollWidth - row.clientWidth);
@@ -450,6 +466,7 @@ const cards = await slotContent(Astro.slots);
           pinned = null;
           ScrollTrigger.removeEventListener("refreshInit", fit);
           frame?.style.removeProperty("--_hold-gap");
+          row.style.removeProperty("--_fit");
           row.removeEventListener("scroll", hold);
           row.classList.remove("is-pinned");
           gsap.set(list, { clearProps: "transform" });
