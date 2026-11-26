@@ -28,7 +28,7 @@ const { render = true, stats = [], class: className, ...rest } = Astro.props;
 {
   render && stats.length > 0 && (
     <div class:list={["stats-main_wrap", className]} {...rest}>
-      <span class="stats-main_rule dashed dashed-block" aria-hidden="true" />
+      <span class="stats-main_rule dashed dashed-top" aria-hidden="true" />
       <ul class="stats-main_list hatched" data-odometer-group>
         {stats.map((stat) => (
           <li class="stats-main_tile dashed">
@@ -123,7 +123,8 @@ const { render = true, stats = [], class: className, ...rest } = Astro.props;
 <style is:global>
   @layer components {
     /* A band of figures across the working area, ruled across the whole page
-       above and below, with dashed dividers between the tiles. */
+       above (below, the dark hero meets the page edge to edge), with dashed
+       dividers between the tiles. */
     .stats-main_wrap {
       --_inset: var(--_frame-inset, var(--space-7));
       position: relative;

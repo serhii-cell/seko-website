@@ -184,9 +184,10 @@ const at = (x: number, y: number) =>
      it is about 70% in. */
   const PART = { duration: 0.4, ease: "osmo" };
   const LEAD = 0.05;
-  /* A tag wipes up from its bottom edge while its point is still growing,
-     then its words fade up inside once it is mostly open. */
-  const TAG = { open: 0.4, text: 0.35, after: 0.03, gap: 0.15 };
+  /* A tag fades in as its point grows, swelling to 120% of its size and
+     settling back to 100%: a small bounce, from its bottom centre so it
+     stays over its point. */
+  const TAG = { after: 0.03, grow: 0.18, settle: 0.24, from: 0.9, peak: 1.2 };
 
   /* The hatching slides in as it fades up, and the line starts drawing at
      once. As the line reaches each divider, that divider draws down and its
@@ -250,20 +251,23 @@ const at = (x: number, y: number) =>
       const at = Math.max(0, reach(Number(point.dataset.x) || 0) - LEAD);
       timeline.fromTo(point, { scale: 0, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, ...PART }, at);
       const tag = tags[index];
-      const words = tag?.querySelector(".observations-main_tag_text");
-      if (tag && words) {
+      if (tag) {
         timeline
           .fromTo(
             tag,
-            { clipPath: "inset(100% 0% 0% 0%)" },
-            { clipPath: "inset(0% 0% 0% 0%)", duration: TAG.open, ease: "osmo" },
+            { autoAlpha: 0, scale: TAG.from, transformOrigin: "50% 100%" },
+            {
+              autoAlpha: 1,
+              scale: TAG.peak,
+              duration: TAG.grow,
+              ease: "power2.out",
+            },
             at + TAG.after,
           )
-          .fromTo(
-            words,
-            { autoAlpha: 0, yPercent: 40 },
-            { autoAlpha: 1, yPercent: 0, duration: TAG.text, ease: "osmo" },
-            at + TAG.after + TAG.gap,
+          .to(
+            tag,
+            { scale: 1, duration: TAG.settle, ease: "power2.inOut" },
+            at + TAG.after + TAG.grow,
           );
       }
     });
@@ -323,29 +327,20 @@ const at = (x: number, y: number) =>
     .observations-main_content {
       display: flex;
       flex-direction: column;
-      gap: var(--section-space-medium);
+      /* 80px from the body text to the chart on wide screens. */
+      gap: var(--section-space-small);
       width: 100%;
     }
 
-    /* The chart sits in its own band, ruled across the whole screen above;
-       the rule below is the top of the problems band that follows. */
+    /* The chart follows the text straight on. Below it, with the problems
+       header's own top padding, sits the gap to the next heading: 240px on
+       wide screens, shrinking with the section spacing on narrower ones. */
     .observations-main_band {
-      position: relative;
-      padding-block: var(--section-space-medium);
-      &::before {
-        content: "";
-        position: absolute;
-        inset-inline: calc(50% - 50vw);
-        height: var(--border-width);
-        pointer-events: none;
-        background-image: repeating-linear-gradient(
-          to right,
-          var(--stroke) 0 var(--dash),
-          transparent 0 calc(var(--dash) * 2)
-        );
-      }
-      &::before {
-        top: 0;
+      padding-bottom: calc(
+        var(--section-space-xlarge) - var(--section-space-small)
+      );
+      @media (width >= 64rem) {
+        padding-bottom: calc(15rem - var(--section-space-small));
       }
     }
 

@@ -1,8 +1,9 @@
 ---
 import type { HTMLAttributes } from "astro/types";
 import Img from "@/components/Media/Img.astro";
-import mountains from "@/assets/home/works/work-bidl-bg-mountains.jpg";
+import mountains from "@/assets/home/works/work-bidl-bg-mountains-clean.jpg";
 import ridges from "@/assets/home/works/work-bidl-front-ridges.png";
+import mountainGlyphs from "@/assets/home/works/work-bidl-bg-mountains-glyphs.png?url";
 
 interface Props extends HTMLAttributes<"div"> {
   /** Set to `false` to skip rendering this component and its children. */
@@ -34,6 +35,13 @@ const cards = [
       {...rest}
     >
       <Img class="work-scene_back" src={mountains} variant="constrained" sizes={sizes} />
+      {/* The mountains' ASCII, drawn on hover (see Card), behind the devices. */}
+      <canvas
+        class="card_glyphs work-scene_glyphs"
+        aria-hidden="true"
+        data-src={mountainGlyphs}
+        data-grid="10.0,16.995,9.67,16.29"
+      />
 
       <svg
         class="work-scene_imac"

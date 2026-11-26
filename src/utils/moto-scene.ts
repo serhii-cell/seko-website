@@ -98,7 +98,10 @@ function prism(
   smooth = false,
   caps = true,
   inside = false,
-  { sides, hidden }: { sides?: string; hidden?: (index: number) => boolean } = {},
+  {
+    sides,
+    hidden,
+  }: { sides?: string; hidden?: (index: number) => boolean } = {},
 ): Piece {
   const top = base.map((p) => add(p, out));
   const centre = mean([...base, ...top]);
@@ -302,9 +305,10 @@ const slab = (
     extra,
   );
 
-/** The headlamp, set in the front of the headset, facing forward: a
-    short rim round its glass. */
-const LAMP = { u: 0.43, v: 2.86, r: 0.19, depth: 0.1 };
+/** The headlamp, set flush in the front of the headset, facing forward:
+    a flat rim round its glass, centred between the front's two edges (a
+    rim with depth showed past the right one). */
+const LAMP = { u: 0.47, v: 2.86, r: 0.17 };
 /* Its glass, just in front of it, and how far ahead its beam reaches. */
 const GLASS = { u: LAMP.u - 0.01, r: LAMP.r * 0.82 };
 const BEAM = { reach: 2.1, spread: 0.4 };
@@ -334,7 +338,9 @@ function body(dy: number) {
     [...arc(1.36), ...arc(1.16).reverse()],
     0.5,
     dy,
-    undefined,
+    /* All white: its curved tip faces forward, not up, and would shade
+       grey. */
+    TOP,
     false,
     /* Its underside, hidden under its top. */
     { hidden: (i) => i > n && i < 2 * n + 1 },
@@ -386,9 +392,7 @@ function body(dy: number) {
   ];
   const shell = slab(cowl, 1.0, dy, undefined, true, { sides: SIDE });
   const onSide = (points: [number, number][]) =>
-    points
-      .map(([u, v]) => project([u, v, 0.5], dy).map(f).join(" "))
-      .join("L");
+    points.map(([u, v]) => project([u, v, 0.5], dy).map(f).join(" ")).join("L");
   const vents = [0.95, 1.1, 1.25]
     .map(
       (v) =>
@@ -436,26 +440,46 @@ function body(dy: number) {
       dy,
     ),
   );
-  pieces.push(tube([0.98, 2.94, -0.82], [0.98, 2.94, 0.82], 0.04, dy));
-  pieces.push(tube([0.98, 2.94, 0.62], [0.98, 2.94, 0.9], 0.065, dy));
-  pieces.push(tube([0.98, 2.94, -0.62], [0.98, 2.94, -0.9], 0.065, dy));
-  pieces.push(tube([0.9, 2.98, -0.55], [0.78, 3.45, -0.6], 0.02, dy));
+  /* The handlebar runs behind the headset, long and swept a little: its
+     far end higher, its near end lower, grips at both ends and a mirror on
+     the far side. */
+  const BAR = {
+    u: 1.0,
+    v: 2.84,
+    reach: 1.15,
+    sweep: 0.12,
+    r: 0.06,
+    grip: 0.085,
+  };
+  const onBar = (w: number): V3 => [
+    BAR.u,
+    BAR.v - (BAR.sweep * w) / BAR.reach,
+    w,
+  ];
+  pieces.push(tube(onBar(-BAR.reach), onBar(BAR.reach), BAR.r, dy));
+  pieces.push(tube(onBar(BAR.reach - 0.3), onBar(BAR.reach), BAR.grip, dy));
+  pieces.push(tube(onBar(-BAR.reach + 0.3), onBar(-BAR.reach), BAR.grip, dy));
+  const foot = onBar(-0.8);
+  const head: V3 = [foot[0] - 0.12, foot[1] + 0.47, foot[2] - 0.05];
+  pieces.push(tube(foot, head, 0.02, dy));
   pieces.push(
-    prism(disc(0.74, 3.5, -0.6, 0.1, 18), [0.05, 0, 0], dy, undefined, true),
+    prism(
+      disc(head[0] - 0.04, head[1] + 0.05, head[2], 0.1, 18),
+      [0.05, 0, 0],
+      dy,
+      undefined,
+      true,
+    ),
   );
   /* The lamp, its glass grey until it is lit (the lit glass is drawn with
      the beam, over the body). */
-  const lamp = prism(
-    disc(LAMP.u, LAMP.v, 0, LAMP.r, 32),
-    [LAMP.depth, 0, 0],
-    dy,
-    undefined,
-    true,
-  );
+  const rim = disc(LAMP.u, LAMP.v, 0, LAMP.r, 32)
+    .map((p) => project(p, dy).map(f).join(","))
+    .join(" ");
   pieces.push({
-    depth: lamp.depth + 0.5,
+    depth: dot([LAMP.u, LAMP.v, 0], VIEW) + 1,
     svg:
-      lamp.svg +
+      `<polygon points="${rim}" fill="${TOP}" stroke="${LINE}"/>` +
       `<polygon points="${glass(dy)}" fill="${SIDE}" stroke="${LINE}"/>`,
   });
   return panels + draw(pieces);

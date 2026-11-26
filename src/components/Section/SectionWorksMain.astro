@@ -68,7 +68,9 @@ const cards = await slotContent(Astro.slots);
       gap: var(--section-space-small);
       align-items: stretch;
       padding-top: var(--section-space-xlarge);
-      padding-bottom: var(--section-space-small);
+      /* While held, set from the script to the space left above the
+         heading, so the cards sit as far above the bottom line. */
+      padding-bottom: var(--_hold-gap, var(--section-space-small));
 
       &::after {
         content: "";
@@ -183,10 +185,10 @@ const cards = await slotContent(Astro.slots);
         --_gap: var(--space-8);
       }
 
-      /* Wide enough that a card filling the screen's height keeps most of
-         its picture, with the next one still peeking in. */
+      /* As drawn on the 1640px working area: a 1249px card, the next one
+         peeking in. */
       @media (width >= 64rem) {
-        --_share: 0.86;
+        --_share: calc(1249 / 1640);
         --_gap: var(--section-space-small);
       }
     }
@@ -213,15 +215,23 @@ const cards = await slotContent(Astro.slots);
   import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
 
-  /* Where the row holds while pinned, in px from the top of the screen:
-     centred in the space under the nav, or its bottom on the screen's
-     bottom when it is taller than that space. */
-  function holdAt(element: HTMLElement) {
+  /* The least space kept above the heading and below the row while held. */
+  const MIN_GAP = 24;
+
+  /* While pinned the section fills the space under the nav: the heading and
+     the row centred in it, and the section's bottom edge (its dashed line) on
+     the screen's bottom, as far below the row as the heading is below the
+     nav. Returns that space and where the heading holds, in px from the top
+     of the screen. */
+  function holdAt(header: HTMLElement, row: HTMLElement) {
     const root = getComputedStyle(document.documentElement);
     const nav = (parseFloat(root.getPropertyValue("--nav-height")) || 0) * parseFloat(root.fontSize);
     const room = innerHeight - nav;
-    const height = element.offsetHeight;
-    return height <= room ? nav + (room - height) / 2 : innerHeight - height;
+    /* To the cards' edge: the row's box reaches past it by its focus ring. */
+    const ring = parseFloat(getComputedStyle(row).marginBottom) || 0;
+    const height = row.getBoundingClientRect().bottom + ring - header.getBoundingClientRect().top;
+    const gap = Math.max(MIN_GAP, (room - height) / 2);
+    return { gap, top: innerHeight - gap - height };
   }
 
   /* Share of the held scroll spent on the first card before the row starts
@@ -240,6 +250,7 @@ const cards = await slotContent(Astro.slots);
   function setup(row: HTMLElement) {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
     const section = row.closest<HTMLElement>(".works-main_wrap");
+    const header = section?.querySelector<HTMLElement>(".works-main_header");
     const viewport = row.parentElement;
     const list = row.querySelector<HTMLElement>(".works-main_list");
     /* Set while the page's scroll drives the row. */
@@ -390,22 +401,29 @@ const cards = await slotContent(Astro.slots);
     row.addEventListener("focusin", onFocus);
     row.addEventListener("wheel", stopGlide, { passive: true });
 
-    /* From 48rem up, with motion, the section holds when its row reaches
-       the space under the nav, and scrolling the page moves the row along
-       until its last card is in; then the page carries on. */
+    /* From 48rem up, with motion, the section holds once its heading and
+       row sit centred on the screen, and scrolling the page moves the row
+       along until its last card is in; then the page carries on. */
     const mm = gsap.matchMedia();
-    if (section && viewport && list && !document.documentElement.classList.contains("stacki-designer")) {
+    if (section && header && viewport && list && !document.documentElement.classList.contains("stacki-designer")) {
       mm.add("(width >= 48rem) and (prefers-reduced-motion: no-preference)", () => {
         stopGlide();
         row.scrollLeft = 0;
         row.classList.add("is-pinned");
+        /* The bottom padding follows the screen's height; set before every
+           refresh measures the section, so the pin and everything below it
+           count the right height. */
+        const frame = header.parentElement;
+        const fit = () => frame?.style.setProperty("--_hold-gap", `${holdAt(header, viewport).gap}px`);
+        fit();
+        ScrollTrigger.addEventListener("refreshInit", fit);
         const shift = () => Math.max(0, row.scrollWidth - row.clientWidth);
         /* A short rest on the first card, then the row moves the rest of
            the way. */
         const tween = gsap.timeline({
           scrollTrigger: {
-            trigger: viewport,
-            start: () => `top ${holdAt(viewport)}`,
+            trigger: header,
+            start: () => `top ${holdAt(header, viewport).top}`,
             end: () => `+=${shift() / (1 - HOLD)}`,
             pin: section,
             /* Off by default inside a flex parent like <main>. */
@@ -430,6 +448,8 @@ const cards = await slotContent(Astro.slots);
         row.addEventListener("scroll", hold);
         return () => {
           pinned = null;
+          ScrollTrigger.removeEventListener("refreshInit", fit);
+          frame?.style.removeProperty("--_hold-gap");
           row.removeEventListener("scroll", hold);
           row.classList.remove("is-pinned");
           gsap.set(list, { clearProps: "transform" });
