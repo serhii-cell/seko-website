@@ -594,10 +594,16 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           invalidateOnRefresh: true,
           animation: timeline,
           scrub: SCRUB,
-          /* The first card's content comes in once the deck is held, from
-             either side. */
-          onEnter: () => reveal(order[front], 0.1),
+          /* Arriving from below (a reload further down, say), the front
+             card's content comes in as the deck is held again. */
           onEnterBack: () => reveal(order[front], 0.1),
+        });
+        /* The first card's content starts coming in as soon as the card's
+           top is in view, before the deck is held. */
+        const arrival = ScrollTrigger.create({
+          trigger: deck,
+          start: "top 70%",
+          onEnter: () => reveal(order[front]),
         });
 
         scrolled = { trigger, order, length: steps + 0.3 };
@@ -610,6 +616,7 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           section.style.removeProperty("--_hold-gap");
           section.style.removeProperty("--_hold-space");
           trigger.kill();
+          arrival.kill();
           order.forEach(uncover);
           timeline.kill();
           undissolve();
