@@ -96,11 +96,13 @@ const months = [
         <div class="pricing-main_block">
           <div class="pricing-main_info">
             <div
-              class="pricing-main_tabs dashed dashed-bottom"
+              class="pricing-main_tabs"
               role="tablist"
               aria-label="Payment models"
               data-fade
             >
+              <span class="pricing-main_ghost" aria-hidden="true" />
+              <span class="pricing-main_indicator" aria-hidden="true" />
               {plans.map((plan, i) => (
                 <button
                   class="pricing-main_tab"
@@ -338,58 +340,69 @@ const months = [
         max-width: 30rem;
       }
     }
+    /* From Osmo's Bouncy Content Tabs, without the bounce: a square track,
+       a filled indicator that slides to the chosen tab and stretches to its
+       width, and a softer one that follows the pointer. */
     .pricing-main_tabs {
-      display: flex;
-      gap: var(--space-5);
-      padding-bottom: var(--border-width);
+      position: relative;
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-self: flex-start;
+      padding: 0.25rem;
+      background-color: color-mix(in srgb, var(--text) 5%, var(--background));
+      border: var(--border-width) solid
+        color-mix(in srgb, var(--text) 12%, transparent);
+    }
+    .pricing-main_ghost,
+    .pricing-main_indicator {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+    .pricing-main_ghost {
+      z-index: 1;
+      background-color: color-mix(in srgb, var(--text) 8%, transparent);
+      opacity: 0;
+      visibility: hidden;
+    }
+    .pricing-main_indicator {
+      z-index: 2;
+      background-color: var(--brand-500);
     }
     .pricing-main_tab {
-      --_tab-ink: var(--_ink);
-      --_tab-text: 40%;
-      --_tab-line: transparent;
+      position: relative;
+      z-index: 3;
       flex: none;
       margin: 0;
-      padding: 0 0 var(--space-4);
+      padding: 0.6em 1.1em;
       border: 0;
-      border-bottom: var(--border-width) solid var(--_tab-line);
-      border-radius: 0.125rem 0.125rem 0 0;
       background: none;
-      color: color-mix(in lab, var(--_tab-ink) var(--_tab-text), transparent);
+      color: color-mix(in srgb, var(--text) 55%, transparent);
       font-family: var(--primary-family);
       font-size: var(--text-main);
       font-weight: var(--primary-regular);
       line-height: var(--line-height-huge);
       cursor: pointer;
-      transition:
-        color var(--hover-duration) var(--hover-ease),
-        border-color var(--hover-duration) var(--hover-ease);
+      transition: color var(--hover-duration) var(--hover-ease);
       &[aria-selected="true"] {
-        --_tab-ink: var(--text);
-        --_tab-text: 100%;
-        --_tab-line: var(--brand-500);
+        color: var(--dark-950);
         cursor: default;
       }
       &:focus-visible {
-        --_tab-line: transparent;
         outline: 0.125rem solid var(--brand-500);
-        outline-offset: 0;
-        border-radius: 0.125rem;
-      }
-      &[aria-selected="false"]:focus-visible {
-        --_tab-text: 70%;
+        outline-offset: 0.125rem;
       }
       @media (hover: hover) {
         &[aria-selected="false"]:hover {
-          --_tab-text: 70%;
-          --_tab-line: var(--stroke);
-        }
-        &[aria-selected="true"]:hover {
-          --_tab-line: var(--brand-600);
-        }
-        &:hover:focus-visible {
-          --_tab-line: transparent;
+          color: var(--text);
         }
       }
+    }
+    /* Before the script has placed the indicator, the chosen tab fills
+       itself. */
+    .pricing-main_tabs:not(.is-ready) .pricing-main_tab[aria-selected="true"] {
+      background-color: var(--brand-500);
     }
 
     /* ========== Plans ========== */
@@ -574,6 +587,8 @@ const months = [
   import { onPage } from "@/utils/lifecycle.ts";
 
   const FADE = "opacity,visibility";
+  /* The indicator's slide: a plain ease, no overshoot or squash. */
+  const SLIDE = { duration: 0.45, ease: "power3.out" };
 
   onPage(() => {
     const roots = document.querySelectorAll<HTMLElement>(".pricing-main_wrap");
@@ -605,6 +620,56 @@ const months = [
       const cardsOf = (index: number) =>
         scenes[index]?.querySelectorAll(".pricing-main_card") ?? [];
 
+      /* The indicator is driven by its two edges, so it stretches between
+         tabs of different widths as it slides. */
+      const nav = root.querySelector<HTMLElement>(".pricing-main_tabs");
+      const indicator = root.querySelector<HTMLElement>(".pricing-main_indicator");
+      const ghost = root.querySelector<HTMLElement>(".pricing-main_ghost");
+      const edges = { left: 0, right: 0 };
+      const rectFor = (tab: HTMLElement) => ({
+        left: tab.offsetLeft,
+        right: tab.offsetLeft + tab.offsetWidth,
+        top: tab.offsetTop,
+        height: tab.offsetHeight,
+      });
+      const render = () =>
+        indicator && gsap.set(indicator, { x: edges.left, width: edges.right - edges.left });
+      const place = (index: number) => {
+        if (!indicator) return;
+        const target = rectFor(tabs[index]);
+        gsap.killTweensOf(edges);
+        gsap.killTweensOf(indicator);
+        edges.left = target.left;
+        edges.right = target.right;
+        gsap.set(indicator, { y: target.top, height: target.height });
+        render();
+      };
+      const slideTo = (index: number) => {
+        if (!indicator) return;
+        const target = rectFor(tabs[index]);
+        gsap.killTweensOf(edges);
+        gsap.to(indicator, { y: target.top, height: target.height, ...SLIDE });
+        gsap.to(edges, { left: target.left, right: target.right, ...SLIDE, onUpdate: render });
+      };
+      let ghostShown = false;
+      const moveGhost = (tab: HTMLElement) => {
+        if (!ghost) return;
+        const target = rectFor(tab);
+        const box = { x: target.left, y: target.top, width: target.right - target.left, height: target.height };
+        if (!ghostShown || !motion) {
+          ghostShown = true;
+          gsap.set(ghost, box);
+          gsap.to(ghost, { autoAlpha: 1, duration: motion ? 0.25 : 0, ease: "power2.out" });
+        } else {
+          gsap.to(ghost, { ...box, autoAlpha: 1, ...SLIDE });
+        }
+      };
+      const hideGhost = () => {
+        if (!ghost) return;
+        ghostShown = false;
+        gsap.to(ghost, { autoAlpha: 0, duration: motion ? 0.2 : 0, ease: "power1.out" });
+      };
+
       /* Swaps the plan and its picture with a short cross-fade, the new
          box's cards rising out of it. */
       const show = (next: number, focus = false) => {
@@ -612,9 +677,14 @@ const months = [
         if (focus) tabs[index].focus();
         if (index === current) return;
 
+        const direction = index > current ? 1 : -1;
+        const fromPanel = panels[current];
+        const toPanel = panels[index];
         const leaving = [panels[current], scenes[current]].filter(Boolean);
         const entering = [panels[index], scenes[index]].filter(Boolean);
         current = index;
+        if (motion) slideTo(index);
+        else place(index);
 
         tabs.forEach((tab, i) => {
           tab.setAttribute("aria-selected", String(i === index));
@@ -625,8 +695,35 @@ const months = [
 
         if (!motion) return;
         ctx.add(() => {
+          /* The plan slides out against the way the tabs moved and the
+             next one comes in from that side. */
           gsap.fromTo(
-            leaving,
+            fromPanel,
+            { autoAlpha: 1, x: 0 },
+            {
+              autoAlpha: 0,
+              x: -direction * 24,
+              duration: 0.3,
+              ease: "power2.out",
+              overwrite: true,
+              clearProps: `${FADE},transform`,
+            },
+          );
+          gsap.fromTo(
+            toPanel,
+            { autoAlpha: 0, x: direction * 24 },
+            {
+              autoAlpha: 1,
+              x: 0,
+              duration: 0.5,
+              delay: 0.12,
+              ease: "power3.out",
+              overwrite: true,
+              clearProps: `${FADE},transform`,
+            },
+          );
+          gsap.fromTo(
+            leaving.filter((el) => el !== fromPanel),
             { autoAlpha: 1 },
             {
               autoAlpha: 0,
@@ -637,7 +734,7 @@ const months = [
             },
           );
           gsap.fromTo(
-            entering,
+            entering.filter((el) => el !== toPanel),
             { autoAlpha: 0 },
             {
               autoAlpha: 1,
@@ -667,9 +764,20 @@ const months = [
       };
 
       const { signal } = listeners;
-      tabs.forEach((tab, i) =>
-        tab.addEventListener("click", () => show(i), { signal }),
-      );
+      tabs.forEach((tab, i) => {
+        tab.addEventListener("click", () => show(i), { signal });
+        tab.addEventListener("pointerenter", () => moveGhost(tab), { signal });
+      });
+      nav?.addEventListener("pointerleave", hideGhost, { signal });
+
+      /* The indicator sits on the chosen tab from the start, and follows it
+         when the tabs reflow (a resize, the font arriving). */
+      place(current);
+      nav?.classList.add("is-ready");
+      const reflow = new ResizeObserver(() => place(current));
+      if (nav) reflow.observe(nav);
+      signal.addEventListener("abort", () => reflow.disconnect());
+      document.fonts?.ready.then(() => place(current));
       tabs[0].parentElement?.addEventListener(
         "keydown",
         (event) => {

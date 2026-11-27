@@ -429,9 +429,35 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
         const order = [...cards].sort((a, b) => posOf(a) - posOf(b));
         const covers = order.map((card) => card.querySelector(".services-main_cover"));
         let front = 0;
+        /* A card's outcome tags start stacked on the first and unfold down
+           into place, one after another, whenever it comes to the front. */
+        const unstack = (card: HTMLElement | undefined) => {
+          const tags = card
+            ? [...card.querySelectorAll<HTMLElement>(".services-main_outcome")]
+            : [];
+          if (tags.length === 0) return;
+          const first = tags[0].offsetTop;
+          gsap.fromTo(
+            tags,
+            {
+              y: (i: number) => first - tags[i].offsetTop,
+              autoAlpha: (i: number) => (i === 0 ? 1 : 0),
+            },
+            {
+              y: 0,
+              autoAlpha: 1,
+              duration: 0.6,
+              ease: "osmo",
+              stagger: 0.07,
+              overwrite: true,
+              clearProps: "transform,opacity,visibility",
+            },
+          );
+        };
         const show = (index: number) => {
           if (index === front) return;
           front = index;
+          unstack(order[index]);
           leanBack();
           const active = document.activeElement;
           order.forEach((card, i) => (card.dataset.pos = String(i - index)));
@@ -532,6 +558,23 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           scrub: SCRUB,
         });
 
+        /* The front card's tags wait stacked until the deck arrives. */
+        const waiting = [
+          ...(order[front]?.querySelectorAll<HTMLElement>(".services-main_outcome") ?? []),
+        ];
+        if (waiting.length > 1) {
+          const first = waiting[0].offsetTop;
+          gsap.set(waiting.slice(1), {
+            y: (i: number) => first - waiting[i + 1].offsetTop,
+            autoAlpha: 0,
+          });
+        }
+        const arrival = ScrollTrigger.create({
+          trigger: deck,
+          start: "top 75%",
+          once: true,
+          onEnter: () => unstack(order[front]),
+        });
         scrolled = { trigger, order, length: steps + 0.3 };
         /* Each card but the last dissolves into ASCII as it drops. */
         const undissolve = dissolveCards(order.slice(0, -1));
@@ -542,6 +585,7 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           section.style.removeProperty("--_hold-gap");
           section.style.removeProperty("--_hold-space");
           trigger.kill();
+          arrival.kill();
           timeline.kill();
           undissolve();
           scrolled = null;
@@ -841,11 +885,12 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
     /* Square hairline tags on a soft light grey, as on the chart and the
        work cards. */
     .services-main_outcome {
-      padding: 0.5em 0.65em;
+      padding: 0.4em 0.55em;
       background-color: color-mix(in srgb, var(--text) 5%, var(--background));
       border: var(--border-width) solid
         color-mix(in srgb, var(--text) 18%, transparent);
       color: color-mix(in srgb, var(--text) 75%, transparent);
+      font-size: 0.6875rem;
       letter-spacing: 0.02em;
       line-height: 1.2;
     }
