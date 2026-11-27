@@ -184,10 +184,11 @@ const at = (x: number, y: number) =>
      it is about 70% in. */
   const PART = { duration: 0.4, ease: "osmo" };
   const LEAD = 0.05;
-  /* A tag fades in as its point grows, swelling to 120% of its size and
-     settling back to 100%: a small bounce, from its bottom centre so it
-     stays over its point. */
-  const TAG = { after: 0.03, grow: 0.18, settle: 0.24, from: 0.9, peak: 1.2 };
+  /* A tag opens as its point grows, like a highlighter: its box wipes open
+     from left to right, easing out, then its text fades in. No bounce. */
+  const TAG = { after: 0.03, open: 0.45, ease: "power3.out", textAt: 0.3, text: 0.3 };
+  const SHUT = "inset(0% 100% 0% 0%)";
+  const OPEN = "inset(0% 0% 0% 0%)";
 
   /* The hatching slides in as it fades up, and the line starts drawing at
      once. As the line reaches each divider, that divider draws down and its
@@ -208,6 +209,7 @@ const at = (x: number, y: number) =>
     const hatch = q(".observations-main_graph > g > g");
     const points = gsap.utils.toArray<SVGElement>(".observations-main_point", chart);
     const tags = q(".observations-main_tag");
+    const texts = q(".observations-main_tag_text");
     /* When the line reaches x. */
     const reach = (x: number) => Math.min(1, Math.max(0, x / WIDTH)) * DRAW;
 
@@ -255,19 +257,15 @@ const at = (x: number, y: number) =>
         timeline
           .fromTo(
             tag,
-            { autoAlpha: 0, scale: TAG.from, transformOrigin: "50% 100%" },
-            {
-              autoAlpha: 1,
-              scale: TAG.peak,
-              duration: TAG.grow,
-              ease: "power2.out",
-            },
+            { clipPath: SHUT },
+            { clipPath: OPEN, duration: TAG.open, ease: TAG.ease },
             at + TAG.after,
           )
-          .to(
-            tag,
-            { scale: 1, duration: TAG.settle, ease: "power2.inOut" },
-            at + TAG.after + TAG.grow,
+          .fromTo(
+            texts[index] ?? [],
+            { autoAlpha: 0 },
+            { autoAlpha: 1, duration: TAG.text, ease: "power1.out" },
+            at + TAG.after + TAG.textAt,
           );
       }
     });

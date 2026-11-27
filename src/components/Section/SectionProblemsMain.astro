@@ -853,11 +853,18 @@ const total = String(Math.min(problems.length, visuals.length));
     };
     gsap.ticker.add(tick);
 
-    /* Who says what, in turn, for good. Each line pops up as the chart's
-       tags do: it fades in swelling to 120% and settles back to 100%, from
-       its bottom centre, over the speaker's head; it fades out plainly. */
-    const POP = { grow: 0.18, settle: 0.24, from: 0.9, peak: 1.2 };
-    gsap.set(bubbles, { transformOrigin: "50% 100%" });
+    /* Who says what, in turn, for good. Each line opens as the chart's tags
+       do, like a highlighter: its box wipes open from left to right over the
+       speaker's head, easing out, then the words fade in. It fades out
+       plainly. */
+    /* 20% quicker than the chart's tags (0.45 / 0.3 / 0.3 / 0.35 there). */
+    const SAY = {
+      open: 0.36,
+      ease: "power3.out",
+      textAt: 0.24,
+      text: 0.24,
+      out: 0.28,
+    };
     const talking = gsap.timeline({ repeat: -1, paused: true });
     lines.forEach((line, index) => {
       const side = index % 2;
@@ -866,26 +873,32 @@ const total = String(Math.min(problems.length, visuals.length));
       const at = index * GEAR.say;
       talking
         .call(() => (word.textContent = line), [], at)
+        .set(word, { autoAlpha: 0 }, at)
         .fromTo(
           bubble,
-          { autoAlpha: 0, scale: POP.from },
+          { autoAlpha: 1, clipPath: "inset(0% 100% 0% 0%)" },
           {
-            autoAlpha: 1,
-            scale: POP.peak,
-            duration: POP.grow,
-            ease: "power2.out",
+            clipPath: "inset(0% 0% 0% 0%)",
+            duration: SAY.open,
+            ease: SAY.ease,
             immediateRender: false,
           },
           at,
         )
-        .to(
-          bubble,
-          { scale: 1, duration: POP.settle, ease: "power2.inOut" },
-          at + POP.grow,
+        .fromTo(
+          word,
+          { autoAlpha: 0 },
+          {
+            autoAlpha: 1,
+            duration: SAY.text,
+            ease: "power1.out",
+            immediateRender: false,
+          },
+          at + SAY.textAt,
         )
         .to(
           bubble,
-          { autoAlpha: 0, duration: 0.35, ease: "power1.in" },
+          { autoAlpha: 0, duration: SAY.out, ease: "power1.in" },
           at + GEAR.hold,
         );
     });
@@ -1016,7 +1029,8 @@ const total = String(Math.min(problems.length, visuals.length));
          page writes on them. */
       gsap.set([...solid, light, left, right], { clearProps: "opacity" });
       gsap.set([wheelPart, hubPart, left, right], { clearProps: "transform" });
-      gsap.set(bubbles, { clearProps: "opacity,visibility,transform" });
+      gsap.set(bubbles, { clearProps: "opacity,visibility,clipPath" });
+      gsap.set(words, { clearProps: "opacity,visibility" });
       words.forEach((word, index) => (word.textContent = said[index]));
     };
   }

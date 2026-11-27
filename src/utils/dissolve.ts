@@ -285,22 +285,25 @@ export function dissolveCards(cards: HTMLElement[], drop = 110): () => void {
     pieces.forEach((piece) => {
       if (!piece.on) return;
       const box = piece.card.getBoundingClientRect();
+      /* On screen the card may be drawn smaller than its own size (a deck
+         scaled down to fit); the cells are in its own px. */
+      const k = box.width / piece.w || 1;
       const now = START + piece.d * (1 - START);
       /* Where the card's top was before it started to drop. */
-      const rest = box.top - (drop / 100) * piece.h * now * now;
-      const scale = piece.w / 860;
+      const rest = box.top - (drop / 100) * piece.h * k * now * now;
+      const scale = box.width / 860;
       piece.cells.forEach((cell) => {
         if (!cell.inside || cell.t > piece.d + 1 / EDGE) return;
         const a = Math.max(0, (piece.d - cell.t + 1 / EDGE) / LIFE);
         if (a >= 1) return;
         const at = START + cell.t * (1 - START);
-        const release = rest + (drop / 100) * piece.h * at * at;
+        const release = rest + (drop / 100) * piece.h * k * at * at;
         const e = 1 - (1 - a) * (1 - a);
         const x =
-          box.left + cell.x + CELL.w / 2 +
+          box.left + (cell.x + CELL.w / 2) * k +
           (-20 - 180 * cell.drift) * e * scale +
           Math.sin(a * 5 + cell.shade * 6.283) * 4;
-        const y = release + cell.y + CELL.h / 2 + (-10 + 70 * cell.fall) * e * scale;
+        const y = release + (cell.y + CELL.h / 2) * k + (-10 + 70 * cell.fall) * e * scale;
         if (y < -20 || y > innerHeight + 20) return;
         const alpha = Math.pow(1 - a, 1.4) * (0.45 + 0.55 * cell.shade);
         glyphs.push(x, y, alpha, (cell.char + Math.floor(a * 7)) % CHARS.length, a);

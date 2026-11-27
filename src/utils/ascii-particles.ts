@@ -1,120 +1,176 @@
 /**
- * Rising ASCII particles on a canvas, in the accent colour: each one a bright
- * head glyph with a soft glow, trailing a dotted column of fainter glyphs
- * below it, set on a character grid. They rise from the bottom edge at their
- * own speeds and fade out at their own heights, so they gather low and thin
- * out toward the top.
+ * Burning embers in ASCII, in the accent colour, rising from the bottom of a
+ * canvas: sparks born hot and pale that cool to a deep green as they climb,
+ * flickering, swaying on a gentle, ever-changing air current but always
+ * making their way up. Fast ones read as short streaks (`|`, `/`, `\`) leaning
+ * the way they move, slow ones as specks (`.`, `'`, `*`, `+`); a few larger
+ * out-of-focus ones float in front, and a faint green haze glows along the
+ * bottom edge, as over a fire, on a dark fade so they glow whatever page
+ * is behind.
  *
  * `asciiParticles(canvas)` returns `start` and `stop`; it only runs between
  * them. With reduced motion it draws one still frame instead.
  */
 
-/** One character cell, in CSS px. */
-const CELL = { w: 9, h: 13 };
-/** Simulation steps per second. */
-const RATE = 30;
-/** Particles alive at once, per 1000 CSS px of width. */
-const DENSITY = 75;
-/** Rising speed, in CSS px per second. */
-const SPEED = { min: 45, max: 230 };
-/** Trail length, in cells, for the slowest and the fastest. */
-const TRAIL = { min: 10, max: 46 };
-/** Trail glyphs from the head down: dotted, as in a long exposure. */
-const TRAIL_GLYPHS = ":.:.'.:.";
-/** Head glyphs. */
-const HEADS = "+*x";
-/** Share of heads drawn pale, almost white. */
-const PALE = 0.25;
+/** Embers alive at once: one per this many square CSS px, within bounds. */
+const AREA_PER_EMBER = 2600;
+const COUNT = { min: 90, max: 800 };
+/** Rising speed, in CSS px per second; most are slow. */
+const RISE = { min: 35, max: 150 };
+/** How long one burns, in seconds. */
+const LIFE = { min: 2.4, max: 6.5 };
+/** Faster than this (CSS px per second) an ember shows as a streak. */
+const STREAK_SPEED = 110;
+/** Share of embers that are large and out of focus. */
+const SOFT = 0.14;
+/** How hard the air sways them sideways, in CSS px per second. */
+const SWAY = 30;
+/** Heat steps in the colour ramp, from pale and hot to deep and cool. */
+const HEAT_STEPS = 7;
 
-type Particle = {
-  column: number;
+/* Specks by heat, hottest last; streaks by lean. */
+const SPECKS = [".", ",", "'", ":", "+", "*"];
+const STREAKS = { up: "|", right: "/", left: "\\" };
+const GLYPHS = [...SPECKS, STREAKS.up, STREAKS.right, STREAKS.left];
+
+type Ember = {
+  x: number;
   y: number;
-  speed: number;
-  trail: number;
-  /** Height (from the bottom, as a share of the canvas) where it is gone. */
-  reach: number;
-  head: number;
-  pale: boolean;
+  /** Its own rising speed. */
+  rise: number;
+  /** Its own slight lean, one way or the other. */
+  drift: number;
+  age: number;
+  life: number;
+  /** How hot it is born, 0–1. */
+  heat: number;
+  soft: boolean;
+  /** Size, as a share of the usual. */
+  scale: number;
   phase: number;
+  /** How fast it flickers. */
+  flicker: number;
+  /** Lateral speed last step, to lean its streak. */
+  vx: number;
 };
 
-/* Glyph sprites: the trail glyphs and heads in the accent, the heads again
-   pale, and a soft glow dot to set under each head. */
-function sprites(accent: string, pale: string, font: string, dpr: number) {
-  const w = Math.ceil(CELL.w * dpr);
-  const h = Math.ceil(CELL.h * dpr);
-  const glow = Math.ceil(CELL.h * 2.2 * dpr);
-  const chars = TRAIL_GLYPHS + HEADS;
+/* Parses #rrggbb. */
+const rgb = (hex: string) =>
+  /^#[0-9a-f]{6}$/i.test(hex)
+    ? [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+    : null;
+
+/* The colour at `share` of the way from `a` to `b`. */
+const mix = (a: number[], b: number[], share: number) =>
+  `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * share)).join(",")})`;
+
+/* The glyph sprites: every glyph in every heat colour, sharp and small, then
+   again large and blurred for the out-of-focus ones, and one soft glow dot to
+   set under the hottest. */
+function sprites(ramp: string[], glowColour: string, font: string, dpr: number) {
+  const sharp = { w: Math.ceil(16 * dpr), h: Math.ceil(20 * dpr), size: 14 * dpr };
+  const soft = { w: Math.ceil(36 * dpr), h: Math.ceil(40 * dpr), size: 22 * dpr };
+  const glow = Math.ceil(30 * dpr);
   const canvas = document.createElement("canvas");
-  canvas.width = w * chars.length + glow;
-  canvas.height = Math.max(h * 2, glow);
+  canvas.width = Math.max(sharp.w, soft.w) * GLYPHS.length + glow;
+  canvas.height = (sharp.h + soft.h) * ramp.length;
   const context = canvas.getContext("2d");
   if (context) {
-    context.font = `${Math.round(CELL.h * 0.82 * dpr)}px ${font}`;
     context.textAlign = "center";
     context.textBaseline = "middle";
-    [accent, pale].forEach((colour, row) => {
+    ramp.forEach((colour, level) => {
       context.fillStyle = colour;
-      [...chars].forEach((char, i) => context.fillText(char, i * w + w / 2, row * h + h / 2));
+      context.font = `${Math.round(sharp.size)}px ${font}`;
+      GLYPHS.forEach((glyph, i) =>
+        context.fillText(glyph, i * sharp.w + sharp.w / 2, level * sharp.h + sharp.h / 2),
+      );
+      const top = ramp.length * sharp.h;
+      context.filter = `blur(${(2.2 * dpr).toFixed(1)}px)`;
+      context.font = `${Math.round(soft.size)}px ${font}`;
+      GLYPHS.forEach((glyph, i) =>
+        context.fillText(glyph, i * soft.w + soft.w / 2, top + level * soft.h + soft.h / 2),
+      );
+      context.filter = "none";
     });
-    const cx = w * chars.length + glow / 2;
-    const gradient = context.createRadialGradient(cx, glow / 2, 0, cx, glow / 2, glow / 2);
-    gradient.addColorStop(0, accent);
+    const gx = Math.max(sharp.w, soft.w) * GLYPHS.length + glow / 2;
+    const gradient = context.createRadialGradient(gx, glow / 2, 0, gx, glow / 2, glow / 2);
+    gradient.addColorStop(0, glowColour);
     gradient.addColorStop(1, "transparent");
-    context.globalAlpha = 0.7;
     context.fillStyle = gradient;
-    context.fillRect(cx - glow / 2, 0, glow, glow);
+    context.fillRect(gx - glow / 2, 0, glow, glow);
   }
-  return { canvas, w, h, glow, glowX: w * chars.length };
-}
-
-/* Mixes two #rrggbb colours. */
-function mix(a: string, b: string, share: number) {
-  const parse = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  if (!/^#[0-9a-f]{6}$/i.test(a) || !/^#[0-9a-f]{6}$/i.test(b)) return a;
-  const [x, y] = [parse(a), parse(b)];
-  return `rgb(${x.map((v, k) => Math.round(v + (y[k] - v) * share)).join(",")})`;
+  return {
+    canvas,
+    sharp,
+    soft: { ...soft, top: ramp.length * sharp.h },
+    glow,
+    glowX: Math.max(sharp.w, soft.w) * GLYPHS.length,
+  };
 }
 
 export function asciiParticles(canvas: HTMLCanvasElement) {
   const context = canvas.getContext("2d");
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
   const style = getComputedStyle(document.documentElement);
-  const accent = style.getPropertyValue("--brand-500").trim() || "#7bd52d";
-  const light = style.getPropertyValue("--light-100").trim() || "#f4f4f4";
-  const pale = mix(accent, light, 0.6);
+  const read = (name: string, fallback: string) =>
+    rgb(style.getPropertyValue(name).trim()) ?? rgb(fallback)!;
+  const accent = read("--brand-500", "#7bd52d");
+  const light = read("--light-100", "#ffffff");
+  const dark = read("--dark-900", "#121212");
   const font = style.getPropertyValue("--mono-family").trim() || "monospace";
+  /* Hot to cool: nearly white green, the accent, then a deep green. */
+  const ramp = Array.from({ length: HEAT_STEPS }, (_, level) => {
+    const heat = 1 - level / (HEAT_STEPS - 1);
+    return heat > 0.5
+      ? mix(accent, light, (heat - 0.5) * 2 * 0.7)
+      : mix(accent, dark, (0.5 - heat) * 2 * 0.55);
+  });
+  const haze = `rgba(${accent.join(",")},`;
+  const shade = `rgba(${dark.join(",")},`;
 
-  let columns = 0;
-  let particles: Particle[] = [];
+  let embers: Ember[] = [];
   let atlas: ReturnType<typeof sprites> | null = null;
   let dpr = 0;
   let width = 0;
   let height = 0;
   let frame = 0;
   let last = 0;
-  let carry = 0;
-  let time = 0;
+  let time = Math.random() * 100;
   let running = false;
   /* The last size laid out, to skip reports that change nothing. */
   let laid = "";
 
-  const born = (anywhere: boolean): Particle => {
-    const speed = SPEED.min + Math.random() ** 1.6 * (SPEED.max - SPEED.min);
-    const share = (speed - SPEED.min) / (SPEED.max - SPEED.min);
-    const reach = 0.3 + Math.random() * 0.75;
-    return {
-      column: Math.floor(Math.random() * columns),
-      /* From just below the bottom edge, or (to fill a first frame)
-         anywhere along its way. */
-      y: anywhere ? height - Math.random() * height * reach : height + Math.random() * CELL.h * 6,
-      speed,
-      trail: Math.round(TRAIL.min + share * (TRAIL.max - TRAIL.min) * (0.6 + Math.random() * 0.4)),
-      reach,
-      head: Math.floor(Math.random() * HEADS.length),
-      pale: Math.random() < PALE,
+  const target = () =>
+    Math.round(
+      Math.min(COUNT.max, Math.max(COUNT.min, (width * height) / AREA_PER_EMBER)),
+    );
+
+  /* A new ember: mostly from just below the bottom edge, some catching light
+     already low on the screen. To fill a first frame, anywhere in its life. */
+  const born = (midway: boolean): Ember => {
+    const soft = Math.random() < SOFT;
+    const rise = (RISE.min + Math.random() ** 1.7 * (RISE.max - RISE.min)) * (soft ? 0.7 : 1);
+    const life = LIFE.min + Math.random() * (LIFE.max - LIFE.min);
+    const low = Math.random() < 0.35;
+    const ember: Ember = {
+      x: Math.random() * width,
+      y: low ? height - Math.random() ** 2 * height * 0.35 : height + 6 + Math.random() * 30,
+      rise,
+      drift: (Math.random() - 0.5) * 16,
+      age: 0,
+      life,
+      heat: 0.7 + Math.random() * 0.3,
+      soft,
+      scale: soft ? 0.8 + Math.random() * 0.5 : 0.75 + Math.random() * 0.5,
       phase: Math.random() * Math.PI * 2,
+      flicker: 6 + Math.random() * 10,
+      vx: 0,
     };
+    if (midway) {
+      ember.age = Math.random() * life;
+      ember.y -= rise * ember.age * 0.8;
+    }
+    return ember;
   };
 
   function size() {
@@ -125,30 +181,44 @@ export function asciiParticles(canvas: HTMLCanvasElement) {
     const key = `${w}x${h}@${nextDpr}`;
     if (key === laid) return true;
     laid = key;
+    /* Embers carry over a resize, moved with the bottom edge. */
+    const shift = height ? h - height : 0;
+    embers.forEach((ember) => (ember.y += shift));
+    embers = embers.filter((ember) => ember.x < w);
     width = w;
     height = h;
     canvas.width = Math.round(w * nextDpr);
     canvas.height = Math.round(h * nextDpr);
-    columns = Math.ceil(w / CELL.w);
-    /* Particles carry over a resize; any past the new width go. */
-    particles = particles.filter((p) => p.column < columns);
     if (nextDpr !== dpr || !atlas) {
       dpr = nextDpr;
-      atlas = sprites(accent, pale, font, dpr);
+      atlas = sprites(ramp, mix(accent, light, 0.2), font, dpr);
     }
     if (running) draw();
     return true;
   }
 
+  /* The air: a slow current that changes from place to place and moment to
+     moment, sideways both ways, never one wind. */
+  const air = (x: number, y: number) =>
+    Math.sin(y * 0.0062 + time * 0.9 + x * 0.0013) * 0.6 +
+    Math.sin(x * 0.0041 - time * 0.55 + y * 0.002) * 0.4;
+
   function step(dt: number) {
     time += dt;
-    const target = Math.round((DENSITY * width) / 1000);
-    /* A few new ones a step, so they arrive as a trickle, not a wave. */
-    for (let k = 0; k < 3 && particles.length < target; k++) particles.push(born(false));
-    particles = particles.filter((p) => {
-      p.y -= p.speed * dt;
-      const risen = (height - p.y) / height;
-      return risen < p.reach + 0.05 && p.y + p.trail * CELL.h > 0;
+    const wanted = target();
+    /* New ones come in steadily as old ones burn out. */
+    for (let k = 0; k < 6 && embers.length < wanted; k++) embers.push(born(false));
+    embers = embers.filter((ember) => {
+      ember.age += dt;
+      if (ember.age >= ember.life) return false;
+      const k = ember.age / ember.life;
+      /* They slow a little as they cool. */
+      const up = ember.rise * (0.6 + 0.4 * (1 - k));
+      const side = air(ember.x, ember.y) * SWAY * (ember.soft ? 0.6 : 1) + ember.drift;
+      ember.vx += (side - ember.vx) * Math.min(1, dt * 2.5);
+      ember.x += ember.vx * dt;
+      ember.y -= up * dt;
+      return ember.y > -40 && ember.x > -40 && ember.x < width + 40;
     });
   }
 
@@ -156,34 +226,61 @@ export function asciiParticles(canvas: HTMLCanvasElement) {
     if (!context || !atlas) return;
     context.setTransform(1, 0, 0, 1, 0, 0);
     context.clearRect(0, 0, canvas.width, canvas.height);
-    const { w, h, glow, glowX } = atlas;
-    const cw = CELL.w * dpr;
-    const ch = CELL.h * dpr;
-    for (const p of particles) {
-      const risen = (height - p.y) / height;
-      /* In over the first stretch, out over the last third of its reach. */
-      const fadeIn = Math.min(1, risen / 0.06);
-      const fadeOut = Math.max(0, Math.min(1, (p.reach - risen) / (p.reach * 0.35)));
-      const life = fadeIn * fadeOut;
-      if (life <= 0) continue;
-      const row = Math.floor(p.y / CELL.h);
-      const x = p.column * cw;
-      const twinkle = 0.75 + 0.25 * Math.sin(time * 9 + p.phase);
-      /* The trail, below the head, dotted and fading with distance. */
-      for (let k = 1; k <= p.trail; k++) {
-        const y = (row + k) * ch;
-        if (y > canvas.height) break;
-        const fade = (1 - k / (p.trail + 1)) ** 1.15;
-        context.globalAlpha = life * fade * 0.8;
-        const glyph = (k + p.column) % TRAIL_GLYPHS.length;
-        context.drawImage(atlas.canvas, glyph * w, 0, w, h, x, y, cw, ch);
+
+    /* The fire burns on dark, whatever the page behind: a soft dark fade up
+       from the bottom edge, then the green haze over it, breathing slowly. */
+    const ground = context.createLinearGradient(0, canvas.height, 0, canvas.height * 0.5);
+    ground.addColorStop(0, `${shade}0.92)`);
+    ground.addColorStop(0.5, `${shade}0.6)`);
+    ground.addColorStop(1, `${shade}0)`);
+    context.fillStyle = ground;
+    context.fillRect(0, canvas.height * 0.5, canvas.width, canvas.height * 0.5);
+
+    const breath = 0.85 + 0.15 * Math.sin(time * 0.8);
+    const gradient = context.createLinearGradient(0, canvas.height, 0, canvas.height * 0.55);
+    gradient.addColorStop(0, `${haze}${(0.14 * breath).toFixed(3)})`);
+    gradient.addColorStop(0.45, `${haze}${(0.04 * breath).toFixed(3)})`);
+    gradient.addColorStop(1, `${haze}0)`);
+    context.fillStyle = gradient;
+    context.fillRect(0, canvas.height * 0.55, canvas.width, canvas.height * 0.45);
+
+    const { sharp, soft, glow, glowX } = atlas;
+    for (const ember of embers) {
+      const k = ember.age / ember.life;
+      /* Bright as it catches, gone as it burns out. */
+      const fade = Math.min(1, ember.age / 0.25) * (1 - k) ** 0.9;
+      const flick =
+        0.72 + 0.28 * Math.sin(time * ember.flicker + ember.phase) * Math.sin(time * ember.flicker * 1.7 + ember.phase * 2);
+      const heat = ember.heat * (1 - k) ** 0.65;
+      const level = Math.min(HEAT_STEPS - 1, Math.round((1 - heat) * (HEAT_STEPS - 1)));
+      const up = ember.rise * (0.6 + 0.4 * (1 - k));
+      /* A streak when fast, leaning the way it moves; a speck otherwise,
+         hotter ones larger. */
+      let glyph: number;
+      if (!ember.soft && up > STREAK_SPEED) {
+        const lean = ember.vx / up;
+        glyph = SPECKS.length + (lean > 0.22 ? 1 : lean < -0.22 ? 2 : 0);
+      } else {
+        glyph = Math.min(SPECKS.length - 1, Math.floor(heat ** 2.2 * SPECKS.length * 1.05));
       }
-      /* The glow, then the head. */
-      context.globalAlpha = life * 0.8 * twinkle;
-      context.drawImage(atlas.canvas, glowX, 0, glow, glow, x + cw / 2 - glow / 2, row * ch + ch / 2 - glow / 2, glow, glow);
-      context.globalAlpha = life * twinkle;
-      const head = TRAIL_GLYPHS.length + p.head;
-      context.drawImage(atlas.canvas, head * w, p.pale ? h : 0, w, h, x, row * ch, cw, ch);
+      const x = ember.x * dpr;
+      const y = ember.y * dpr;
+      if (ember.soft) {
+        const w = soft.w * ember.scale;
+        const h = soft.h * ember.scale;
+        context.globalAlpha = fade * flick * 0.35;
+        context.drawImage(atlas.canvas, glyph * soft.w, soft.top + level * soft.h, soft.w, soft.h, x - w / 2, y - h / 2, w, h);
+        continue;
+      }
+      if (heat > 0.35) {
+        context.globalAlpha = Math.min(1, fade * flick * (heat - 0.35) * 1.4);
+        const g = glow * ember.scale;
+        context.drawImage(atlas.canvas, glowX, 0, glow, glow, x - g / 2, y - g / 2, g, g);
+      }
+      const w = sharp.w * ember.scale;
+      const h = sharp.h * ember.scale;
+      context.globalAlpha = fade * flick;
+      context.drawImage(atlas.canvas, glyph * sharp.w, level * sharp.h, sharp.w, sharp.h, x - w / 2, y - h / 2, w, h);
     }
     context.globalAlpha = 1;
   }
@@ -191,20 +288,15 @@ export function asciiParticles(canvas: HTMLCanvasElement) {
   function tick(now: number) {
     if (!running) return;
     frame = requestAnimationFrame(tick);
-    const dt = last ? Math.min(0.1, (now - last) / 1000) : 1 / RATE;
+    const dt = last ? Math.min(0.05, (now - last) / 1000) : 1 / 60;
     last = now;
-    carry += dt;
-    if (carry < 1 / RATE) return;
-    const steps = Math.min(3, Math.floor(carry * RATE));
-    carry -= steps / RATE;
-    for (let k = 0; k < steps; k++) step(1 / RATE);
+    step(dt);
     draw();
   }
 
-  /* A full field straight away: particles already on their way up. */
+  /* A full fire straight away: embers already on their way up. */
   function fill() {
-    const target = Math.round((DENSITY * width) / 1000);
-    particles = Array.from({ length: target }, () => born(true));
+    embers = Array.from({ length: target() }, () => born(true));
     draw();
   }
 
@@ -226,7 +318,6 @@ export function asciiParticles(canvas: HTMLCanvasElement) {
       fill();
       if (reduce.matches) return;
       last = 0;
-      carry = 0;
       frame = requestAnimationFrame(tick);
     },
     stop() {

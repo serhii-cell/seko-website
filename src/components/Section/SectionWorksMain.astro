@@ -180,16 +180,16 @@ const cards = await slotContent(Astro.slots);
         }
       }
 
+      /* 48px between cards on wide screens, a little less on smaller. */
       @media (width >= 48rem) {
         --_share: 0.8;
-        --_gap: var(--space-8);
+        --_gap: var(--space-7);
       }
 
       /* As drawn on the 1640px working area: a 1249px card, the next one
          peeking in. */
       @media (width >= 64rem) {
         --_share: calc(1249 / 1640);
-        --_gap: var(--section-space-small);
       }
     }
 
