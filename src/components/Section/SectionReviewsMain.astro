@@ -3,10 +3,7 @@ import type { HTMLAttributes, SvgComponent } from "astro/types";
 import Section from "@/components/Wrapper/Section.astro";
 import Heading from "@/components/Typography/Heading.astro";
 import Paragraph from "@/components/Typography/Paragraph.astro";
-import Icon from "@/components/Media/Icon.astro";
-import FlipText from "@/components/Typography/FlipText.astro";
-import ArrowBack from "@/assets/home/reviews/icon-arrow-back.svg";
-import ArrowForward from "@/assets/home/reviews/icon-arrow-forward.svg";
+import Button from "@/components/Button.astro";
 
 type Review = {
   /** The client's name, listed in the selector. */
@@ -89,24 +86,24 @@ const uid = Math.random().toString(36).slice(2, 8);
         </div>
 
         <div class="reviews-main_arrows" data-fade>
-          <button
-            type="button"
-            class="reviews-main_step text-style-label"
+          <Button
+            emphasis="secondary"
+            size="medium"
+            class="reviews-main_step"
             aria-label="Previous client story"
             data-reviews-step="-1"
           >
-            <Icon src={ArrowBack} class="reviews-main_icon" />
-            <FlipText>Prev</FlipText>
-          </button>
-          <button
-            type="button"
-            class="reviews-main_step text-style-label"
+            ← Prev
+          </Button>
+          <Button
+            emphasis="secondary"
+            size="medium"
+            class="reviews-main_step"
             aria-label="Next client story"
             data-reviews-step="1"
           >
-            <FlipText>Next</FlipText>
-            <Icon src={ArrowForward} class="reviews-main_icon" />
-          </button>
+            Next →
+          </Button>
         </div>
 
         <p class="sr-only" aria-live="polite" data-reviews-status />
@@ -436,44 +433,24 @@ const uid = Math.random().toString(36).slice(2, 8);
         color: var(--brand-500);
       }
     }
-    /* Prev and Next: small mono links, their letters flipping on hover
-       like the buttons' do, the arrows in the accent. */
+    /* Prev and Next: the site's outline buttons, letters flipping on
+       hover. They wrap round, so neither is ever disabled. */
     .reviews-main_arrows {
       grid-area: arrows;
       align-self: start;
       display: flex;
-      gap: var(--space-6);
+      gap: var(--space-3);
     }
-    .reviews-main_step {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      margin: 0;
-      padding: 0.25rem 0;
-      border: 0;
-      background: none;
-      color: color-mix(in lab, var(--text) 70%, transparent);
-      cursor: pointer;
-      transition: color var(--hover-duration) var(--hover-ease);
-      &::before,
-      &::after {
-        content: none;
-      }
-      @media (hover: hover) {
-        &:hover {
-          color: var(--text);
-        }
-      }
-      &:focus-visible {
-        outline: var(--focus-width) solid var(--brand-500);
-        outline-offset: 0.25rem;
-      }
-    }
-    .reviews-main_icon {
-      flex: none;
-      width: 0.875rem;
-      height: 0.875rem;
-      color: var(--brand-500);
+    /* Outlined like the nav links: a hairline in the stroke colour that
+       brightens on hover, no fill. */
+    .reviews-main_arrows .reviews-main_step.button_wrap {
+      --button-background: transparent;
+      --button-background-hover: transparent;
+      --button-background-pressed: transparent;
+      --button-border: var(--stroke);
+      --button-border-hover: color-mix(in lab, var(--text) 40%, transparent);
+      --button-text: var(--text);
+      --button-text-hover: var(--text);
     }
 
     /* Stories, stacked in one cell and cross-faded. Each is as tall as the
