@@ -341,14 +341,15 @@ const months = [
       }
     }
     /* From Osmo's Bouncy Content Tabs, without the bounce: a square track,
-       a filled indicator that slides to the chosen tab and stretches to its
-       width, and a softer one that follows the pointer. */
+       a black indicator (white text on it) that slides to the chosen tab
+       and stretches to its width, and a softer one that follows the
+       pointer. */
     .pricing-main_tabs {
       position: relative;
       display: inline-flex;
       flex-wrap: wrap;
       align-self: flex-start;
-      padding: 0.25rem;
+      padding: 0.1875rem;
       background-color: color-mix(in srgb, var(--text) 5%, var(--background));
       border: var(--border-width) solid
         color-mix(in srgb, var(--text) 12%, transparent);
@@ -368,25 +369,25 @@ const months = [
     }
     .pricing-main_indicator {
       z-index: 2;
-      background-color: var(--brand-500);
+      background-color: var(--dark-950);
     }
     .pricing-main_tab {
       position: relative;
       z-index: 3;
       flex: none;
       margin: 0;
-      padding: 0.6em 1.1em;
+      padding: 0.5em 0.9em;
       border: 0;
       background: none;
       color: color-mix(in srgb, var(--text) 55%, transparent);
       font-family: var(--primary-family);
-      font-size: var(--text-main);
+      font-size: 0.875rem;
       font-weight: var(--primary-regular);
       line-height: var(--line-height-huge);
       cursor: pointer;
       transition: color var(--hover-duration) var(--hover-ease);
       &[aria-selected="true"] {
-        color: var(--dark-950);
+        color: var(--light-100);
         cursor: default;
       }
       &:focus-visible {
@@ -402,7 +403,7 @@ const months = [
     /* Before the script has placed the indicator, the chosen tab fills
        itself. */
     .pricing-main_tabs:not(.is-ready) .pricing-main_tab[aria-selected="true"] {
-      background-color: var(--brand-500);
+      background-color: var(--dark-950);
     }
 
     /* ========== Plans ========== */

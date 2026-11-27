@@ -183,6 +183,7 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
   import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
   import { dissolveCards } from "@/utils/dissolve.ts";
+  import { createLines, type Lines } from "@/utils/lines.ts";
 
   const CARD = ".services-main_card";
   /* Seconds the deck takes to catch up with the scroll: small, so it
@@ -429,35 +430,63 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
         const order = [...cards].sort((a, b) => posOf(a) - posOf(b));
         const covers = order.map((card) => card.querySelector(".services-main_cover"));
         let front = 0;
-        /* A card's outcome tags start stacked on the first and unfold down
-           into place, one after another, whenever it comes to the front. */
-        const unstack = (card: HTMLElement | undefined) => {
-          const tags = card
-            ? [...card.querySelectorAll<HTMLElement>(".services-main_outcome")]
-            : [];
-          if (tags.length === 0) return;
-          const first = tags[0].offsetTop;
-          gsap.fromTo(
-            tags,
-            {
-              y: (i: number) => first - tags[i].offsetTop,
-              autoAlpha: (i: number) => (i === 0 ? 1 : 0),
-            },
-            {
-              y: 0,
-              autoAlpha: 1,
-              duration: 0.6,
-              ease: "osmo",
-              stagger: 0.07,
-              overwrite: true,
-              clearProps: "transform,opacity,visibility",
-            },
-          );
+        /* A card's content comes in when it reaches the front: its name,
+           labels and text with the page's line reveal, its outcome tags
+           rising and fading in one after another. Each card keeps its own
+           reveal, so one coming forward again plays it afresh. */
+        const reveals = new Map<HTMLElement, { lines: Lines[]; tags: HTMLElement[] }>();
+        const textsOf = (card: HTMLElement) => [
+          ...card.querySelectorAll<HTMLElement>(
+            ".services-main_body :is(.heading, p.text)",
+          ),
+        ];
+        const tagsOf = (card: HTMLElement) => [
+          ...card.querySelectorAll<HTMLElement>(".services-main_outcome"),
+        ];
+        const conceal = (card: HTMLElement | undefined) => {
+          if (!card) return;
+          reveals.get(card)?.lines.forEach((lines) => lines.revert());
+          const tags = tagsOf(card);
+          gsap.killTweensOf(tags);
+          gsap.set(tags, { y: "0.75rem", autoAlpha: 0 });
+          reveals.set(card, { lines: textsOf(card).map(createLines), tags });
+        };
+        const reveal = (card: HTMLElement | undefined, delay = 0) => {
+          if (!card) return;
+          if (!reveals.has(card)) conceal(card);
+          const found = reveals.get(card);
+          if (!found) return;
+          found.lines.forEach((lines, i) => lines.play(delay + i * 0.08));
+          gsap.to(found.tags, {
+            y: 0,
+            autoAlpha: 1,
+            duration: 0.8,
+            ease: "power3.out",
+            stagger: 0.08,
+            delay: delay + 0.3,
+            clearProps: "transform,opacity,visibility",
+          });
+          reveals.delete(card);
+        };
+        /* Going back, a card simply shows what it holds. */
+        const uncover = (card: HTMLElement | undefined) => {
+          if (!card) return;
+          const found = reveals.get(card);
+          if (!found) return;
+          found.lines.forEach((lines) => lines.revert());
+          gsap.killTweensOf(found.tags);
+          gsap.set(found.tags, { clearProps: "transform,opacity,visibility" });
+          reveals.delete(card);
         };
         const show = (index: number) => {
           if (index === front) return;
+          if (index > front) {
+            /* Forward: the next card's content waits hidden, then comes in
+               as the card in front of it goes. */
+            conceal(order[index]);
+            reveal(order[index], 0.05);
+          } else uncover(order[index]);
           front = index;
-          unstack(order[index]);
           leanBack();
           const active = document.activeElement;
           order.forEach((card, i) => (card.dataset.pos = String(i - index)));
@@ -516,6 +545,8 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
               );
           }
         }
+        conceal(order[0]);
+
         /* The last card holds a moment before the page moves on. */
         timeline.to({}, { duration: 0.3 });
         const steps = total - 1;
@@ -556,25 +587,12 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           invalidateOnRefresh: true,
           animation: timeline,
           scrub: SCRUB,
+          /* The first card's content comes in once the deck is held, from
+             either side. */
+          onEnter: () => reveal(order[0], 0.1),
+          onEnterBack: () => reveal(order[0], 0.1),
         });
 
-        /* The front card's tags wait stacked until the deck arrives. */
-        const waiting = [
-          ...(order[front]?.querySelectorAll<HTMLElement>(".services-main_outcome") ?? []),
-        ];
-        if (waiting.length > 1) {
-          const first = waiting[0].offsetTop;
-          gsap.set(waiting.slice(1), {
-            y: (i: number) => first - waiting[i + 1].offsetTop,
-            autoAlpha: 0,
-          });
-        }
-        const arrival = ScrollTrigger.create({
-          trigger: deck,
-          start: "top 75%",
-          once: true,
-          onEnter: () => unstack(order[front]),
-        });
         scrolled = { trigger, order, length: steps + 0.3 };
         /* Each card but the last dissolves into ASCII as it drops. */
         const undissolve = dissolveCards(order.slice(0, -1));
@@ -585,7 +603,7 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           section.style.removeProperty("--_hold-gap");
           section.style.removeProperty("--_hold-space");
           trigger.kill();
-          arrival.kill();
+          order.forEach(uncover);
           timeline.kill();
           undissolve();
           scrolled = null;
