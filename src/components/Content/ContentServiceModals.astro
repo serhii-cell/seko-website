@@ -415,9 +415,9 @@ const ANSWER = QUOTE;
         </div>
 
         <div class="service-modal_contact theme-dark">
-          <Heading tag="h3" variant="h4" class="service-modal_contact-title">
-            Different partnership models.<br />You pick what fits you best
-          </Heading>
+          <h3 class="service-modal_contact-title text-style-label">
+            Let's talk
+          </h3>
           <StepForm name={`${service.id}-call`} class="service-modal_steps" />
         </div>
       </Modal>
@@ -804,8 +804,13 @@ const ANSWER = QUOTE;
       }
     }
 
+    /* A small caps label over the form, on its left edge. */
     .service-modal_contact-title {
-      max-width: 20rem;
+      width: 100%;
+      max-width: 54rem;
+      margin: 0;
+      color: color-mix(in srgb, var(--text) 60%, transparent);
+      text-align: start;
     }
 
     .service-modal_steps {
