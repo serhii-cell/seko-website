@@ -270,6 +270,8 @@ const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
         class="service-modal_wrap theme-light"
         data-reveal="own"
       >
+        {/* Green ASCII particles rising over the blurred page, behind the sheet. */}
+        <canvas slot="backdrop" class="service-modal_particles" />
         <header class="service-modal_header dashed dashed-block dashed-inline">
           <div class="service-modal_intro">
             <div class="service-modal_icon hatched">
@@ -466,6 +468,30 @@ const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
 
 <script>
   import { onPage } from "@/utils/lifecycle.ts";
+  import { asciiParticles } from "@/utils/ascii-particles.ts";
+
+  /* Each sheet's particles run only while that sheet is open. */
+  onPage(() => {
+    const modals = document.querySelectorAll<HTMLDialogElement>(".service-modal_wrap");
+    const stops: (() => void)[] = [];
+    modals.forEach((modal) => {
+      const canvas = modal.querySelector<HTMLCanvasElement>(".service-modal_particles");
+      if (!canvas) return;
+      const particles = asciiParticles(canvas);
+      const start = () => particles.start();
+      const stop = () => particles.stop();
+      modal.addEventListener("modal-open", start);
+      modal.addEventListener("modal-close", stop);
+      /* Opened before this ran (a `?modal=` link opens it on load). */
+      if (modal.open) requestAnimationFrame(start);
+      stops.push(() => {
+        particles.stop();
+        modal.removeEventListener("modal-open", start);
+        modal.removeEventListener("modal-close", stop);
+      });
+    });
+    return () => stops.forEach((stop) => stop());
+  });
 
   const kyiv = new Intl.DateTimeFormat("en-US", {
     timeZone: "Europe/Kyiv",

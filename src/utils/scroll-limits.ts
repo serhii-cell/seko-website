@@ -81,6 +81,11 @@ export function guardWheel(data: { deltaY: number; event: WheelEvent | TouchEven
   lastInput = performance.now();
   const r = range();
   if (!r || !lenis || data.event.ctrlKey) return true;
+  /* Scrolling inside something that scrolls itself (an open sheet, say):
+     not the page's, so not held. */
+  const target = data.event.target;
+  if (target instanceof Element && target.closest("[data-lenis-prevent], dialog[open]")) return true;
+  if (document.querySelector("dialog[open]")) return true;
   const { deltaY, event } = data;
   if (event.type.includes("touch")) {
     /* Touch scrolls natively: only refuse a move further past the limit. */

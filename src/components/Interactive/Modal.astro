@@ -40,6 +40,8 @@ const {
 } = Astro.props;
 
 const content = await slotContent(Astro.slots);
+/* Art drawn on the blurred page, behind the content (the sheet's particles). */
+const backdrop = await slotContent(Astro.slots, "backdrop");
 
 if (import.meta.env.DEV && render && content && !id) {
   console.warn(
@@ -63,6 +65,11 @@ if (import.meta.env.DEV && render && content && !id) {
       tabindex={variant === "sheet" ? -1 : undefined}
       {...rest}
     >
+      {backdrop && (
+        <div class="modal_backdrop-art" aria-hidden="true">
+          <Fragment set:html={backdrop} />
+        </div>
+      )}
       <div class="modal_content">
         {variant === "sheet" ? (
           <button
@@ -104,10 +111,21 @@ if (import.meta.env.DEV && render && content && !id) {
     for (const modal of modals) {
       const scroll = modal.querySelector<HTMLElement>("[data-modal-scroll]");
 
+      /* A sheet scrolls itself; its entrance and exit scale about the middle
+         of the screen, wherever it has been scrolled to. */
+      if (modal.classList.contains("sheet")) {
+        modal.addEventListener(
+          "scroll",
+          () => modal.style.setProperty("--_scroll", `${modal.scrollTop}px`),
+          { passive: true, signal },
+        );
+      }
+
       const open = () => {
         if (modal.open) return;
         if (scroll) scroll.scrollTop = 0;
         modal.scrollTop = 0;
+        modal.style.removeProperty("--_scroll");
         const root = document.documentElement;
         root.toggleAttribute(
           "data-modal-gutter",
@@ -257,9 +275,11 @@ if (import.meta.env.DEV && render && content && !id) {
       }
 
       &.sheet {
-        --_from: 0 3rem;
+        --_from: 0 1.5rem;
+        --_scale-from: 0.97;
         --_backdrop: color-mix(in srgb, var(--dark-900) 10%, transparent);
-        padding: 10rem var(--site-margin) 0;
+        /* Room below the sheet too, so its end floats over the page. */
+        padding: 10rem var(--site-margin);
         align-items: start;
         overflow-y: auto;
         overscroll-behavior: contain;
@@ -290,9 +310,11 @@ if (import.meta.env.DEV && render && content && !id) {
       overflow: hidden;
       opacity: 0;
       translate: var(--_from);
+      scale: var(--_scale-from, 1);
       transition:
         opacity var(--_leaving) var(--open-ease),
-        translate var(--_leaving) var(--open-ease);
+        translate var(--_leaving) var(--open-ease),
+        scale var(--_leaving) var(--open-ease);
 
       .modal_wrap.side-panel & {
         max-width: var(--_panel);
@@ -310,23 +332,60 @@ if (import.meta.env.DEV && render && content && !id) {
         flex: none;
         max-width: 71.9375rem;
         max-height: none;
-        border-radius: 0.125rem 0.125rem 0 0;
+        border-radius: 0.125rem;
       }
 
       .modal_wrap:is([open], .stacki-opened) &,
       .stacki-designer .modal_wrap.preview & {
         opacity: 1;
         translate: 0 0;
+        scale: 1;
         transition:
           opacity var(--open-duration) var(--open-ease),
-          translate var(--open-duration) var(--open-ease);
+          translate var(--open-duration) var(--open-ease),
+          scale var(--open-duration) var(--open-ease);
       }
 
       @starting-style {
         .modal_wrap[open] & {
           opacity: 0;
           translate: var(--_from);
+          scale: var(--_scale-from, 1);
         }
+      }
+
+      /* Grows and shrinks about the middle of what is on screen: the sheet
+         is taller than the screen and scrolls (`--_scroll`, set from the
+         script). */
+      .modal_wrap.sheet & {
+        transform-origin: 50% calc(var(--_scroll, 0px) + 50vh);
+      }
+    }
+
+    /* Fixed over the whole screen, behind the content, fading in and out
+       with the blur; clicks pass through to close the dialog. */
+    .modal_backdrop-art {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity var(--_leaving) var(--open-ease);
+
+      .modal_wrap[open] & {
+        opacity: 1;
+        transition: opacity calc(var(--open-duration) * 2) var(--open-ease);
+      }
+
+      @starting-style {
+        .modal_wrap[open] & {
+          opacity: 0;
+        }
+      }
+
+      & > * {
+        display: block;
+        width: 100%;
+        height: 100%;
       }
     }
 
