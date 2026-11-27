@@ -94,6 +94,16 @@ const { render = true, label, heading, items = [] } = Astro.props;
       &::after {
         z-index: -1;
       }
+      /* The list's full-width line runs along the last question's bottom,
+         under it; a second, out-of-step dash on top would read as solid.
+         Once the question fills (open or hovered), the fill hides the
+         list's line, so it draws its own again. */
+      & .accordion_item:last-child:not(:is([open], .stacki-opened, :hover)) {
+        background-size:
+          var(--border-width) 100%,
+          var(--border-width) 100%,
+          100% 0;
+      }
     }
 
     .faq-main_end {

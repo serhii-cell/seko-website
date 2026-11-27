@@ -980,16 +980,8 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
 
     /* ---------- Front card states ---------- */
 
+    /* Hover only: pressing a card changes nothing. */
     .services-main_deck:not(.is-moving) .services-main_card[data-pos="0"] {
-      &:active .services-main_bg {
-        background-color: var(--stroke);
-      }
-
-      &:active .services-main_expand {
-        background-color: var(--brand-600);
-        color: var(--brand-text);
-      }
-
       @media (hover: hover) and (pointer: fine) {
         &:hover {
           & .services-main_bg::after {
@@ -998,9 +990,6 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           & .services-main_expand {
             background-color: var(--brand-500);
             color: var(--brand-text);
-          }
-          &:active .services-main_expand {
-            background-color: var(--brand-600);
           }
         }
 
