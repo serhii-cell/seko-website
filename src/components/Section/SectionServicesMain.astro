@@ -451,9 +451,10 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           gsap.set(tags, { y: "0.75rem", autoAlpha: 0 });
           reveals.set(card, { lines: textsOf(card).map(createLines), tags });
         };
+        /* Plays a hidden card's content in; one already showing is left as
+           it is, so nothing flickers. */
         const reveal = (card: HTMLElement | undefined, delay = 0) => {
           if (!card) return;
-          if (!reveals.has(card)) conceal(card);
           const found = reveals.get(card);
           if (!found) return;
           found.lines.forEach((lines, i) => lines.play(delay + i * 0.08));
@@ -481,11 +482,15 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
         const show = (index: number) => {
           if (index === front) return;
           if (index > front) {
-            /* Forward: the next card's content waits hidden, then comes in
-               as the card in front of it goes. */
-            conceal(order[index]);
+            /* Forward: the card's content has waited hidden behind the one
+               in front, and comes in as that one goes. */
             reveal(order[index], 0.05);
-          } else uncover(order[index]);
+          } else {
+            /* Back: the card returning shows what it holds; the one going
+               behind hides its content again, ready to come in afresh. */
+            uncover(order[index]);
+            conceal(order[front]);
+          }
           front = index;
           leanBack();
           const active = document.activeElement;
@@ -545,7 +550,9 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
               );
           }
         }
-        conceal(order[0]);
+        /* Every card's content starts hidden; each comes in when its card
+           reaches the front, so none shows through the one in front. */
+        order.forEach(conceal);
 
         /* The last card holds a moment before the page moves on. */
         timeline.to({}, { duration: 0.3 });
@@ -589,8 +596,8 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           scrub: SCRUB,
           /* The first card's content comes in once the deck is held, from
              either side. */
-          onEnter: () => reveal(order[0], 0.1),
-          onEnterBack: () => reveal(order[0], 0.1),
+          onEnter: () => reveal(order[front], 0.1),
+          onEnterBack: () => reveal(order[front], 0.1),
         });
 
         scrolled = { trigger, order, length: steps + 0.3 };
