@@ -6,10 +6,7 @@ import Paragraph from "@/components/Typography/Paragraph.astro";
 import Button from "@/components/Button.astro";
 import Accordion from "@/components/Interactive/Accordion.astro";
 import AccordionItem from "@/components/Interactive/AccordionItem.astro";
-import Form from "@/components/Form/Form.astro";
-import Fieldset from "@/components/Form/Fieldset.astro";
-import Input from "@/components/Form/Input.astro";
-import Select from "@/components/Form/Select.astro";
+import StepForm from "@/components/Form/StepForm.astro";
 import crtMonitor from "@/assets/home/modals/icon-website-crt-monitor.svg";
 import openBox from "@/assets/home/modals/icon-product-open-box.svg";
 import magnifyingGlass from "@/assets/home/modals/icon-audit-magnifying-glass.svg";
@@ -257,7 +254,6 @@ const SERVICES: Service[] = [
 const QUOTE =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.";
 const ANSWER = QUOTE;
-const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
 ---
 
 {
@@ -270,6 +266,8 @@ const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
         class="service-modal_wrap theme-light"
         data-reveal="own"
       >
+        {/* Green ASCII embers rising over the blurred page, behind the sheet. */}
+        <canvas slot="backdrop" class="service-modal_particles" />
         <header class="service-modal_header dashed dashed-block dashed-inline">
           <div class="service-modal_intro">
             <div class="service-modal_icon hatched">
@@ -417,48 +415,10 @@ const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
         </div>
 
         <div class="service-modal_contact theme-dark">
-          <Heading tag="h3" variant="h4" class="service-modal_contact-title">
-            Different partnership models.<br />You pick what fits you best
-          </Heading>
-          <Form name={`${service.id}-call`} class="service-modal_form">
-            <Fieldset
-              legend="Your details"
-              legendStyle="hidden"
-              variant="columns"
-            >
-              <Input
-                label="Your full name"
-                placeholder=""
-                autocomplete="name"
-                required
-              />
-              <Input
-                label="Your company name"
-                placeholder=""
-                autocomplete="organization"
-              />
-              <Input
-                label="Your work email"
-                variant="email"
-                placeholder=""
-                required
-                class="service-modal_wide"
-              />
-              <Select
-                label="Your budget"
-                placeholder="Select"
-                options={OPTIONS}
-              />
-              <Select
-                label="When do you want to start?"
-                placeholder="Select"
-                options={OPTIONS}
-              />
-            </Fieldset>
-            <Button type="submit" class="service-modal_submit">
-              Book a Call
-            </Button>
-          </Form>
+          <h3 class="service-modal_contact-title text-style-label">
+            Let's talk
+          </h3>
+          <StepForm name={`${service.id}-call`} class="service-modal_steps" />
         </div>
       </Modal>
     ))
@@ -466,6 +426,30 @@ const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
 
 <script>
   import { onPage } from "@/utils/lifecycle.ts";
+  import { asciiParticles } from "@/utils/ascii-particles.ts";
+
+  /* Each sheet's particles run only while that sheet is open. */
+  onPage(() => {
+    const modals = document.querySelectorAll<HTMLDialogElement>(".service-modal_wrap");
+    const stops: (() => void)[] = [];
+    modals.forEach((modal) => {
+      const canvas = modal.querySelector<HTMLCanvasElement>(".service-modal_particles");
+      if (!canvas) return;
+      const particles = asciiParticles(canvas);
+      const start = () => particles.start();
+      const stop = () => particles.stop();
+      modal.addEventListener("modal-open", start);
+      modal.addEventListener("modal-close", stop);
+      /* Opened before this ran (a `?modal=` link opens it on load). */
+      if (modal.open) requestAnimationFrame(start);
+      stops.push(() => {
+        particles.stop();
+        modal.removeEventListener("modal-open", start);
+        modal.removeEventListener("modal-close", stop);
+      });
+    });
+    return () => stops.forEach((stop) => stop());
+  });
 
   const kyiv = new Intl.DateTimeFormat("en-US", {
     timeZone: "Europe/Kyiv",
@@ -687,12 +671,36 @@ const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
       }
     }
 
+    /* Its grey covers the column divider and the table's edges behind it,
+       so the head draws them again over its own grey: a divider on its
+       right, the table's left edge where it starts a row, and the table's
+       top edge in the first row. */
     .service-modal_stage-head {
+      --_dash-right: var(--border-width);
+      --_dash-top: var(--border-width);
       display: flex;
       flex-direction: column;
       gap: var(--space-1);
       padding: var(--space-5) var(--space-5) var(--space-3);
       background-color: var(--background-2);
+
+      .service-modal_stage:first-child > & {
+        --_dash-left: var(--border-width);
+      }
+      @media (width < 64rem) {
+        .service-modal_stage:nth-child(odd) > & {
+          --_dash-left: var(--border-width);
+        }
+        .service-modal_stage:nth-child(n + 3) > & {
+          --_dash-top: 0px;
+        }
+      }
+      @media (width < 48rem) {
+        --_dash-left: var(--border-width);
+        .service-modal_stage:nth-child(n + 2) > & {
+          --_dash-top: 0px;
+        }
+      }
     }
 
     .service-modal_stage-items {
@@ -731,7 +739,11 @@ const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
       }
     }
 
+    /* Its grey covers the band's lines above and below the row, so each
+       card draws them again over its own grey: a dashed box all round. */
     .service-modal_card {
+      --_dash-top: var(--border-width);
+      --_dash-bottom: var(--border-width);
       display: flex;
       flex-direction: column;
       gap: var(--space-5);
@@ -802,6 +814,19 @@ const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
       @media (width < 64rem) {
         padding-inline: var(--_band);
       }
+
+      /* The list's own full-width line runs along the last question's
+         bottom, under it; a second, out-of-step dash on top would read as
+         solid. Once the question fills (open or hovered), the fill hides
+         the list's line, so it draws its own again. */
+      & .accordion_item {
+        &:last-child:not(:is([open], .stacki-opened, :hover)) {
+          background-size:
+            var(--border-width) 100%,
+            var(--border-width) 100%,
+            100% 0;
+        }
+      }
     }
 
     /* Contact */
@@ -820,25 +845,17 @@ const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
       }
     }
 
+    /* A small caps label over the form, on its left edge. */
     .service-modal_contact-title {
-      max-width: 20rem;
-    }
-
-    .service-modal_form {
-      max-width: 32.5rem;
+      width: 100%;
+      max-width: 54rem;
+      margin: 0;
+      color: color-mix(in srgb, var(--text) 60%, transparent);
       text-align: start;
     }
 
-    .service-modal_form .field-star {
-      display: none;
-    }
-
-    .service-modal_wide {
-      grid-column: 1 / -1;
-    }
-
-    .service-modal_submit {
-      align-self: center;
+    .service-modal_steps {
+      max-width: 54rem;
     }
   }
 </style>

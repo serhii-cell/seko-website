@@ -1,6 +1,7 @@
 <script>
   import Lenis from "lenis";
   import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
+  import { bindLenis, guardWheel } from "@/utils/scroll-limits.ts";
 
   const designing =
     document.documentElement.classList.contains("stacki-designer");
@@ -17,7 +18,10 @@
       autoToggle: true,
       allowNestedScroll: true,
       respectReducedMotion: true,
+      /* Parts of the page that must play through can hold the wheel. */
+      virtualScroll: guardWheel,
     });
+    bindLenis(lenis);
 
     lenis.on("scroll", ScrollTrigger.update);
 
@@ -54,6 +58,14 @@
     html.lenis,
     html.lenis body {
       height: auto;
+    }
+
+    /* The scrollbar's space is always kept. With autoToggle, Lenis holds the
+       page's `overflow: hidden` a frame longer than whatever set it (the
+       loader, an open modal), so for that frame there is no scrollbar and,
+       without this, the whole page shifts sideways and back. */
+    html {
+      scrollbar-gutter: stable;
     }
 
     .lenis:not(.lenis-autoToggle).lenis-stopped {

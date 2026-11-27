@@ -15,9 +15,12 @@ import adaptive from "@/assets/home/hero/client-adaptive.svg";
 import webshare from "@/assets/home/hero/client-webshare.svg";
 import oblivious from "@/assets/home/hero/client-oblivious.svg";
 import metomic from "@/assets/home/hero/client-metomic.svg";
-import workAdaptive from "@/assets/home/works/work-adaptive-co.jpg";
-import workWyr from "@/assets/home/works/work-wyr.jpg";
-import workHomeRumble from "@/assets/home/works/work-home-rumble.jpg";
+import workAdaptive from "@/assets/home/works/work-adaptive-co-clean.jpg";
+import workWyr from "@/assets/home/works/work-wyr-clean.jpg";
+import workHomeRumble from "@/assets/home/works/work-home-rumble-clean.jpg";
+import workAdaptiveGlyphs from "@/assets/home/works/work-adaptive-co-glyphs.png?url";
+import workWyrGlyphs from "@/assets/home/works/work-wyr-glyphs.png?url";
+import workHomeRumbleGlyphs from "@/assets/home/works/work-home-rumble-glyphs.png?url";
 import websiteTile from "@/assets/home/services/service-website-tile.svg";
 import productTile from "@/assets/home/services/service-product-tile.svg";
 import auditTile from "@/assets/home/services/service-audit-tile.svg";
@@ -91,7 +94,8 @@ const loremLong =
       image={workAdaptive}
       imageAlt="A man at a laptop showing the Adaptive growth overview dashboard"
       href="/case/adaptive"
-      cursor={["+170% engagement", "Webflow · marketing site", "Open case ↗"]}
+      cursor={["Open case"]}
+      glyphs={{ src: workAdaptiveGlyphs, grid: [14.165, 23.845, 13.96, 23.05] }}
     />
     <Card
       variant="work"
@@ -101,7 +105,8 @@ const loremLong =
       image={workWyr}
       imageAlt="The WYR app's cards screen on a phone, with balance and transfer widgets"
       href="/case/wyr"
-      cursor={["Fintech app", "Product design", "Open case ↗"]}
+      cursor={["Open case"]}
+      glyphs={{ src: workWyrGlyphs, grid: [14.005, 24.015, 13.89, 22.81] }}
     />
     <Card
       variant="work"
@@ -111,7 +116,8 @@ const loremLong =
       image={workHomeRumble}
       imageAlt="A laptop showing Home Rumble's side-by-side property comparison"
       href="/case/home-rumble"
-      cursor={["Real estate web app", "Strategy · UX/UI", "Open case ↗"]}
+      cursor={["Open case"]}
+      glyphs={{ src: workHomeRumbleGlyphs, grid: [14.0, 23.96, 0.04, 0.24] }}
     />
     <Card
       variant="work"
@@ -119,7 +125,7 @@ const loremLong =
       subtitle="Product Design"
       tags={["Finance"]}
       href="/case/bidl"
-      cursor={["Construction SaaS", "Web · mobile", "Open case ↗"]}
+      cursor={["Open case"]}
     >
       <WorkSceneBidl
         slot="media"
@@ -132,11 +138,6 @@ const loremLong =
   <SectionServicesMain
     label="Our services"
     heading="Fix what loses users, build what keeps them"
-    stats={[
-      { value: "20+", label: "finished projects" },
-      { value: "10+", label: "Years of experience" },
-      { value: "4.8", total: "5", label: "Average reviews rating" },
-    ]}
     services={[
       {
         modal: "service-website",

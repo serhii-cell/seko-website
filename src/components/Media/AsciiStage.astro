@@ -39,7 +39,6 @@ const { render = true, class: className, ...rest } = Astro.props;
     measureRamp,
     pickGlyph,
     createController,
-    createTorch,
     rotation,
     sway,
     LIGHT,
@@ -63,7 +62,6 @@ const { render = true, class: className, ...rest } = Astro.props;
   /* ---------- Cubes: eight cubes slide together, merge, and zoom out to one ---------- */
   function createCubes(
     canvas: HTMLCanvasElement,
-    stage: HTMLElement,
     controller: Controller,
     look: Look,
     motion: boolean,
@@ -169,8 +167,6 @@ const { render = true, class: className, ...rest } = Astro.props;
     const [HX, HY, HZ] = HALF;
     const FL = KEY;
     const ss = (u: number) => smoothstep(0, 1, u);
-
-    const torch = createTorch(stage, canvas, motion);
 
     let seamFill = 0;
     const SEAM_ORDER = (() => {
@@ -343,7 +339,6 @@ const { render = true, class: className, ...rest } = Astro.props;
       context.clearRect(0, 0, width, height);
       context.font = font;
       context.textBaseline = "top";
-      const lit = torch.lit();
       const total = cols * rows;
       let count = 0;
       for (let gy = 0; gy < rows; gy++) {
@@ -368,16 +363,7 @@ const { render = true, class: className, ...rest } = Astro.props;
                 Math.min(1, (specular[i] - 0.3) * 1.3) * 0.7,
               );
           }
-          let boost = 0;
-          if (lit) {
-            ({ b, color, boost } = torch.light(
-              ox + gx * cw + cw / 2,
-              oy + gy * ch + ch / 2,
-              b,
-              color,
-            ));
-          }
-          const lum = Math.min(1.25, 0.55 + 0.45 * b + boost);
+          const lum = Math.min(1.25, 0.55 + 0.45 * b);
           const glyphChar = pickGlyph(ramp, coverage, b, gx, gy);
           if (glyphChar === " ") continue;
           const rgb =
@@ -478,9 +464,7 @@ const { render = true, class: className, ...rest } = Astro.props;
         draw();
       }
       if (clock - lastStep < 33) return;
-      const dt = Math.min(0.1, (clock - lastStep) / 1000);
       lastStep = clock;
-      torch.step(dt);
       scene(simTime / 1000);
       pending = true;
     }
@@ -537,7 +521,6 @@ const { render = true, class: className, ...rest } = Astro.props;
         flicker?.kill();
         pause();
         observer.disconnect();
-        torch.destroy();
       },
     };
   }
@@ -602,7 +585,7 @@ const { render = true, class: className, ...rest } = Astro.props;
       .catch(() => {})
       .then(() => {
         if (stopped) return;
-        cubes = createCubes(canvas, stage, controller, look, motion);
+        cubes = createCubes(canvas, controller, look, motion);
         if (revealAt !== null) cubes.reveal(revealAt);
       });
 

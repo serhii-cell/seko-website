@@ -163,11 +163,42 @@
         ),
       );
 
+      /* Inside a `data-reveal-together` block (a short list, say) the text
+         and the faders come in as one, in reading order, as soon as the
+         block's top is 20% of the way up the screen, so no row is left
+         waiting for its own turn. */
+      const together = new Map<Element, HTMLElement[]>();
+      const groupOf = (element: Element) =>
+        first.includes(element as HTMLElement)
+          ? null
+          : element.closest("[data-reveal-together]");
+      [...lines.keys(), ...faders].forEach((element) => {
+        const group = groupOf(element);
+        if (group)
+          together.set(group, [
+            ...(together.get(group) ?? []),
+            element as HTMLElement,
+          ]);
+      });
+      together.forEach((members, group) => {
+        ScrollTrigger.create({
+          trigger: group,
+          start: "clamp(top 80%)",
+          once: true,
+          onEnter: () =>
+            members.sort(byReadingOrder).forEach((member, index) => {
+              const reveal = lines.get(member);
+              if (reveal) reveal.play(index * STAGGER);
+              else fadeIn([member], 0, index * STAGGER);
+            }),
+        });
+      });
+
       /* The rest comes in as it scrolls into view: text once its top is 20%
          of the way up the screen, headlines tied to the scroll, blocks in
          batches. */
       lines.forEach((reveal, element) => {
-        if (first.includes(element as HTMLElement)) return;
+        if (first.includes(element as HTMLElement) || groupOf(element)) return;
         ScrollTrigger.create({
           trigger: element,
           start: "clamp(top 80%)",
@@ -187,7 +218,9 @@
         if (passed.length > 0) gsap.set(passed, { clearProps: settle });
         if (entering.length > 0) fadeIn(entering.sort(byReadingOrder), 0.08);
       });
-      const later = faders.filter((block) => !first.includes(block));
+      const later = faders.filter(
+        (block) => !first.includes(block) && !groupOf(block),
+      );
       if (later.length > 0) {
         ScrollTrigger.batch(later, {
           start: "top 90%",

@@ -106,6 +106,13 @@ type Props = Base &
         href?: string;
         /** Short facts the scramble cursor cycles through while the card is hovered, such as a result, the platform and "Open case". `BaseLayout` renders the cursor. */
         cursor?: string[];
+        /**
+         * ASCII drawn over the image on hover: the URL of a glyph layer the
+         * image's size (white glyphs on transparent), and its character
+         * grid as `[width, height, x offset, y offset]` in the layer's px.
+         * Leave unset for no ASCII. A `media` slot draws its own.
+         */
+        glyphs?: { src: string; grid: [number, number, number, number] };
       }
   );
 
@@ -116,6 +123,7 @@ type AllProps = Base & {
   subtitle?: string;
   href?: string;
   cursor?: string[];
+  glyphs?: { src: string; grid: [number, number, number, number] };
 };
 
 const {
@@ -134,6 +142,7 @@ const {
   subtitle,
   href,
   cursor = [],
+  glyphs,
   class: className,
   ...rest
 } = Astro.props as AllProps;
@@ -189,6 +198,14 @@ if (import.meta.env.DEV && render) {
                 alt={imageAlt}
                 variant="constrained"
                 sizes="(min-width: 64rem) 80vw, 90vw"
+              />
+            )}
+            {!media && glyphs && (
+              <canvas
+                class="card_glyphs"
+                aria-hidden="true"
+                data-src={glyphs.src}
+                data-grid={glyphs.grid.join(",")}
               />
             )}
           </div>
@@ -347,14 +364,11 @@ if (import.meta.env.DEV && render) {
       }
     }
 
-    /* Work: a case study, the whole card one link. The card is its visual,
-       which fills the room under the nav (less a margin above and below)
-       while the row is held, so nothing of the section above shows. Its
-       ratio caps the width; where the row is narrower than that, the image
-       fills the taller box and crops at the sides. */
+    /* Work: a case study, the whole card one link. The card is its picture,
+       at the design's 1249 × 725, as wide as the row makes it; the tags and
+       the name sit on it. */
     .card_wrap.work {
       --_visual-ratio: 1249 / 725;
-      --_fill: calc(100svh - var(--nav-height) - var(--space-5) * 2);
       container: card / inline-size;
       gap: 0;
       background-color: transparent;
@@ -367,26 +381,15 @@ if (import.meta.env.DEV && render) {
       &:has(.card_link:focus-visible) {
         outline-color: var(--brand-500);
       }
-
-      @media (width >= 48rem) {
-        max-width: max(20rem, calc(var(--_fill) * var(--_visual-ratio)));
-      }
     }
 
     /* The media, blur and shade are stacked layers; the caption is the one
        grid item, so its link's cover reaches the whole visual. */
-    /* On phones the card stands upright, so its tags and name have room;
-       the picture crops at the sides. */
     .work > .card_visual {
       display: grid;
-      aspect-ratio: 4 / 5;
+      aspect-ratio: var(--_visual-ratio);
       border-radius: 0;
       isolation: isolate;
-
-      @media (width >= 48rem) {
-        aspect-ratio: auto;
-        height: max(18rem, min(var(--_fill), calc(100cqw / 1.2)));
-      }
     }
 
     .card_media {
@@ -403,6 +406,15 @@ if (import.meta.env.DEV && render) {
 
     .card_blur {
       height: 80%;
+    }
+
+    /* The ASCII drawn on hover, over the picture and scaled with it. */
+    .card_glyphs {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
     }
 
     /* A soft, eased darkening under the name, so it reads on bright images
@@ -523,3 +535,16 @@ if (import.meta.env.DEV && render) {
     }
   }
 </style>
+
+<script>
+  import { onPage } from "@/utils/lifecycle.ts";
+  import { glyphHover } from "@/utils/glyph-hover.ts";
+
+  /* Work cards with ASCII bring it in on hover. */
+  onPage(() => {
+    const stops = [...document.querySelectorAll<HTMLElement>(".card_wrap.work")]
+      .filter((card) => card.querySelector(".card_glyphs"))
+      .map(glyphHover);
+    return () => stops.forEach((stop) => stop());
+  });
+</script>
