@@ -671,12 +671,36 @@ const ANSWER = QUOTE;
       }
     }
 
+    /* Its grey covers the column divider and the table's edges behind it,
+       so the head draws them again over its own grey: a divider on its
+       right, the table's left edge where it starts a row, and the table's
+       top edge in the first row. */
     .service-modal_stage-head {
+      --_dash-right: var(--border-width);
+      --_dash-top: var(--border-width);
       display: flex;
       flex-direction: column;
       gap: var(--space-1);
       padding: var(--space-5) var(--space-5) var(--space-3);
       background-color: var(--background-2);
+
+      .service-modal_stage:first-child > & {
+        --_dash-left: var(--border-width);
+      }
+      @media (width < 64rem) {
+        .service-modal_stage:nth-child(odd) > & {
+          --_dash-left: var(--border-width);
+        }
+        .service-modal_stage:nth-child(n + 3) > & {
+          --_dash-top: 0px;
+        }
+      }
+      @media (width < 48rem) {
+        --_dash-left: var(--border-width);
+        .service-modal_stage:nth-child(n + 2) > & {
+          --_dash-top: 0px;
+        }
+      }
     }
 
     .service-modal_stage-items {
@@ -715,7 +739,11 @@ const ANSWER = QUOTE;
       }
     }
 
+    /* Its grey covers the band's lines above and below the row, so each
+       card draws them again over its own grey: a dashed box all round. */
     .service-modal_card {
+      --_dash-top: var(--border-width);
+      --_dash-bottom: var(--border-width);
       display: flex;
       flex-direction: column;
       gap: var(--space-5);
@@ -785,6 +813,19 @@ const ANSWER = QUOTE;
 
       @media (width < 64rem) {
         padding-inline: var(--_band);
+      }
+
+      /* The list's own full-width line runs along the last question's
+         bottom, under it; a second, out-of-step dash on top would read as
+         solid. Once the question fills (open or hovered), the fill hides
+         the list's line, so it draws its own again. */
+      & .accordion_item {
+        &:last-child:not(:is([open], .stacki-opened, :hover)) {
+          background-size:
+            var(--border-width) 100%,
+            var(--border-width) 100%,
+            100% 0;
+        }
       }
     }
 

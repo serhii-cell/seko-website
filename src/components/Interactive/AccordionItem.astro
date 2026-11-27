@@ -56,12 +56,20 @@ const content = await slotContent(Astro.slots);
 
 <style is:global>
   @layer components {
+    /* Each question is boxed on its sides and bottom by dashed rules (3px on,
+       3px off), the site's line: the border keeps its room but stays clear,
+       and the dashes are drawn over it, above the fill. */
     .accordion_item {
       --_pad: var(--space-7);
       --_tile: 2rem;
       --_gap: var(--space-4);
       --_fill: transparent;
       --_edge: var(--stroke);
+      --_rule-v: repeating-linear-gradient(
+        to bottom,
+        var(--_edge) 0 var(--dash),
+        transparent 0 calc(var(--dash) * 2)
+      );
       --_title: light-dark(
         var(--text),
         color-mix(in srgb, var(--text) 60%, transparent)
@@ -70,17 +78,44 @@ const content = await slotContent(Astro.slots);
       position: relative;
       color: var(--text);
       background-color: var(--_fill);
-      border: var(--border-width) solid var(--_edge);
+      border: var(--border-width) solid transparent;
       border-top: 0;
-      transition:
-        background-color var(--hover-duration) var(--hover-ease),
-        border-color var(--hover-duration) var(--hover-ease);
+      background-image:
+        var(--_rule-v),
+        var(--_rule-v),
+        repeating-linear-gradient(
+          to right,
+          var(--_edge) 0 var(--dash),
+          transparent 0 calc(var(--dash) * 2)
+        );
+      background-origin: border-box;
+      background-position:
+        left top,
+        right top,
+        left bottom;
+      background-size:
+        var(--border-width) 100%,
+        var(--border-width) 100%,
+        100% var(--border-width);
+      background-repeat: no-repeat;
+      transition: background-color var(--hover-duration) var(--hover-ease);
       @media (width < 48rem) {
         --_pad: var(--space-4);
         --_gap: var(--space-3);
       }
+      /* Open, it fills a little quieter than hover, and under the cursor it
+         takes the hover fill. On dark sections that is a step between the
+         page and the hover grey; on light ones the soft grey, with hover a
+         touch darker (the light greys sit too close to tell apart). */
+      --_hover: light-dark(
+        color-mix(in srgb, var(--background-2), var(--text) 3%),
+        var(--background-2)
+      );
       &:is([open], .stacki-opened) {
-        --_fill: var(--background-2);
+        --_fill: light-dark(
+          var(--background-2),
+          color-mix(in srgb, var(--background-2), var(--background))
+        );
         --_title: var(--text);
       }
       &:has(> .accordion_toggle:focus-visible) {
@@ -90,15 +125,8 @@ const content = await slotContent(Astro.slots);
       }
       @media (hover: hover) {
         &:hover {
-          --_fill: var(--background-2);
+          --_fill: var(--_hover);
           --_title: var(--text);
-        }
-        &:is([open], .stacki-opened):hover {
-          --_fill: light-dark(
-            var(--background-2),
-            color-mix(in srgb, var(--background-2), var(--text) 1%)
-          );
-          --_edge: var(--brand-500);
         }
       }
     }
