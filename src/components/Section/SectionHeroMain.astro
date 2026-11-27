@@ -95,11 +95,10 @@ const { render = true, heading, text, facts = [], stats = [] } = Astro.props;
       min-width: 0;
     }
 
+    /* The same inset on every side, so the title keeps as much room before
+       the divider on its right as the rail on its left. */
     .hero-main_head {
       padding: var(--_frame-inset);
-      @media (width >= 64rem) {
-        padding-right: 0;
-      }
     }
 
     .hero-main_title {

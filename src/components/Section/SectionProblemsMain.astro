@@ -1430,9 +1430,9 @@ const total = String(Math.min(problems.length, visuals.length));
     }
 
     /* On the hero's grid: split where the hero splits, at half the width
-       and a half rem. The drawing fills the left side and the text sits
-       centred in the right, both inset by the frame's inset, as the hero's
-       text is. Below 64rem they stack. */
+       and a half rem. The drawing fills the left side and the text the
+       right, their tops level, both inset by the frame's inset, as the
+       hero's text is. Below 64rem they stack. */
     .problems-main_content {
       --_pad: var(--_frame-inset, var(--space-7));
       display: flex;
@@ -1442,7 +1442,7 @@ const total = String(Math.min(problems.length, visuals.length));
       @media (width >= 64rem) {
         display: grid;
         grid-template-columns: minmax(0, calc(50% + 0.5rem)) minmax(0, 1fr);
-        align-items: center;
+        align-items: start;
         gap: 0;
         padding: 0;
         & > .problems-main_figure {
