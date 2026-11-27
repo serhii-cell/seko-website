@@ -45,29 +45,45 @@ const { render = true, class: className, ...rest } = Astro.props;
       transform: translateZ(0);
     }
 
+    /* Each layer's box starts a little above its band, not at the top:
+       a backdrop blur works over its whole box whatever the mask shows, so
+       five full-size layers cost five full blurs on every frame the picture
+       moves or changes. The gap above each band keeps the blur's edge out
+       of sight. The mask is the full height's gradient, sized back up to
+       the full height and pinned to the bottom, so the bands land where
+       they did. */
     .progressive-blur_layer {
       position: absolute;
       inset: 0;
+      top: calc(var(--_top) * 100%);
+      mask-position: bottom;
+      mask-repeat: no-repeat;
+      mask-size: 100% calc(100% / (1 - var(--_top)));
 
       &:nth-child(1) {
+        --_top: 0.46;
         backdrop-filter: blur(0.09375rem);
-        mask: linear-gradient(#0000 50%, #000 62.5% 75%, #0000 87.5%);
+        mask-image: linear-gradient(#0000 50%, #000 62.5% 75%, #0000 87.5%);
       }
       &:nth-child(2) {
+        --_top: 0.56;
         backdrop-filter: blur(0.1875rem);
-        mask: linear-gradient(#0000 62.5%, #000 75% 87.5%, #0000 100%);
+        mask-image: linear-gradient(#0000 62.5%, #000 75% 87.5%, #0000 100%);
       }
       &:nth-child(3) {
+        --_top: 0.66;
         backdrop-filter: blur(0.375rem);
-        mask: linear-gradient(#0000 75%, #000 87.5% 100%);
+        mask-image: linear-gradient(#0000 75%, #000 87.5% 100%);
       }
       &:nth-child(4) {
+        --_top: 0.7;
         backdrop-filter: blur(0.75rem);
-        mask: linear-gradient(#0000 82%, #000 92% 100%);
+        mask-image: linear-gradient(#0000 82%, #000 92% 100%);
       }
       &:nth-child(5) {
+        --_top: 0.72;
         backdrop-filter: blur(1.5rem);
-        mask: linear-gradient(#0000 88%, #000 100%);
+        mask-image: linear-gradient(#0000 88%, #000 100%);
       }
     }
   }
