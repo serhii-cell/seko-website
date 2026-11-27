@@ -28,13 +28,12 @@ const {
   class: className,
 } = Astro.props;
 
-const KEYS = "ABCDEFGH";
 ---
 
 {/*
   One question at a time, from Osmo's Multi Step Form (Receipt): each answer
   prints onto a receipt beside the questions, a line of which takes you back
-  to its step. Choices answer to their letter key; Enter moves on.
+  to its step. Enter moves on.
 */}
 {
   render && (
@@ -102,10 +101,9 @@ const KEYS = "ABCDEFGH";
               Roughly what budget do you have in mind?
             </h3>
             <div class="step-form_choices" data-step-form-reveal>
-              {budgets.map((budget, i) => (
+              {budgets.map((budget) => (
                 <label class="step-form_choice">
                   <input class="step-form_choice-input" type="radio" name="budget" value={budget} required />
-                  <span class="step-form_key" data-step-form-key>{KEYS[i]}</span>
                   <span class="step-form_choice-label">{budget}</span>
                 </label>
               ))}
@@ -123,10 +121,9 @@ const KEYS = "ABCDEFGH";
               When would you like to start?
             </h3>
             <div class="step-form_choices" data-step-form-reveal>
-              {starts.map((start, i) => (
+              {starts.map((start) => (
                 <label class="step-form_choice">
                   <input class="step-form_choice-input" type="radio" name="start" value={start} required />
-                  <span class="step-form_key" data-step-form-key>{KEYS[i]}</span>
                   <span class="step-form_choice-label">{start}</span>
                 </label>
               ))}
@@ -284,18 +281,12 @@ const KEYS = "ABCDEFGH";
       (field.type !== "email" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(field.value.trim()));
     const firstInvalid = (step: Element) => fieldsOf(step).find((field) => !isValid(field));
 
-    const choiceText = (field: HTMLInputElement) => {
-      const label = field.labels?.[0]?.cloneNode(true) as HTMLElement | undefined;
-      if (!label) return field.value;
-      label.querySelector("[data-step-form-key]")?.remove();
-      return label.textContent?.trim() ?? field.value;
-    };
     const valueOf = (step: Element) =>
       fieldsOf(step)
         .map((field) =>
           field.type === "radio" || field.type === "checkbox"
             ? field.checked
-              ? choiceText(field)
+              ? field.value
               : ""
             : field.value.trim(),
         )
@@ -475,7 +466,7 @@ const KEYS = "ABCDEFGH";
       { signal },
     );
 
-    /* Enter moves on; a choice's letter picks it. */
+    /* Enter moves on. */
     document.addEventListener(
       "keydown",
       (event) => {
@@ -493,21 +484,7 @@ const KEYS = "ABCDEFGH";
           event.preventDefault();
           if (last && clickedAway) buttonOf(step)?.click();
           else next();
-          return;
         }
-
-        const typing = target.matches(
-          "input:not([type='radio']):not([type='checkbox']), textarea, select",
-        );
-        if (typing || event.metaKey || event.ctrlKey || event.altKey || event.key.length !== 1) return;
-        const key = [...step.querySelectorAll("[data-step-form-key]")].find(
-          (element) => element.textContent?.trim().toLowerCase() === event.key.toLowerCase(),
-        );
-        const input = key?.closest("label")?.querySelector("input");
-        if (!input) return;
-        event.preventDefault();
-        input.click();
-        input.focus({ preventScroll: true });
       },
       { capture: true, signal },
     );
@@ -687,8 +664,8 @@ const KEYS = "ABCDEFGH";
       }
     }
 
-    /* Choices: square hairline boxes, a letter in a green square; picked,
-       the green spreads from the letter to fill the box. */
+    /* Choices: square hairline boxes with just their text; picked, green
+       wipes in from the left. */
     .step-form_choices {
       display: flex;
       width: 100%;
@@ -700,15 +677,12 @@ const KEYS = "ABCDEFGH";
     }
 
     .step-form_choice {
-      --_key: 1.75rem;
-      --_inset: 0.375rem;
       position: relative;
       display: flex;
       overflow: hidden;
       align-items: center;
-      gap: 0.625rem;
       margin: 0;
-      padding: var(--_inset) 0.875rem var(--_inset) var(--_inset);
+      padding: 0.75rem 1rem;
       border: var(--border-width) solid var(--stroke);
       color: var(--text);
       font-size: 1rem;
@@ -722,10 +696,7 @@ const KEYS = "ABCDEFGH";
         position: absolute;
         inset: 0;
         background-color: var(--brand-500);
-        clip-path: inset(
-          var(--_inset) calc(100% - var(--_inset) - var(--_key)) var(--_inset)
-            var(--_inset)
-        );
+        clip-path: inset(0 100% 0 0);
         transition: clip-path 0.5s cubic-bezier(0.625, 0.05, 0, 1);
       }
       @media (hover: hover) {
@@ -755,20 +726,6 @@ const KEYS = "ABCDEFGH";
       opacity: 0;
       appearance: none;
       cursor: pointer;
-    }
-
-    .step-form_key {
-      position: relative;
-      display: flex;
-      width: var(--_key);
-      height: var(--_key);
-      flex: none;
-      justify-content: center;
-      align-items: center;
-      color: var(--dark-950);
-      font-family: var(--mono-family);
-      font-size: 0.75rem;
-      line-height: 1;
     }
 
     .step-form_choice-label {
