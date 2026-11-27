@@ -6,10 +6,7 @@ import Paragraph from "@/components/Typography/Paragraph.astro";
 import Button from "@/components/Button.astro";
 import Accordion from "@/components/Interactive/Accordion.astro";
 import AccordionItem from "@/components/Interactive/AccordionItem.astro";
-import Form from "@/components/Form/Form.astro";
-import Fieldset from "@/components/Form/Fieldset.astro";
-import Input from "@/components/Form/Input.astro";
-import Select from "@/components/Form/Select.astro";
+import StepForm from "@/components/Form/StepForm.astro";
 import crtMonitor from "@/assets/home/modals/icon-website-crt-monitor.svg";
 import openBox from "@/assets/home/modals/icon-product-open-box.svg";
 import magnifyingGlass from "@/assets/home/modals/icon-audit-magnifying-glass.svg";
@@ -257,7 +254,6 @@ const SERVICES: Service[] = [
 const QUOTE =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.";
 const ANSWER = QUOTE;
-const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
 ---
 
 {
@@ -422,45 +418,7 @@ const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
           <Heading tag="h3" variant="h4" class="service-modal_contact-title">
             Different partnership models.<br />You pick what fits you best
           </Heading>
-          <Form name={`${service.id}-call`} class="service-modal_form">
-            <Fieldset
-              legend="Your details"
-              legendStyle="hidden"
-              variant="columns"
-            >
-              <Input
-                label="Your full name"
-                placeholder=""
-                autocomplete="name"
-                required
-              />
-              <Input
-                label="Your company name"
-                placeholder=""
-                autocomplete="organization"
-              />
-              <Input
-                label="Your work email"
-                variant="email"
-                placeholder=""
-                required
-                class="service-modal_wide"
-              />
-              <Select
-                label="Your budget"
-                placeholder="Select"
-                options={OPTIONS}
-              />
-              <Select
-                label="When do you want to start?"
-                placeholder="Select"
-                options={OPTIONS}
-              />
-            </Fieldset>
-            <Button type="submit" class="service-modal_submit">
-              Book a Call
-            </Button>
-          </Form>
+          <StepForm name={`${service.id}-call`} class="service-modal_steps" />
         </div>
       </Modal>
     ))
@@ -850,21 +808,8 @@ const OPTIONS = ["Option 1", "Option 2", "Option 3", "Option 4"];
       max-width: 20rem;
     }
 
-    .service-modal_form {
-      max-width: 32.5rem;
-      text-align: start;
-    }
-
-    .service-modal_form .field-star {
-      display: none;
-    }
-
-    .service-modal_wide {
-      grid-column: 1 / -1;
-    }
-
-    .service-modal_submit {
-      align-self: center;
+    .service-modal_steps {
+      max-width: 54rem;
     }
   }
 </style>

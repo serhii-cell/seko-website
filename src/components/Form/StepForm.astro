@@ -1,0 +1,946 @@
+---
+import Form from "@/components/Form/Form.astro";
+import Button from "@/components/Button.astro";
+
+interface Props {
+  /** Set to `false` to skip rendering this component and its children. */
+  render?: boolean;
+  /** What the form is called, which is what it submits under. */
+  name: string;
+  /** Where it posts. Left unset, it sends nothing and reports success. */
+  action?: string;
+  /** The budget choices, in order. */
+  budgets?: string[];
+  /** The start-date choices, in order. */
+  starts?: string[];
+  /** Text of the button that sends the form. */
+  submitLabel?: string;
+  class?: string;
+}
+
+const {
+  render = true,
+  name,
+  action,
+  budgets = ["Under $5k", "$5k to $15k", "$15k to $40k", "$40k or more"],
+  starts = ["As soon as possible", "Within a month", "In 1 to 3 months", "Just exploring"],
+  submitLabel = "Book a Call",
+  class: className,
+} = Astro.props;
+
+const KEYS = "ABCDEFGH";
+---
+
+{/*
+  One question at a time, from Osmo's Multi Step Form (Receipt): each answer
+  prints onto a receipt beside the questions, a line of which takes you back
+  to its step. Choices answer to their letter key; Enter moves on.
+*/}
+{
+  render && (
+    <Form name={name} action={action} class:list={["step-form_form", className]}>
+      <div class="step-form_layout" data-step-form data-lines="off">
+        <div class="step-form_stage">
+          <div class="step-form_step" data-step-form-step="Name" role="group">
+            <h3 class="step-form_question" data-step-form-question>
+              Hi there. What should we call you?
+            </h3>
+            <div class="step-form_field" data-step-form-reveal>
+              <input
+                class="step-form_input"
+                name="name"
+                type="text"
+                autocomplete="name"
+                placeholder="Type your name"
+                required
+              />
+              <button
+                type="button"
+                class="step-form_arrow"
+                aria-label="Next question"
+                data-step-form-next
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="square" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="step-form_step" data-step-form-step="Company" role="group">
+            <h3 class="step-form_question" data-step-form-question>
+              <span>Nice to meet you, </span><span data-step-form-answer="name">friend</span><span>. Which company are you with?</span>
+            </h3>
+            <div class="step-form_field" data-step-form-reveal>
+              <input
+                class="step-form_input"
+                name="company"
+                type="text"
+                autocomplete="organization"
+                placeholder="Company name, if there is one"
+              />
+              <button
+                type="button"
+                class="step-form_arrow"
+                aria-label="Next question"
+                data-step-form-next
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="square" />
+                </svg>
+              </button>
+            </div>
+            <div class="step-form_actions" data-step-form-reveal>
+              <Button type="button" emphasis="secondary" size="medium" class="step-form_back" data-step-form-prev>
+                Back
+              </Button>
+            </div>
+          </div>
+
+          <div class="step-form_step" data-step-form-step="Budget" role="group">
+            <h3 class="step-form_question" data-step-form-question>
+              Roughly what budget do you have in mind?
+            </h3>
+            <div class="step-form_choices" data-step-form-reveal>
+              {budgets.map((budget, i) => (
+                <label class="step-form_choice">
+                  <input class="step-form_choice-input" type="radio" name="budget" value={budget} required />
+                  <span class="step-form_key" data-step-form-key>{KEYS[i]}</span>
+                  <span class="step-form_choice-label">{budget}</span>
+                </label>
+              ))}
+            </div>
+            <div class="step-form_actions" data-step-form-reveal>
+              <Button type="button" size="medium" data-step-form-next>Next</Button>
+              <Button type="button" emphasis="secondary" size="medium" class="step-form_back" data-step-form-prev>
+                Back
+              </Button>
+            </div>
+          </div>
+
+          <div class="step-form_step" data-step-form-step="Start" role="group">
+            <h3 class="step-form_question" data-step-form-question>
+              When would you like to start?
+            </h3>
+            <div class="step-form_choices" data-step-form-reveal>
+              {starts.map((start, i) => (
+                <label class="step-form_choice">
+                  <input class="step-form_choice-input" type="radio" name="start" value={start} required />
+                  <span class="step-form_key" data-step-form-key>{KEYS[i]}</span>
+                  <span class="step-form_choice-label">{start}</span>
+                </label>
+              ))}
+            </div>
+            <div class="step-form_actions" data-step-form-reveal>
+              <Button type="button" size="medium" data-step-form-next>Next</Button>
+              <Button type="button" emphasis="secondary" size="medium" class="step-form_back" data-step-form-prev>
+                Back
+              </Button>
+            </div>
+          </div>
+
+          <div class="step-form_step" data-step-form-step="Email" role="group">
+            <h3 class="step-form_question" data-step-form-question>
+              Where can we reach you?
+            </h3>
+            <div class="step-form_field" data-step-form-reveal>
+              <input
+                class="step-form_input"
+                name="email"
+                type="email"
+                autocomplete="email"
+                placeholder="Type your work email"
+                required
+              />
+              <button
+                type="button"
+                class="step-form_arrow"
+                aria-label="Next question"
+                data-step-form-next
+              >
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M5 12h14m-6-6 6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="square" />
+                </svg>
+              </button>
+            </div>
+            <div class="step-form_actions" data-step-form-reveal>
+              <Button type="button" emphasis="secondary" size="medium" class="step-form_back" data-step-form-prev>
+                Back
+              </Button>
+            </div>
+          </div>
+
+          <div class="step-form_step" data-step-form-step="" role="group">
+            <h3 class="step-form_question" data-step-form-question>
+              <span>That's everything, </span><span data-step-form-answer="name">friend</span><span>. Check your answers and book the call.</span>
+            </h3>
+            <div class="step-form_actions" data-step-form-reveal>
+              <Button type="submit" size="medium">{submitLabel}</Button>
+              <Button type="button" emphasis="secondary" size="medium" class="step-form_back" data-step-form-prev>
+                Back
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <aside class="step-form_receipt" aria-label="Your answers">
+          <div class="step-form_receipt-head">
+            <p class="step-form_receipt-label">Your answers</p>
+            <p class="step-form_receipt-label">
+              <span>Step </span><span data-step-form-current>01</span><span>/</span><span data-step-form-total>06</span>
+            </p>
+          </div>
+          <ol class="step-form_list">
+            <li class="step-form_line" data-step-form-line>
+              <button type="button" class="step-form_line-button" data-step-form-line-button>
+                <span class="step-form_line-label" data-step-form-line-label>Name</span>
+                <span class="step-form_line-dots" aria-hidden="true"></span>
+                <span class="step-form_line-value" data-step-form-line-value>—</span>
+              </button>
+            </li>
+          </ol>
+          <div class="step-form_receipt-foot">
+            <div class="step-form_barcode" aria-hidden="true"></div>
+            <p class="step-form_receipt-label">©2026 Seko</p>
+          </div>
+        </aside>
+      </div>
+    </Form>
+  )
+}
+
+<script>
+  import { gsap, SplitText } from "@/utils/gsap.ts";
+  import { onPage } from "@/utils/lifecycle.ts";
+
+  const FIELDS =
+    "input:not([type='hidden'], [type='submit'], [type='button']), select, textarea";
+
+  type Line = {
+    element: HTMLElement;
+    value: HTMLElement | null;
+    emptyText: string;
+    button: HTMLButtonElement | null;
+    index: number;
+  };
+
+  const pad = (number: number) => String(number).padStart(2, "0");
+
+  function setUp(root: HTMLElement, rootIndex: number, signal: AbortSignal) {
+    const form = root.closest("form");
+    const steps = [...root.querySelectorAll<HTMLElement>("[data-step-form-step]")];
+    if (!form || steps.length === 0) return () => {};
+    const reduce = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const currentCounts = root.querySelectorAll("[data-step-form-current]");
+    const totalCounts = root.querySelectorAll("[data-step-form-total]");
+    const answersIn = (element: Element) => [
+      ...element.querySelectorAll<HTMLElement>("[data-step-form-answer]"),
+    ];
+    const fallbacks = answersIn(root).map((answer) => answer.textContent ?? "");
+    const fieldsOf = (step: Element) => [
+      ...step.querySelectorAll<HTMLInputElement>(FIELDS),
+    ];
+
+    /* One receipt line per step with a label, copied from the one drawn. */
+    const blueprint = root.querySelector<HTMLElement>("[data-step-form-line]");
+    const lines: Line[] = blueprint
+      ? steps
+          .filter((step) => step.dataset.stepFormStep)
+          .map((step) => {
+            const element = blueprint.cloneNode(true) as HTMLElement;
+            const label = element.querySelector("[data-step-form-line-label]");
+            const value = element.querySelector<HTMLElement>("[data-step-form-line-value]");
+            if (label) label.textContent = step.dataset.stepFormStep ?? "";
+            blueprint.before(element);
+            return {
+              element,
+              value,
+              emptyText: value?.textContent ?? "",
+              button: element.querySelector<HTMLButtonElement>("[data-step-form-line-button]"),
+              index: steps.indexOf(step),
+            };
+          })
+      : [];
+    blueprint?.remove();
+
+    let active = 0;
+    let furthest = 0;
+    let playing: gsap.core.Timeline | null = null;
+    let inUse = false;
+
+    steps.forEach((step, index) => {
+      const question = step.querySelector<HTMLElement>("[data-step-form-question]");
+      if (!question) return;
+      question.id ||= `step-form-${rootIndex}-question-${index}`;
+      step.setAttribute("aria-labelledby", question.id);
+      fieldsOf(step)
+        .filter((field) => field.type !== "radio" && field.type !== "checkbox")
+        .filter((field) => !field.labels?.length && !field.hasAttribute("aria-label"))
+        .forEach((field) => field.setAttribute("aria-labelledby", question.id));
+    });
+
+    const isValid = (field: HTMLInputElement) =>
+      field.checkValidity() &&
+      (field.type !== "email" || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(field.value.trim()));
+    const firstInvalid = (step: Element) => fieldsOf(step).find((field) => !isValid(field));
+
+    const choiceText = (field: HTMLInputElement) => {
+      const label = field.labels?.[0]?.cloneNode(true) as HTMLElement | undefined;
+      if (!label) return field.value;
+      label.querySelector("[data-step-form-key]")?.remove();
+      return label.textContent?.trim() ?? field.value;
+    };
+    const valueOf = (step: Element) =>
+      fieldsOf(step)
+        .map((field) =>
+          field.type === "radio" || field.type === "checkbox"
+            ? field.checked
+              ? choiceText(field)
+              : ""
+            : field.value.trim(),
+        )
+        .filter(Boolean)
+        .join(", ");
+
+    /* An answer prints onto its line, left to right in steps. */
+    const print = (element: HTMLElement) =>
+      gsap.fromTo(
+        element,
+        { clipPath: "inset(0% 100% 0% 0%)" },
+        { clipPath: "inset(0% 0% 0% 0%)", duration: 0.4, ease: "steps(8)", clearProps: "clipPath" },
+      );
+
+    const updateAnswers = () =>
+      answersIn(root).forEach((answer, i) => {
+        const field = form.elements.namedItem(answer.dataset.stepFormAnswer ?? "");
+        const value = field instanceof HTMLInputElement ? field.value.trim() : "";
+        answer.textContent = value || fallbacks[i];
+      });
+
+    const updateLines = () =>
+      lines.forEach(({ element, value, emptyText, button, index }) => {
+        const answer = valueOf(steps[index]);
+        const current = index === active;
+        element.dataset.stepFormLineStatus = current ? "current" : answer ? "answered" : "empty";
+        if (button) {
+          button.disabled = index > furthest;
+          button.setAttribute("aria-current", current ? "step" : "false");
+        }
+        const text = answer || emptyText;
+        if (!value || value.textContent === text) return;
+        value.textContent = text;
+        if (answer && !reduce()) print(value);
+      });
+
+    const updateStatus = (leaving: HTMLElement | null = null) => {
+      steps.forEach((step, index) => {
+        const isActive = index === active;
+        if (step !== leaving) step.dataset.stepFormStatus = isActive ? "active" : "inactive";
+        step.inert = !isActive;
+      });
+      currentCounts.forEach((count) => (count.textContent = pad(active + 1)));
+      updateLines();
+    };
+
+    const buttonOf = (step: Element) =>
+      step.querySelector<HTMLElement>("button[type='submit'], button:not([data-step-form-prev])");
+    const focusStep = (step: Element) => {
+      const fields = fieldsOf(step);
+      (fields.find((field) => field.checked) ?? fields[0] ?? buttonOf(step))?.focus({
+        preventScroll: true,
+      });
+    };
+
+    /* The question's lines, with an answer kept on the line its punctuation
+       follows. */
+    const splitQuestion = (step: Element) => {
+      const question = step.querySelector<HTMLElement>("[data-step-form-question]");
+      if (!question) return { lines: [] as Element[], revert: () => {} };
+      const html = question.innerHTML;
+      answersIn(question).forEach((answer) => {
+        const after = answer.nextSibling;
+        if (!after?.textContent) return;
+        const punctuation = after.textContent.match(/^\S*/)?.[0] ?? "";
+        answer.textContent += punctuation;
+        after.textContent = after.textContent.slice(punctuation.length);
+      });
+      const split = SplitText.create(question, { type: "lines", mask: "lines" });
+      return {
+        lines: split.lines,
+        revert() {
+          split.revert();
+          question.innerHTML = html;
+        },
+      };
+    };
+
+    /* The question going rises out of its lines, the rest fades up after
+       it; the next question rises in on Osmo's ease, its parts after. Going
+       back runs it the other way. */
+    const transition = (from: HTMLElement, to: HTMLElement, direction: number) => {
+      const fromSplit = splitQuestion(from);
+      const toSplit = splitQuestion(to);
+      const fromParts = from.querySelectorAll("[data-step-form-reveal]");
+      const toParts = to.querySelectorAll("[data-step-form-reveal]");
+      return gsap
+        .timeline({
+          onComplete: () => {
+            fromSplit.revert();
+            toSplit.revert();
+            gsap.set([...fromParts, ...toParts], { clearProps: "all" });
+            from.dataset.stepFormStatus = "inactive";
+          },
+        })
+        .to(fromSplit.lines, { yPercent: -100 * direction, duration: 0.4, ease: "power2.in", stagger: 0.05 })
+        .to(
+          fromParts,
+          { opacity: 0, yPercent: -25 * direction, duration: 0.3, ease: "power2.in", stagger: 0.05 },
+          "<",
+        )
+        .fromTo(
+          toSplit.lines,
+          { yPercent: 100 * direction },
+          { yPercent: 0, duration: 0.7, ease: "osmo", stagger: 0.05 },
+          "<+=0.3",
+        )
+        .fromTo(
+          toParts,
+          { opacity: 0, yPercent: 25 * direction },
+          { opacity: 1, yPercent: 0, duration: 0.6, ease: "osmo", stagger: 0.05 },
+          "<+=0.15",
+        );
+    };
+
+    const goTo = (index: number) => {
+      if (index === active || index < 0 || index >= steps.length) return;
+      playing?.progress(1).kill();
+      const from = steps[active];
+      const direction = index > active ? 1 : -1;
+      active = index;
+      furthest = Math.max(furthest, index);
+      updateAnswers();
+      updateStatus(reduce() ? null : from);
+      focusStep(steps[index]);
+      playing = reduce() ? null : transition(from, steps[index], direction);
+    };
+
+    /* A step lets you through only once its fields are valid; one that
+       isn't shakes and says why. */
+    const validate = (step: Element) => {
+      const invalid = firstInvalid(step);
+      if (!invalid) return true;
+      invalid.setAttribute("aria-invalid", "true");
+      invalid.reportValidity();
+      if (!reduce()) {
+        gsap.fromTo(
+          invalid.closest("[data-step-form-reveal]") ?? invalid,
+          { xPercent: 0 },
+          { keyframes: { xPercent: [-2, 2, -1, 1, 0] }, duration: 0.4, ease: "none" },
+        );
+      }
+      return false;
+    };
+    const advanceTo = (index: number) => {
+      if (!validate(steps[active])) return;
+      const invalidAt = steps.findIndex((step, i) => i < index && firstInvalid(step));
+      goTo(invalidAt === -1 ? index : invalidAt);
+    };
+    const next = () => advanceTo(Math.max(furthest, active + 1));
+
+    root.querySelectorAll("[data-step-form-next]").forEach((button) =>
+      button.addEventListener("click", next, { signal }),
+    );
+    root.querySelectorAll("[data-step-form-prev]").forEach((button) =>
+      button.addEventListener("click", () => goTo(active - 1), { signal }),
+    );
+    lines.forEach(({ button, index }) =>
+      button?.addEventListener(
+        "click",
+        () => (index > active ? advanceTo(index) : goTo(index)),
+        { signal },
+      ),
+    );
+    root.addEventListener(
+      "input",
+      () =>
+        fieldsOf(steps[active])
+          .filter((field) => field.hasAttribute("aria-invalid") && isValid(field))
+          .forEach((field) => field.removeAttribute("aria-invalid")),
+      { signal },
+    );
+    root.addEventListener("change", updateLines, { signal });
+    document.addEventListener(
+      "focusin",
+      (event) => (inUse = root.contains(event.target as Node)),
+      { signal },
+    );
+
+    /* Enter moves on; a choice's letter picks it. */
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        const target = event.target as HTMLElement;
+        const step = steps[active];
+        const last = active === steps.length - 1;
+        const clickedAway = inUse && target === document.body && step.checkVisibility();
+        if (!root.contains(target) && !clickedAway) return;
+
+        if (event.key === "Enter") {
+          if (last && step.contains(target)) return;
+          if (target.tagName === "TEXTAREA" && !event.metaKey && !event.ctrlKey) return;
+          event.stopPropagation();
+          if (target.closest("button")) return;
+          event.preventDefault();
+          if (last && clickedAway) buttonOf(step)?.click();
+          else next();
+          return;
+        }
+
+        const typing = target.matches(
+          "input:not([type='radio']):not([type='checkbox']), textarea, select",
+        );
+        if (typing || event.metaKey || event.ctrlKey || event.altKey || event.key.length !== 1) return;
+        const key = [...step.querySelectorAll("[data-step-form-key]")].find(
+          (element) => element.textContent?.trim().toLowerCase() === event.key.toLowerCase(),
+        );
+        const input = key?.closest("label")?.querySelector("input");
+        if (!input) return;
+        event.preventDefault();
+        input.click();
+        input.focus({ preventScroll: true });
+      },
+      { capture: true, signal },
+    );
+
+    /* Sending with an earlier step no longer valid goes back to it. */
+    form.addEventListener(
+      "submit",
+      (event) => {
+        const invalidAt = steps.findIndex((step) => firstInvalid(step));
+        if (invalidAt === -1) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        goTo(invalidAt);
+        validate(steps[invalidAt]);
+      },
+      { capture: true, signal },
+    );
+    /* After sending, the form starts over. */
+    form.addEventListener(
+      "reset",
+      () =>
+        requestAnimationFrame(() => {
+          playing?.progress(1).kill();
+          active = 0;
+          furthest = 0;
+          updateAnswers();
+          updateStatus();
+        }),
+      { signal },
+    );
+
+    totalCounts.forEach((count) => (count.textContent = pad(steps.length)));
+    updateAnswers();
+    updateStatus();
+
+    return () => {
+      playing?.progress(1).kill();
+      lines.forEach(({ element }) => element.remove());
+      if (blueprint) root.querySelector(".step-form_list")?.prepend(blueprint);
+      steps.forEach((step) => {
+        step.inert = false;
+        delete step.dataset.stepFormStatus;
+      });
+    };
+  }
+
+  onPage(() => {
+    const roots = document.querySelectorAll<HTMLElement>("[data-step-form]");
+    if (roots.length === 0) return;
+    const listeners = new AbortController();
+    const cleanups = [...roots].map((root, i) => setUp(root, i, listeners.signal));
+    return () => {
+      listeners.abort();
+      cleanups.forEach((cleanup) => cleanup());
+    };
+  });
+</script>
+
+<style is:global>
+  @layer components {
+    .step-form_form {
+      width: 100%;
+      text-align: start;
+    }
+
+    .step-form_layout {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-8);
+      @media (width < 48rem) {
+        flex-direction: column;
+        gap: var(--space-7);
+      }
+    }
+
+    /* The steps share one cell, so the stage keeps the tallest's height and
+       nothing jumps as they change. */
+    .step-form_stage {
+      display: grid;
+      flex: 1;
+      min-width: 0;
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .step-form_step {
+      grid-area: 1 / 1;
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-6);
+      &[data-step-form-status="inactive"] {
+        visibility: hidden;
+      }
+    }
+
+    .step-form_question {
+      max-width: 18em;
+      margin: 0;
+      color: var(--text);
+      font-family: var(--primary-family);
+      font-size: clamp(1.5rem, 1.2rem + 1vw, 2rem);
+      font-weight: var(--primary-medium);
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      text-wrap: balance;
+    }
+
+    /* A text answer: a hairline box, the arrow a green square inside it. */
+    .step-form_field {
+      display: flex;
+      width: 100%;
+      max-width: 30rem;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.375rem;
+      border: var(--border-width) solid var(--stroke);
+      background-color: color-mix(in srgb, var(--text) 3%, transparent);
+      transition: border-color var(--hover-duration) var(--hover-ease);
+      &:has(.step-form_input:focus-visible) {
+        border-color: var(--brand-500);
+      }
+      &:has(.step-form_input[aria-invalid="true"]) {
+        border-color: #e5484d;
+      }
+    }
+
+    .step-form_input {
+      width: 100%;
+      min-width: 0;
+      height: auto;
+      margin: 0;
+      padding: 0.5rem 0.625rem;
+      border: 0;
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: 1.125rem;
+      line-height: 1.3;
+      outline: none;
+      appearance: none;
+      &::placeholder {
+        color: color-mix(in srgb, var(--text) 40%, transparent);
+        opacity: 1;
+      }
+      &:autofill {
+        box-shadow: inset 0 0 0 10rem var(--dark-950);
+        -webkit-text-fill-color: var(--text);
+      }
+    }
+
+    .step-form_arrow {
+      display: flex;
+      width: 2.75rem;
+      height: 2.75rem;
+      flex: none;
+      justify-content: center;
+      align-items: center;
+      padding: 0;
+      border: 0;
+      background-color: var(--brand-500);
+      color: var(--dark-950);
+      cursor: pointer;
+      transition: background-color var(--hover-duration) var(--hover-ease);
+      & svg {
+        width: 1.125rem;
+        height: 1.125rem;
+      }
+      @media (hover: hover) {
+        &:hover {
+          background-color: var(--brand-300);
+        }
+      }
+      &:focus-visible {
+        outline: var(--focus-width) solid var(--brand-300);
+        outline-offset: 0.125rem;
+      }
+    }
+
+    /* Choices: square hairline boxes, a letter in a green square; picked,
+       the green spreads from the letter to fill the box. */
+    .step-form_choices {
+      display: flex;
+      width: 100%;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      &:has([aria-invalid="true"]) .step-form_choice {
+        border-color: #e5484d;
+      }
+    }
+
+    .step-form_choice {
+      --_key: 1.75rem;
+      --_inset: 0.375rem;
+      position: relative;
+      display: flex;
+      overflow: hidden;
+      align-items: center;
+      gap: 0.625rem;
+      margin: 0;
+      padding: var(--_inset) 0.875rem var(--_inset) var(--_inset);
+      border: var(--border-width) solid var(--stroke);
+      color: var(--text);
+      font-size: 1rem;
+      line-height: 1.3;
+      cursor: pointer;
+      transition:
+        color 0.35s ease,
+        border-color var(--hover-duration) var(--hover-ease);
+      &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-color: var(--brand-500);
+        clip-path: inset(
+          var(--_inset) calc(100% - var(--_inset) - var(--_key)) var(--_inset)
+            var(--_inset)
+        );
+        transition: clip-path 0.5s cubic-bezier(0.625, 0.05, 0, 1);
+      }
+      @media (hover: hover) {
+        &:hover {
+          border-color: color-mix(in lab, var(--text) 40%, transparent);
+        }
+      }
+      &:has(.step-form_choice-input:checked) {
+        color: var(--dark-950);
+        border-color: var(--brand-500);
+        &::before {
+          clip-path: inset(0);
+        }
+      }
+      &:has(.step-form_choice-input:focus-visible) {
+        outline: var(--focus-width) solid var(--brand-300);
+        outline-offset: 0.125rem;
+      }
+    }
+
+    .step-form_choice-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      opacity: 0;
+      appearance: none;
+      cursor: pointer;
+    }
+
+    .step-form_key {
+      position: relative;
+      display: flex;
+      width: var(--_key);
+      height: var(--_key);
+      flex: none;
+      justify-content: center;
+      align-items: center;
+      color: var(--dark-950);
+      font-family: var(--mono-family);
+      font-size: 0.75rem;
+      line-height: 1;
+    }
+
+    .step-form_choice-label {
+      position: relative;
+    }
+
+    .step-form_actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    /* Back is outlined like the nav links. */
+    .step-form_actions .step-form_back.button_wrap {
+      --button-background: transparent;
+      --button-background-hover: transparent;
+      --button-background-pressed: transparent;
+      --button-border: var(--stroke);
+      --button-border-hover: color-mix(in lab, var(--text) 40%, transparent);
+      --button-text: var(--text);
+      --button-text-hover: var(--text);
+    }
+
+    /* The receipt: a dark slip with hairline rules and a torn foot. */
+    .step-form_receipt {
+      position: relative;
+      display: flex;
+      width: 17.5rem;
+      flex: none;
+      flex-direction: column;
+      gap: var(--space-4);
+      padding: var(--space-5) var(--space-5) var(--space-6);
+      background-color: var(--dark-900);
+      border: var(--border-width) solid var(--stroke);
+      border-bottom: 0;
+      color: var(--text);
+      font-family: var(--mono-family);
+      @media (width < 48rem) {
+        width: 100%;
+      }
+      &::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: calc(var(--border-width) * -1);
+        right: calc(var(--border-width) * -1);
+        height: 0.5rem;
+        background-image:
+          linear-gradient(135deg, var(--dark-900) 25%, transparent 25%),
+          linear-gradient(225deg, var(--dark-900) 25%, transparent 25%);
+        background-size: 1rem 1rem;
+        background-repeat: repeat-x;
+      }
+    }
+
+    .step-form_receipt-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: var(--space-3);
+      padding-bottom: var(--space-4);
+      border-bottom: var(--border-width) dashed var(--stroke);
+    }
+
+    .step-form_receipt-label {
+      margin: 0;
+      color: color-mix(in srgb, var(--text) 60%, transparent);
+      font-size: 0.6875rem;
+      letter-spacing: 0.05em;
+      line-height: 1.3;
+      text-transform: uppercase;
+    }
+
+    .step-form_list {
+      display: flex;
+      flex-direction: column;
+      margin: 0 -0.5rem;
+      padding: 0;
+      list-style: none;
+    }
+
+    .step-form_line-button {
+      display: flex;
+      width: 100%;
+      align-items: baseline;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      font-size: 0.75rem;
+      line-height: 1.3;
+      text-align: left;
+      cursor: pointer;
+      transition:
+        background-color 0.2s ease,
+        opacity 0.2s ease;
+      @media (hover: hover) {
+        &:hover {
+          background-color: color-mix(in srgb, var(--text) 6%, transparent);
+        }
+      }
+      &:focus-visible {
+        outline: var(--border-width) solid var(--brand-500);
+        outline-offset: calc(var(--border-width) * -1);
+      }
+      &:disabled {
+        background-color: transparent;
+        opacity: 0.35;
+        cursor: default;
+      }
+      [data-step-form-line-status="current"] & {
+        background-color: color-mix(in srgb, var(--text) 8%, transparent);
+      }
+    }
+
+    .step-form_line-label {
+      flex: none;
+      text-transform: uppercase;
+    }
+
+    .step-form_line-dots {
+      min-width: 1rem;
+      flex: 1;
+      border-bottom: var(--border-width) dotted
+        color-mix(in srgb, var(--text) 35%, transparent);
+    }
+
+    .step-form_line-value {
+      max-width: 65%;
+      min-width: 0;
+      flex: 0 1 auto;
+      overflow-wrap: anywhere;
+      text-align: right;
+      [data-step-form-line-status="answered"] & {
+        color: var(--brand-500);
+      }
+      [data-step-form-line-status="empty"] & {
+        opacity: 0.4;
+      }
+    }
+
+    .step-form_receipt-foot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-3);
+      padding-top: var(--space-5);
+      border-top: var(--border-width) dashed var(--stroke);
+    }
+
+    .step-form_barcode {
+      width: 100%;
+      height: 2.25rem;
+      background-image: repeating-linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--text) 80%, transparent) 0 2px,
+        transparent 2px 4px,
+        color-mix(in srgb, var(--text) 80%, transparent) 4px 5px,
+        transparent 5px 7px,
+        color-mix(in srgb, var(--text) 80%, transparent) 7px 10px,
+        transparent 10px 11px,
+        color-mix(in srgb, var(--text) 80%, transparent) 11px 12px,
+        transparent 12px 15px
+      );
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .step-form_choice::before {
+        transition: none;
+      }
+    }
+  }
+</style>
