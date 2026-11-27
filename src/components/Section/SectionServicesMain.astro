@@ -183,15 +183,12 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
   import { gsap, ScrollTrigger } from "@/utils/gsap.ts";
   import { onPage } from "@/utils/lifecycle.ts";
   import { dissolveCards } from "@/utils/dissolve.ts";
-  import { addScrollLimit, jumpTo, scrollingByHand } from "@/utils/scroll-limits.ts";
+  import { createLines, type Lines } from "@/utils/lines.ts";
 
   const CARD = ".services-main_card";
-  /* Seconds a card takes to drop and dissolve once it has started. */
-  const STEP_TIME = 1.1;
-  /* How far into a card's stretch of scroll (as a share of it) it starts
-     to go, and how far back past that it returns. */
-  const LEAD = 0.15;
-  const BACK = 0.1;
+  /* Seconds the deck takes to catch up with the scroll: small, so it
+     follows the page as closely as the rest of it does. */
+  const SCRUB = 0.3;
   /* How far each step back leans toward the cursor (at half a screen from
      the front card's centre, or more), in px, and how quickly it follows. */
   const LEAN = { x: 8, y: 5, time: 0.6 };
@@ -433,8 +430,67 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
         const order = [...cards].sort((a, b) => posOf(a) - posOf(b));
         const covers = order.map((card) => card.querySelector(".services-main_cover"));
         let front = 0;
+        /* A card's content comes in when it reaches the front: its name,
+           labels and text with the page's line reveal, its outcome tags
+           rising and fading in one after another. Each card keeps its own
+           reveal, so one coming forward again plays it afresh. */
+        const reveals = new Map<HTMLElement, { lines: Lines[]; tags: HTMLElement[] }>();
+        const textsOf = (card: HTMLElement) => [
+          ...card.querySelectorAll<HTMLElement>(
+            ".services-main_body :is(.heading, p.text)",
+          ),
+        ];
+        const tagsOf = (card: HTMLElement) => [
+          ...card.querySelectorAll<HTMLElement>(".services-main_outcome"),
+        ];
+        const conceal = (card: HTMLElement | undefined) => {
+          if (!card) return;
+          reveals.get(card)?.lines.forEach((lines) => lines.revert());
+          const tags = tagsOf(card);
+          gsap.killTweensOf(tags);
+          gsap.set(tags, { y: "0.75rem", autoAlpha: 0 });
+          reveals.set(card, { lines: textsOf(card).map(createLines), tags });
+        };
+        /* Plays a hidden card's content in; one already showing is left as
+           it is, so nothing flickers. */
+        const reveal = (card: HTMLElement | undefined, delay = 0) => {
+          if (!card) return;
+          const found = reveals.get(card);
+          if (!found) return;
+          found.lines.forEach((lines, i) => lines.play(delay + i * 0.08));
+          gsap.to(found.tags, {
+            y: 0,
+            autoAlpha: 1,
+            duration: 0.8,
+            ease: "power3.out",
+            stagger: 0.08,
+            delay: delay + 0.3,
+            clearProps: "transform,opacity,visibility",
+          });
+          reveals.delete(card);
+        };
+        /* Going back, a card simply shows what it holds. */
+        const uncover = (card: HTMLElement | undefined) => {
+          if (!card) return;
+          const found = reveals.get(card);
+          if (!found) return;
+          found.lines.forEach((lines) => lines.revert());
+          gsap.killTweensOf(found.tags);
+          gsap.set(found.tags, { clearProps: "transform,opacity,visibility" });
+          reveals.delete(card);
+        };
         const show = (index: number) => {
           if (index === front) return;
+          if (index > front) {
+            /* Forward: the card's content has waited hidden behind the one
+               in front, and comes in as that one goes. */
+            reveal(order[index], 0.05);
+          } else {
+            /* Back: the card returning shows what it holds; the one going
+               behind hides its content again, ready to come in afresh. */
+            uncover(order[index]);
+            conceal(order[front]);
+          }
           front = index;
           leanBack();
           const active = document.activeElement;
@@ -462,9 +518,8 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           if (cover instanceof HTMLElement) cover.style.willChange = "opacity";
         });
 
-        /* One unit of time per card. The scroll doesn't scrub it: it only
-           says how many cards should be gone, and each change then plays out
-           in full at its own pace, so a card can't be left half dissolved. */
+        /* One unit of time per card, scrubbed by the scroll: each card
+           drops and dissolves as the page moves, and stops where it stops. */
         const timeline = gsap.timeline({
           paused: true,
           defaults: { ease: "power2.inOut", duration: 1 },
@@ -495,73 +550,13 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
               );
           }
         }
-        /* Scroll a little into a card's stretch and it goes; scroll back a
-           little past where it went and it returns. The gap between the two
-           keeps a card from flicking back and forth at one spot. */
-        const steps = total - 1;
-        let gone = 0;
-        let playing: gsap.core.Tween | null = null;
-        const goTo = (count: number, instant: boolean) => {
-          if (count === gone && !instant) return;
-          gone = count;
-          playing?.kill();
-          if (instant) {
-            timeline.time(count);
-            return;
-          }
-          const distance = Math.abs(timeline.time() - count);
-          playing = timeline.tweenTo(count, {
-            duration: STEP_TIME * distance,
-            ease: distance > 1 ? "none" : "power1.inOut",
-          });
-        };
-        const judge = (progress: number, instant = false) => {
-          /* The last card holds a moment (the extra 0.3) before the page
-             moves on. */
-          const at = progress * (steps + 0.3);
-          let count = gone;
-          /* Card k (1-based) goes at (k - 1) + LEAD into the scroll and
-             comes back below (k - 1) + LEAD - BACK. */
-          while (count < steps && at >= count + LEAD) count++;
-          while (count > 0 && at < count - 1 + LEAD - BACK) count--;
-          goTo(count, instant);
-        };
+        /* Every card's content starts hidden; each comes in when its card
+           reaches the front, so none shows through the one in front. */
+        order.forEach(conceal);
 
-        /* No skipping by hand: while a card is on its way, the reader's
-           scrolling stops short of the point that would start the next one
-           (or, at either end, of leaving the deck), and from rest it can
-           reach only one card further. Once a card has played, the next bit
-           of scroll starts the next. */
-        let trigger: ScrollTrigger | null = null;
-        const limit = (): { min: number; max: number } | null => {
-          const t = trigger;
-          if (!t) return null;
-          const length = steps + 0.3;
-          const px = (at: number) => t.start + (at / length) * (t.end - t.start);
-          const time = timeline.time();
-          const moving = Math.abs(time - gone) > 0.001;
-          let min = -Infinity;
-          let max = Infinity;
-          if (moving && time < gone) {
-            max = gone < steps ? px(gone + LEAD) - 2 : t.end - 2;
-          } else if (moving) {
-            min = gone > 0 ? px(gone - 1 + LEAD - BACK) + 2 : t.start + 2;
-          } else {
-            if (gone < steps) max = Math.min(px(gone + 1 + LEAD) - 2, t.end - 2);
-            if (gone > 0) min = gone >= 2 ? px(gone - 2 + LEAD - BACK) + 2 : t.start + 2;
-          }
-          return { min, max };
-        };
-        const unlimit = addScrollLimit(limit);
-        /* Keys, touch and the scrollbar scroll natively; put the page back
-           if they went past the limit. */
-        const hold = (scroll: number) => {
-          if (!scrollingByHand()) return;
-          const r = limit();
-          if (!r) return;
-          if (scroll > r.max) jumpTo(r.max);
-          else if (scroll < r.min) jumpTo(r.min);
-        };
+        /* The last card holds a moment before the page moves on. */
+        timeline.to({}, { duration: 0.3 });
+        const steps = total - 1;
 
         /* On a screen too short for all of it, the deck shrinks (`--_fit`,
            with `--_fit-cut` taking back the space it no longer fills), so the
@@ -588,9 +583,7 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
         fit();
         ScrollTrigger.addEventListener("refreshInit", fit);
 
-        /* Set after the first refresh has put the deck where the page is. */
-        let placed = false;
-        trigger = ScrollTrigger.create({
+        const trigger = ScrollTrigger.create({
           trigger: title,
           start: () => `top ${holdAt(title, deck).top}`,
           /* A screen of scroll per card. */
@@ -599,17 +592,18 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           /* Off by default inside a flex parent like <main>. */
           pinSpacing: true,
           invalidateOnRefresh: true,
-          onUpdate: (self) => {
-            hold(self.scroll());
-            judge(self.progress);
-          },
-          /* Arriving mid-way (a reload, a jump link): no replay of the cards
-             before; they're simply gone already. Later refreshes (a resize)
-             leave a card that's on its way alone. */
-          onRefresh: (self) => {
-            judge(self.progress, !placed);
-            placed = true;
-          },
+          animation: timeline,
+          scrub: SCRUB,
+          /* Arriving from below (a reload further down, say), the front
+             card's content comes in as the deck is held again. */
+          onEnterBack: () => reveal(order[front], 0.1),
+        });
+        /* The first card's content starts coming in as soon as the card's
+           top is in view, before the deck is held. */
+        const arrival = ScrollTrigger.create({
+          trigger: deck,
+          start: "top 70%",
+          onEnter: () => reveal(order[front]),
         });
 
         scrolled = { trigger, order, length: steps + 0.3 };
@@ -621,9 +615,9 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
           deck.style.removeProperty("--_fit-cut");
           section.style.removeProperty("--_hold-gap");
           section.style.removeProperty("--_hold-space");
-          unlimit();
-          playing?.kill();
-          trigger?.kill();
+          trigger.kill();
+          arrival.kill();
+          order.forEach(uncover);
           timeline.kill();
           undissolve();
           scrolled = null;
@@ -923,11 +917,12 @@ const { render = true, label, heading, stats = [], services = [] } = Astro.props
     /* Square hairline tags on a soft light grey, as on the chart and the
        work cards. */
     .services-main_outcome {
-      padding: 0.5em 0.65em;
+      padding: 0.4em 0.55em;
       background-color: color-mix(in srgb, var(--text) 5%, var(--background));
       border: var(--border-width) solid
         color-mix(in srgb, var(--text) 18%, transparent);
       color: color-mix(in srgb, var(--text) 75%, transparent);
+      font-size: 0.6875rem;
       letter-spacing: 0.02em;
       line-height: 1.2;
     }

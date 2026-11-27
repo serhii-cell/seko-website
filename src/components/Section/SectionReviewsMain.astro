@@ -3,9 +3,7 @@ import type { HTMLAttributes, SvgComponent } from "astro/types";
 import Section from "@/components/Wrapper/Section.astro";
 import Heading from "@/components/Typography/Heading.astro";
 import Paragraph from "@/components/Typography/Paragraph.astro";
-import Icon from "@/components/Media/Icon.astro";
-import ArrowBack from "@/assets/home/reviews/icon-arrow-back.svg";
-import ArrowForward from "@/assets/home/reviews/icon-arrow-forward.svg";
+import Button from "@/components/Button.astro";
 
 type Review = {
   /** The client's name, listed in the selector. */
@@ -83,28 +81,29 @@ const uid = Math.random().toString(36).slice(2, 8);
               <span class="reviews-main_name" data-lines>
                 {review.client}
               </span>
-              <span class="reviews-main_dot" aria-hidden="true" />
             </button>
           ))}
         </div>
 
         <div class="reviews-main_arrows" data-fade>
-          <button
-            type="button"
-            class="reviews-main_arrow is-previous"
+          <Button
+            emphasis="secondary"
+            size="medium"
+            class="reviews-main_step"
             aria-label="Previous client story"
             data-reviews-step="-1"
           >
-            <Icon src={ArrowBack} class="reviews-main_icon" />
-          </button>
-          <button
-            type="button"
-            class="reviews-main_arrow is-next"
+            ← Prev
+          </Button>
+          <Button
+            emphasis="secondary"
+            size="medium"
+            class="reviews-main_step"
             aria-label="Next client story"
             data-reviews-step="1"
           >
-            <Icon src={ArrowForward} class="reviews-main_icon" />
-          </button>
+            Next →
+          </Button>
         </div>
 
         <p class="sr-only" aria-live="polite" data-reviews-status />
@@ -129,7 +128,6 @@ const uid = Math.random().toString(36).slice(2, 8);
                       class="reviews-main_logo"
                       role="img"
                       aria-label={review.client}
-                      data-fade
                     />
                   )}
                   <Paragraph variant="label" class="reviews-main_tagline">
@@ -169,9 +167,9 @@ const uid = Math.random().toString(36).slice(2, 8);
   /* Osmo's Line Reveal Testimonials: the story going out slides up out of
      its line masks as its logo wipes away; the one coming in rises line by
      line into place as its logo wipes in. */
-  const HIDDEN = "inset(0% 100% 0% 0%)";
-  const GONE = "inset(0% 0% 0% 100%)";
-  const SHOWN = "inset(0% 0% 0% 0%)";
+  /* Softer than Osmo's: lines travel a little less and fade as they go,
+     and the logos cross-fade. */
+  const RISE = 60;
 
   onPage(() => {
     const controller = new AbortController();
@@ -214,12 +212,15 @@ const uid = Math.random().toString(36).slice(2, 8);
                 linesClass: "reviews-main_line",
                 autoSplit: true,
                 onSplit(self) {
-                  gsap.set(self.lines, { yPercent: i === current ? 0 : 110 });
+                  gsap.set(self.lines, {
+                    yPercent: i === current ? 0 : RISE,
+                    opacity: i === current ? 1 : 0,
+                  });
                 },
               }),
             );
             const logo = panel.querySelector<SVGElement>(".reviews-main_logo");
-            if (logo) gsap.set(logo, { clipPath: i === current ? SHOWN : HIDDEN });
+            if (logo && i !== current) gsap.set(logo, { opacity: 0 });
             panel.inert = i !== current;
             return {
               panel,
@@ -236,7 +237,7 @@ const uid = Math.random().toString(36).slice(2, 8);
           slides.forEach(({ panel, logo, splits }) => {
             panel.inert = false;
             splits.forEach((split) => split.revert());
-            if (logo) gsap.set(logo, { clearProps: "clipPath" });
+            if (logo) gsap.set(logo, { clearProps: "opacity" });
           });
         });
       }
@@ -248,24 +249,40 @@ const uid = Math.random().toString(36).slice(2, 8);
         const into = slides[to];
         out.panel.inert = true;
         into.panel.inert = false;
-        gsap.set(into.lines(), { yPercent: 110 });
-        if (into.logo) gsap.set(into.logo, { clipPath: HIDDEN });
+        gsap.set(into.lines(), { yPercent: RISE, opacity: 0 });
+        if (into.logo) gsap.set(into.logo, { opacity: 0 });
         timeline = gsap
           .timeline()
           .to(
             out.lines(),
-            { yPercent: -110, duration: 0.6, ease: "power4.inOut", stagger: { amount: 0.25 } },
+            {
+              yPercent: -RISE,
+              opacity: 0,
+              duration: 0.5,
+              ease: "power2.in",
+              stagger: { amount: 0.2 },
+            },
             0,
           );
         if (out.logo)
-          timeline.to(out.logo, { clipPath: GONE, duration: 0.6, ease: "power4.inOut" }, 0);
+          timeline.to(out.logo, { opacity: 0, duration: 0.4, ease: "power1.out" }, 0);
         timeline.to(
           into.lines(),
-          { yPercent: 0, duration: 0.7, ease: "power4.inOut", stagger: { amount: 0.4 } },
-          ">-=0.3",
+          {
+            yPercent: 0,
+            opacity: 1,
+            duration: 0.9,
+            ease: "power3.out",
+            stagger: { amount: 0.35 },
+          },
+          0.4,
         );
         if (into.logo)
-          timeline.to(into.logo, { clipPath: SHOWN, duration: 0.75, ease: "power4.inOut" }, "<");
+          timeline.to(
+            into.logo,
+            { opacity: 0.4, duration: 0.7, ease: "power1.out", clearProps: "opacity" },
+            0.55,
+          );
       };
 
       const show = (next: number, focus = false, announce = false) => {
@@ -332,13 +349,7 @@ const uid = Math.random().toString(36).slice(2, 8);
     .reviews-main_wrap {
       --_label-trim: 0.27rem;
       --_fade: var(--hover-duration);
-      --_arrow: 7.5rem;
-      --_arrow-inset: var(--space-4);
       --_muted: color-mix(in lab, currentcolor 40%, transparent);
-      @media (width < 48rem) {
-        --_arrow: 4.5rem;
-        --_arrow-inset: var(--space-3);
-      }
       & :is(.heading, .text) {
         margin: 0;
       }
@@ -420,67 +431,26 @@ const uid = Math.random().toString(36).slice(2, 8);
       }
       &.is-active {
         color: var(--brand-500);
-        /* The dot's halo reaches 4px past the button; room for it while
-           focused, so the outline clears the ring. At rest the button keeps
-           Figma's width (label + 24 + 6). */
-        &:focus-visible {
-          padding-right: 0.25rem;
-        }
       }
     }
-    .reviews-main_dot {
-      display: none;
-      width: 0.375rem;
-      height: 0.375rem;
-      border-radius: 50%;
-      background-color: var(--brand-500);
-      box-shadow: 0 0 0 0.25rem
-        color-mix(in lab, var(--brand-500) 20%, transparent);
-      .reviews-main_client.is-active & {
-        display: block;
-      }
-    }
-
+    /* Prev and Next: the site's outline buttons, letters flipping on
+       hover. They wrap round, so neither is ever disabled. */
     .reviews-main_arrows {
       grid-area: arrows;
       align-self: start;
       display: flex;
+      gap: var(--space-3);
     }
-    .reviews-main_arrow {
-      position: relative;
-      width: var(--_arrow);
-      height: var(--_arrow);
-      color: var(--brand-500);
-      border: var(--border-width) solid var(--stroke);
-      font-size: 1rem;
-      transition: background-color var(--hover-duration) var(--hover-ease);
-      &.is-previous {
-        border-right-width: 0;
-      }
-      @media (hover: hover) {
-        &:hover {
-          background-color: var(--background-2);
-        }
-      }
-      &:active {
-        background-color: color-mix(in srgb, var(--background-2), var(--text) 1%);
-      }
-      &:focus-visible {
-        outline: none;
-        box-shadow: inset 0 0 0 var(--focus-width) var(--brand-500);
-      }
-    }
-    /* Inset from the arrow's outer edge, so less its 1px border */
-    .reviews-main_icon {
-      --_inset: calc(var(--_arrow-inset) - var(--border-width));
-      position: absolute;
-      bottom: var(--_inset);
-      .reviews-main_arrow.is-previous & {
-        left: var(--_inset);
-      }
-      .reviews-main_arrow.is-next & {
-        right: var(--_inset);
-      }
+    /* Outlined like the nav links: a hairline in the stroke colour that
+       brightens on hover, no fill. */
+    .reviews-main_arrows .reviews-main_step.button_wrap {
+      --button-background: transparent;
+      --button-background-hover: transparent;
+      --button-background-pressed: transparent;
+      --button-border: var(--stroke);
+      --button-border-hover: color-mix(in lab, var(--text) 40%, transparent);
+      --button-text: var(--text);
+      --button-text-hover: var(--text);
     }
 
     /* Stories, stacked in one cell and cross-faded. Each is as tall as the

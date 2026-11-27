@@ -30,6 +30,11 @@ and CSS; this covers what changes once JavaScript is involved.
   and each cell leaves a character that drifts off, turns green and fades,
   shown only around the deck. It reads the card's `yPercent`, so it follows
   the scroll both ways. The Services deck uses it while it is held.
+- **Step form:** `StepForm` (from Osmo's Multi Step Form (Receipt)) asks one
+  question at a time inside the Form component: the question leaves and the
+  next rises in by its lines on the `osmo` ease, each answer prints onto a
+  receipt beside it, a receipt line jumps back to its step, letters pick
+  choices and Enter moves on. The service modals use it for booking a call.
 - CSS stays the first choice for hovers and simple state changes, on the
   `--hover-*` and `--open-*` tokens in `src/styles/base.css`. GSAP is for
   anything sequenced, scroll-driven or split into parts.
